@@ -71,15 +71,31 @@ function getPredominantColor(imageUrl) {
                     b += data[i + 2];
                     count++;
                 }
-                 resolve({
-                    color30: `rgba(${Math.floor(r/count)}, ${Math.floor(g/count)}, ${Math.floor(b/count)}, 0.3)`,
-                    color100: `rgb(${Math.floor(r/count)}, ${Math.floor(g/count)}, ${Math.floor(b/count)})`
+                r = Math.floor(r / count);
+                g = Math.floor(g / count);
+                b = Math.floor(b / count);
+
+                // Clareia a cor aproximando de branco
+                const lighten = (value, amount = 0.4) =>
+                    Math.min(255, Math.floor(value + (100 - value) * amount));
+
+                const lr = lighten(r);
+                const lg = lighten(g);
+                const lb = lighten(b);
+
+                resolve({
+                    color30: `rgba(${r}, ${g}, ${b}, 0.3)`,
+                    color100: `rgb(${r}, ${g}, ${b})`,
+                    colorLight: `rgb(${lr}, ${lg}, ${lb})`
                 });
-            } catch (e) { reject(e); }
+            } catch (e) {
+                reject(e);
+            }
         };
         img.onerror = reject;
     });
 }
+
 
 async function calculateColor(imageBuffer, imageMimeType) {
     let imageUrl;
@@ -525,10 +541,11 @@ export async function saveCharacterCard(cardForm) {
             imageMimeType: imageMimeType,
             backgroundMimeType: backgroundMimeType,
             inPlay: false,
+            activeBuffs: [], // Inicializa a propriedade de buffs
         };
     }
 
-    cardData.predominantColor = await calculateColor(cardData.backgroundImage, cardData.backgroundMimeType);
+    cardData.predominantColor = await calculateColor(cardData.image, cardData.imageMimeType);
 
     await saveData('rpgCards', cardData);
     

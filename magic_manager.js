@@ -66,15 +66,24 @@ async function calculateColor(imageBuffer, imageMimeType) {
 // --- Fim das Funções de Cálculo de Cor ---
 
 // Funções auxiliares para imagens
-function showImagePreview(element, url, isImageElement) {
+/**
+ * Shows or hides an image preview element.
+ * @param {HTMLImageElement|HTMLElement} element The image or div element for preview.
+ * @param {string|null} url The object URL of the image or null to hide.
+ * @param {boolean} isImageElement True if the element is an <img>, false if it's a div for background.
+ */
+export function showImagePreview(element, url, isImageElement) { // Added export
     if (url) {
         if (isImageElement) element.src = url;
         else element.style.backgroundImage = `url('${url}')`;
         element.classList.remove('hidden');
     } else {
+        if (isImageElement) element.src = ''; // Clear src for img tags
+        else element.style.backgroundImage = ''; // Clear background for divs
         element.classList.add('hidden');
     }
 }
+
 
 function readFileAsArrayBuffer(file) {
     return new Promise((resolve, reject) => {
@@ -220,7 +229,7 @@ export async function saveSpellCard(spellForm, type) {
             tipo: el.dataset.tipo
         });
     });
-    
+
     let existingData = null;
     if (currentEditingSpellId) {
         existingData = await getData('rpgSpells', currentEditingSpellId);
@@ -228,7 +237,7 @@ export async function saveSpellCard(spellForm, type) {
 
     const imageBuffer = spellImageFile ? await readFileAsArrayBuffer(spellImageFile) : (existingData ? existingData.image : null);
     const imageMimeType = spellImageFile ? spellImageFile.type : (existingData ? existingData.imageMimeType : null);
-    
+
     let spellData;
     if (currentEditingSpellId) {
         spellData = existingData;
@@ -298,7 +307,7 @@ export async function editSpell(spellId) {
     if (!spellData) return;
 
     currentEditingSpellId = spellId;
-    
+
     document.getElementById('spellName').value = spellData.name;
     document.getElementById('spellCircle').value = spellData.circle || '';
     document.getElementById('spellExecution').value = spellData.execution;
@@ -310,7 +319,7 @@ export async function editSpell(spellId) {
     document.getElementById('spellDescription').value = spellData.description;
     document.getElementById('spellEnhance').value = spellData.enhance;
     document.getElementById('spellTrue').value = spellData.true;
-    
+
     await populateCharacterSelect('spellCharacterOwner');
     document.getElementById('spellCharacterOwner').value = spellData.characterId || '';
 
@@ -386,7 +395,7 @@ export async function importSpell(file, type) {
                 if (importedSpell.image) {
                     importedSpell.image = base64ToArrayBuffer(importedSpell.image);
                 }
-                
+
                 importedSpell.predominantColor = await calculateColor(importedSpell.image, importedSpell.imageMimeType);
 
                 await saveData('rpgSpells', importedSpell);
@@ -403,7 +412,7 @@ export async function importSpell(file, type) {
 
 document.addEventListener('DOMContentLoaded', () => {
     populateSpellAumentosSelect();
-    
+
     document.addEventListener('periciasUpdated', populateSpellAumentosSelect);
 
     const addBtn = document.getElementById('add-spell-aumento-btn');
@@ -416,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const nome = select.options[select.selectedIndex].text;
             const valor = parseInt(valueInput.value, 10) || 0;
             const tipo = typeRadio.value;
-            
+
             if (!nome || valor === 0) {
                 alert("Por favor, selecione um tipo de aumento e insira um valor diferente de zero.");
                 return;

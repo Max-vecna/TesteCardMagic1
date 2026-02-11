@@ -21,6 +21,71 @@ function bufferToBlob(buffer, mimeType) {
     return new Blob([buffer], { type: mimeType });
 }
 
+/**
+ * Exporta o conteúdo de um grimório para um arquivo .txt
+ * @param {string} id - O ID do grimório.
+ */
+async function exportGrimoireToTxt(id) {
+    const grimoire = await getData('rpgGrimoires', id);
+    if (!grimoire) {
+        showCustomAlert("Erro ao exportar: Grimório não encontrado.");
+        return;
+    }
+
+    let content = "";
+    const separator = "==================================================\n";
+    const pageSeparator = "--------------------------------------------------\n";
+
+    // Cabeçalho
+    content += separator;
+    content += `TÍTULO: ${grimoire.title}\n`;
+    if (grimoire.vol) content += `VOLUME: ${grimoire.vol}\n`;
+    
+    // Tenta buscar o nome do dono se houver ID
+    if (grimoire.characterId) {
+        const character = await getData('rpgCards', grimoire.characterId);
+        const ownerName = character ? character.title : 'Desconhecido';
+        content += `PROPRIEDADE DE: ${ownerName}\n`;
+    }
+    
+    content += separator + "\n";
+
+    // Conteúdo das páginas
+    if (grimoire.entries && grimoire.entries.length > 0) {
+        grimoire.entries.forEach((entry, index) => {
+            content += `PÁGINA ${index + 1}: ${entry.subtitle || 'Sem Título'}\n`;
+            content += pageSeparator;
+            content += `${entry.content || '(Página em branco)'}\n`;
+            
+            if (entry.image) {
+                content += `\n[NOTA: Esta página contém uma imagem anexada no sistema]\n`;
+            }
+            content += "\n\n";
+        });
+    } else {
+        content += "(Este grimório não possui páginas escritas.)\n";
+    }
+
+    content += separator;
+    content += "Gerado por Farland RPG Manager";
+
+    // Cria o download
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // Nome do arquivo seguro
+    const safeTitle = (grimoire.title || 'grimorio').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const safeVol = (grimoire.vol || '').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    a.download = `${safeTitle}${safeVol ? `_${safeVol}` : ''}.txt`;
+    
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 
 /**
  * Função principal para renderizar a tela de gerenciamento de grimórios.
@@ -246,6 +311,9 @@ async function loadAndDisplayGrimoires() {
                         <button class="w-10 h-9 text-sm rounded-md bg-green-600 hover:bg-green-700 flex items-center justify-center" data-action="edit" data-id="${g.id}" title="Editar Volume">
                             <i class="fas fa-edit"></i>
                         </button>
+                        <button class="w-10 h-9 text-sm rounded-md bg-blue-600 hover:bg-blue-700 flex items-center justify-center" data-action="export-txt" data-id="${g.id}" title="Baixar como .txt">
+                            <i class="fas fa-file-alt"></i>
+                        </button>
                         <button class="w-10 h-9 text-sm rounded-md bg-red-700 hover:bg-red-800 flex items-center justify-center" data-action="delete" data-id="${g.id}" title="Excluir Volume">
                             <i class="fas fa-trash-alt"></i>
                         </button>
@@ -265,6 +333,16 @@ async function loadAndDisplayGrimoires() {
                             <p class="text-xs text-gray-400">${volumes.length} ${volumes.length === 1 ? 'volume' : 'volumes'}, ${totalPages} ${totalPages === 1 ? 'página' : 'páginas'} no total</p>
                         </div>
                     </div>
+                    <div class="mt-3 flex justify-end">
+                        <button 
+                            class="px-3 py-1 text-xs rounded-md bg-blue-700 hover:bg-blue-800"
+                            data-action="export-all"
+                            data-title="${title}"
+                            title="Baixar todos os volumes em um único .txt">
+                            Baixar Coleção Completa
+                        </button>
+                    </div>
+
                 </div>
                 <div class="bg-black/20 px-5 pb-4 pt-2">
                     <div class="flex flex-col gap-2">
@@ -294,6 +372,12 @@ async function loadAndDisplayGrimoires() {
                 }
             } else if (action === 'edit') {
                 await editGrimoireMetadata(id);
+            } else if (action === 'export-txt') {
+                await exportGrimoireToTxt(id);
+            }
+            else if (action === 'export-all') {
+                const title = button.dataset.title;
+                await exportAllVolumesByTitle(title);
             }
         });
     });
@@ -637,4 +721,71 @@ function clearEntryForm(container) {
     entryImageFile = null;
 }
 
+/**
+ * Exporta todos os volumes de um mesmo título em um único arquivo .txt
+ * @param {string} title - O título do grupo de grimórios.
+ */
+async function exportAllVolumesByTitle(title) {
+    const allGrimoires = await getData('rpgGrimoires') || [];
+    const grouped = allGrimoires.filter(g => g.title.trim() === title.trim());
 
+    if (grouped.length === 0) {
+        showCustomAlert("Nenhum volume encontrado para exportação.");
+        return;
+    }
+
+    let content = "";
+    const bigSeparator = "============================================================\n";
+    const separator = "------------------------------------------------------------\n";
+
+    content += bigSeparator;
+    content += `GRIMÓRIO COMPLETO: ${title}\n`;
+    content += `TOTAL DE VOLUMES: ${grouped.length}\n`;
+    content += bigSeparator + "\n\n";
+
+    for (const grimoire of grouped) {
+
+        content += bigSeparator;
+        content += `VOLUME: ${grimoire.vol || "Volume Único"}\n`;
+
+        if (grimoire.characterId) {
+            const character = await getData('rpgCards', grimoire.characterId);
+            const ownerName = character ? character.title : 'Desconhecido';
+            content += `PROPRIEDADE DE: ${ownerName}\n`;
+        }
+
+        content += bigSeparator + "\n";
+
+        if (grimoire.entries && grimoire.entries.length > 0) {
+            grimoire.entries.forEach((entry, index) => {
+                content += `PÁGINA ${index + 1}: ${entry.subtitle || 'Sem Título'}\n`;
+                content += separator;
+                content += `${entry.content || '(Página em branco)'}\n`;
+
+                if (entry.image) {
+                    content += "\n[NOTA: Esta página contém imagem no sistema]\n";
+                }
+
+                content += "\n\n";
+            });
+        } else {
+            content += "(Este volume não possui páginas escritas.)\n\n";
+        }
+    }
+
+    content += bigSeparator;
+    content += "Gerado por Farland RPG Manager";
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    const safeTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    a.download = `${safeTitle}_colecao_completa.txt`;
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
