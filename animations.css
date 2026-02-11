@@ -1,0 +1,57 @@
+/* Animações para os Modais e Fichas */
+
+/* O contêiner do modal (fundo escuro) terá uma transição de fade e desfoque */
+#character-sheet-container, 
+#spell-sheet-container, 
+#item-sheet-container,
+#nested-sheet-container {
+    opacity: 0;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(0px);
+    backdrop-filter: blur(0px);
+    transition: opacity 0.3s ease, -webkit-backdrop-filter 0.3s ease, backdrop-filter 0.3s ease;
+}
+
+/* Estado visível do contêiner do modal */
+#character-sheet-container.visible, 
+#spell-sheet-container.visible, 
+#item-sheet-container.visible,
+#nested-sheet-container.visible {
+    opacity: 1;
+    pointer-events: auto;
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+}
+
+/* A ficha em si terá uma animação de escala e fade */
+#character-sheet-container > #character-sheet,
+#spell-sheet-container > #spell-sheet,
+#item-sheet-container > #item-sheet,
+#nested-sheet-container > #character-sheet {
+    opacity: 0;
+    transform: scale(0.95);
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.2s ease-in-out;
+}
+
+/* Estado visível da ficha */
+#character-sheet-container.visible > #character-sheet,
+#spell-sheet-container.visible > #spell-sheet,
+#item-sheet-container.visible > #item-sheet,
+#nested-sheet-container.visible > #character-sheet {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Animação de fade-in para a ficha "Em Jogo" */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.in-play-animation > div { /* O alvo é a ficha dentro do contêiner */
+    animation: fadeIn 0.6s ease-out forwards;
+}

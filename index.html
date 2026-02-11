@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Fichas RPG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="./animations.css">
+    <style>
+        /* Estilos para o formulário de sobreposição */
+        #creation-section, #character-sheet-container, #spell-creation-section, #spell-sheet-container, #item-sheet-container, #item-creation-section, #attack-creation-section, #attack-sheet-container, #nested-sheet-container, #grimoire-editor-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100; /* Z-index elevado para sobrepor a sidebar */
+        }
+
+        #creation-section.hidden, #character-sheet-container.hidden, #spell-creation-section.hidden, #spell-sheet-container.hidden, #item-sheet-container.hidden, #item-creation-section.hidden, #attack-creation-section.hidden, #attack-sheet-container.hidden, #nested-sheet-container.hidden, #grimoire-editor-container.hidden {
+            display: none;
+            pointer-events: none; /* Impede cliques quando oculto */
+        }
+
+        .form-container {
+            background-color: var(--form-bg);
+            max-height: 100%; /* Limita a altura para caber na tela */
+            overflow-y: auto; /* Adiciona rolagem se o formulário for muito grande */
+            padding: 2rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            height: 100%;
+        }
+
+    </style>
+</head>
+<body class="overflow-hidden dark"> <!-- Inicia com o tema escuro por padrão -->
+    <!-- Splash Screen -->
+    <div id="splash-screen" class="splash-screen fixed inset-0 flex items-center justify-center z-50">
+        <div class="flex flex-col items-center justify-center">
+            <i class="fas fa-dice-d20 text-8xl text-white animate-spin"></i>
+            <p class="mt-4 text-xl font-bold text-white tracking-widest animate-pulse">CARREGANDO...</p>
+        </div>
+    </div>
+    
+    <!-- New Desktop Sidebar -->
+    <aside id="desktop-sidebar" class="hidden md:flex flex-col fixed top-0 left-0 h-screen w-64 z-40 shadow-lg">
+        <div class="p-5 text-2xl font-bold border-b border-gray-700/50 flex items-center gap-3">
+            <i class="fas fa-dice-d20 text-indigo-400"></i>
+            <span>Farland 1.0</span>
+        </div>
+        <div class="flex flex-col gap-2 p-4 flex-grow">
+            <button class="desktop-nav-button" data-target="personagem-em-jogo" title="Personagem em Jogo">
+                <i class="fas fa-theater-masks"></i><span>Em Jogo</span>
+            </button>
+            <button class="desktop-nav-button" data-target="personagem" title="Personagens">
+                <i class="fas fa-users"></i><span>Personagens</span>
+            </button>
+            <button class="desktop-nav-button" data-target="ataques" title="Ataques">
+                <i class="fas fa-khanda"></i><span>Ataques</span>
+            </button>
+            <button class="desktop-nav-button" data-target="magias" title="Magias">
+                <i class="fas fa-magic"></i><span>Magias</span>
+            </button>
+            <button class="desktop-nav-button" data-target="habilidades" title="Habilidades">
+                <i class="fas fa-fist-raised"></i><span>Habilidades</span>
+            </button>
+            <button class="desktop-nav-button" data-target="itens" title="Itens">
+                <i class="fas fa-box"></i><span>Itens</span>
+            </button>
+             <button class="desktop-nav-button" data-target="categorias" title="Categorias">
+                <i class="fas fa-tags"></i><span>Categorias</span>
+            </button>
+            <button class="desktop-nav-button" data-target="grimorio" title="Grimório">
+                <i class="fas fa-book-open"></i><span>Grimório</span>
+            </button>
+        </div>
+        <div class="p-2 border-t border-gray-700/50 flex justify-around items-center">
+            <button id="dice-roller-fab" class="dice-roller-fab desktop-action-button" title="Rolar Dados">
+                <i class="fas fa-dice-d20 text-2xl"></i>
+            </button>
+            <button id="export-db-btn" class="desktop-action-button" title="Exportar Banco de Dados">
+                <i class="fas fa-file-download"></i>
+            </button>
+            <button id="import-db-btn" class="desktop-action-button" title="Importar Banco de Dados">
+                <i class="fas fa-file-upload"></i>
+            </button>
+            <button id="export-images-btn" class="desktop-action-button" title="Baixar Imagens">
+                <i class="fas fa-file-image"></i>
+            </button>
+            <button id="aspect-ratio-btn" class="desktop-action-button" title="Ajustar Tamanho dos Cards">
+                <i class="fas fa-expand-alt"></i>
+            </button>
+        </div>
+    </aside>
+
+     <!-- Sliding Actions Sidebar for Mobile -->
+    <div id="actions-sidebar" class="fixed top-1/2 -translate-y-1/2 z-50 flex items-center md:hidden">
+        <button id="sidebar-toggle" class="w-3 h-16 rounded-l-lg flex items-center justify-center shadow-lg">
+            <i class="fas fa-chevron-left"></i>
+        </button>   
+        <div id="sidebar-buttons" class="flex flex-col gap-3 p-2 rounded-l-lg shadow-lg">
+            <button id="export-db-btn-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Exportar Banco de Dados">
+                <i class="fas fa-file-download"></i>
+            </button>
+            <button id="import-db-btn-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Importar Banco de Dados">
+                <i class="fas fa-file-upload"></i>
+            </button>
+             <button id="export-images-btn-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Baixar Imagens">
+                <i class="fas fa-file-image"></i>
+            </button>
+        </div>
+             
+    </div>
+
+     <!-- Sliding Actions Sidebar for Mobile -->
+    <div id="actions-sidebar-1" class="fixed top-1/2 -translate-y-1/2 z-50 flex items-center md:hidden">
+        <div id="sidebar-buttons" class="flex flex-col gap-3 p-2 rounded-r-lg shadow-lg">
+            <button id="dice-roller-fab" class="dice-roller-fab sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Exportar Banco de Dados">
+               <i class="fas fa-dice-d20"></i>
+            </button>
+            <button id="aspect-ratio-btn-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Ajustar Tamanho dos Cards">
+                <i class="fas fa-expand-alt"></i>
+            </button>           
+
+            <!-- <button id="theme-switcher-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Alterar Tema">
+                <i class="fas fa-moon"></i>
+            </button> -->  
+            <hr>
+            <button  class=" sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Exportar Banco de Dados"  data-target="grimorio" title="Grimório">
+               <i class="fas fa-book-open"></i>
+            </button>
+            <button class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" data-target="categorias" title="Categorias">
+                <i class="fas fa-tags"></i>
+            </button>
+        </div>
+        <button id="sidebar-toggle-1" class="w-3 h-16 rounded-r-lg flex items-center justify-center shadow-lg">
+            <i class="fas fa-chevron-left"></i>
+        </button>        
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-content" class="main-content flex-grow w-full">
+        <main class="w-full h-full flex-grow rounded-2xl shadow-2xl flex flex-col items-center overflow-hidden" style="border-radius: 1rem;">
+            <div id="content-display" class="w-full h-full flex flex-col items-center overflow-y-auto">
+                <!-- Conteúdo dinâmico será injetado aqui pelo JavaScript -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Container da Ficha de Personagem -->
+    <div id="character-sheet-container" class="hidden"></div>
+    <!-- Container da Ficha de Magia/Habilidade -->
+    <div id="spell-sheet-container" class="hidden"></div>
+    <!-- Container da Ficha de Item -->
+    <div id="item-sheet-container" class="hidden"></div>
+    <!-- Container da Ficha de Ataque -->
+    <div id="attack-sheet-container" class="hidden"></div>
+    <!-- Contêiner para fichas aninhadas (ex: relacionamentos) -->
+    <div id="nested-sheet-container" class="hidden"></div>
+    <!-- Container do Editor de Grimório -->
+    <div id="grimoire-editor-container" class="hidden"></div>
+    
+    <!-- Formulário de Criação de Personagem -->
+    <div id="creation-section" class="hidden">
+        <div class="form-container">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="form-title" class="text-2xl font-bold text-indigo-300">Novo Cartão de Personagem</h2>
+                <button id="close-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+            </div>
+            <form id="cardForm" class="space-y-6">
+                <!-- ... (Conteúdo do formulário de personagem) ... -->
+                 <div>
+                    <label for="cardTitle" class="block text-sm font-semibold mb-1">Nome</label>
+                    <input type="text" id="cardTitle" placeholder="Ex: Guerreiro Lendário" required class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                </div>
+                <div>
+                    <label for="cardSubTitle" class="block text-sm font-semibold mb-1">Raça e Classe</label>
+                    <input type="text" id="cardSubTitle" placeholder="Ex: Humano Mago" required class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="cardLevel" class="block text-sm font-semibold mb-1">Nível</label>
+                        <input type="number" id="cardLevel" placeholder="1" required class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                    </div>
+                    <div>
+                        <label for="dinheiro" class="block text-sm font-semibold mb-1">Dinheiro</label>
+                        <input type="number" id="dinheiro" placeholder="0" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-indigo-300 mb-2">Imagem do Personagem</h3>
+                    <div class="mt-4 text-center">
+                        <label for="characterImageUpload" class="block text-sm font-semibold mb-1 cursor-pointer">Faça upload de uma imagem:</label>
+                        <input type="file" id="characterImageUpload" accept="image/*" class="file-upload-input">
+                        <img id="characterImagePreview" class="mt-4 mx-auto w-32 h-32 object-cover rounded-full border-4 border-gray-600 hidden" alt="Pré-visualização do Personagem">
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-indigo-300 mb-2">Imagem de Fundo</h3>
+                    <div class="mt-4 text-center">
+                        <label for="backgroundImageUpload" class="block text-sm font-semibold mb-1 cursor-pointer">Faça upload de uma imagem:</label>
+                        <input type="file" id="backgroundImageUpload" accept="image/*" class="file-upload-input">
+                        <div id="backgroundImagePreview" class="mt-4 mx-auto w-full h-48 rounded-lg border-4 border-gray-600 hidden bg-cover bg-center"></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <h3 class="col-span-2 text-xl font-bold text-indigo-300">Status de Combate</h3>
+                    <div><label for="vida" class="block text-sm font-semibold mb-1">Vida Máx. (PV)</label><input type="number" id="vida" placeholder="1" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                    <div><label for="mana" class="block text-sm font-semibold mb-1">Mana Máx. (PM)</label><input type="number" id="mana" placeholder="1" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                    <div><label for="vidaAtual" class="block text-sm font-semibold mb-1">Vida Atual</label><input type="number" id="vidaAtual" placeholder="1" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                    <div><label for="manaAtual" class="block text-sm font-semibold mb-1">Mana Atual</label><input type="number" id="manaAtual" placeholder="1" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                    <div><label for="armadura" class="block text-sm font-semibold mb-1">Armadura</label><input type="number" id="armadura" placeholder="0" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                    <div><label for="esquiva" class="block text-sm font-semibold mb-1">Esquiva</label><input type="number" id="esquiva" placeholder="0" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                    <div><label for="bloqueio" class="block text-sm font-semibold mb-1">Bloqueio</label><input type="number" id="bloqueio" placeholder="0" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                    <div><label for="deslocamento" class="block text-sm font-semibold mb-1">Deslocamento</label><input type="number" id="deslocamento" placeholder="0" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <h3 class="col-span-2 text-xl font-bold text-indigo-300">Atributos Principais</h3>
+                    <div><label for="agilidade" class="block text-sm font-semibold mb-1">Agilidade (AGI)</label><input type="number" id="agilidade" placeholder="1" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                    <div><label for="carisma" class="block text-sm font-semibold mb-1">Carisma (CAR)</label><input type="number" id="carisma" placeholder="1" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                    <div><label for="forca" class="block text-sm font-semibold mb-1">Força (FOR)</label><input type="number" id="forca" placeholder="1" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                    <div><label for="inteligencia" class="block text-sm font-semibold mb-1">Inteligência (INT)</label><input type="number" id="inteligencia" placeholder="1" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                    <div><label for="sabedoria" class="block text-sm font-semibold mb-1">Sabedoria (SAB)</label><input type="number" id="sabedoria" placeholder="1" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                    <div><label for="vigor" class="block text-sm font-semibold mb-1">Vigor (VIG)</label><input type="number" id="vigor" placeholder="1" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-indigo-300 mb-2">Detalhes do Personagem</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="historia" class="block text-sm font-semibold mb-1">História</label>
+                            <textarea id="historia" rows="4" placeholder="A jornada do personagem até agora..." class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></textarea>
+                        </div>
+                        <div>
+                            <label for="personalidade" class="block text-sm font-semibold mb-1">Personalidade</label>
+                            <textarea id="personalidade" rows="3" placeholder="Traços, manias, e como o personagem se comporta..." class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></textarea>
+                        </div>
+                        <div>
+                            <label for="motivacao" class="block text-sm font-semibold mb-1">Motivação</label>
+                            <textarea id="motivacao" rows="3" placeholder="O que impulsiona o personagem em sua aventura?" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-xl font-bold text-indigo-300">Perícias</h3>
+                        <button type="button" id="show-add-pericia-form-btn" class="text-indigo-400 hover:text-indigo-300 text-sm font-bold">+ Nova Perícia</button>
+                    </div>
+                    <div id="add-pericia-form" class="hidden bg-gray-900/50 p-4 rounded-lg mb-4 space-y-3 border border-gray-700">
+                        <h4 class="font-semibold text-indigo-200">Adicionar Nova Perícia</h4>
+                        <div>
+                            <label for="new-pericia-name" class="block text-xs font-semibold mb-1">Nome da Perícia</label>
+                            <input type="text" id="new-pericia-name" placeholder="Ex: Alquimia" class="w-full px-3 py-2 bg-gray-800 text-white rounded-lg border border-gray-600 text-sm">
+                        </div>
+                        <div>
+                            <label for="new-pericia-attribute" class="block text-xs font-semibold mb-1">Atributo Associado</label>
+                            <select id="new-pericia-attribute" class="w-full px-3 py-2 bg-gray-800 text-white rounded-lg border border-gray-600 text-sm">
+                                <option value="AGILIDADE">Agilidade</option>
+                                <option value="CARISMA">Carisma</option>
+                                <option value="FORÇA">Força</option>
+                                <option value="INTELIGÊNCIA">Inteligência</option>
+                                <option value="SABEDORIA">Sabedoria</option>
+                                <option value="VIGOR">Vigor</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="new-pericia-description" class="block text-xs font-semibold mb-1">Descrição (Opcional)</label>
+                            <input type="text" id="new-pericia-description" placeholder="Descrição da perícia" class="w-full px-3 py-2 bg-gray-800 text-white rounded-lg border border-gray-600 text-sm">
+                        </div>
+                        <div class="flex gap-2 pt-2">
+                            <button type="button" id="add-new-pericia-btn" class="w-full py-2 px-4 rounded-lg text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">Adicionar</button>
+                            <button type="button" id="cancel-add-pericia-btn" class="w-full py-2 px-4 rounded-lg text-sm font-bold text-gray-300 bg-gray-600 hover:bg-gray-500 transition-colors">Cancelar</button>
+                        </div>
+                    </div>
+                    <div id="pericias-checkboxes-container" class="space-y-2"></div>
+                    <div id="pericia-description-display" class="mt-4 p-4 rounded-lg bg-gray-700 hidden">
+                        <h4 id="periciaDescriptionTitle" class="font-bold text-indigo-300"></h4>
+                        <p id="periciaDescriptionText" class="text-sm text-gray-300 mt-2"></p>
+                    </div>
+                </div>
+                
+                <div id="form-inventory-section" class="hidden">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold text-amber-300">Inventário</h3>
+                        <button type="button" id="add-item-to-inventory-btn" class="py-2 px-4 rounded-full text-sm font-bold text-white bg-amber-600 hover:bg-amber-700 transition-colors flex items-center gap-2">
+                            <i class="fas fa-plus"></i> Adicionar Item
+                        </button>
+                    </div>
+                    <p id="slots-info" class="text-sm text-gray-400 text-center my-2">Força: 0 | Carga: 0/5</p>
+                    <div class="bg-gray-900/50 p-4 rounded-xl border border-gray-700 space-y-4">               
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-400 mb-2">Equipamento Especial (Concede Slots)</h4>
+                            <div id="special-equipment-container" class="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-6 gap-2"></div>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-400 mb-2">Itens com Carga</h4>
+                            <div id="item-slots-container" class="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-6 gap-2"></div>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-400 mb-2">Itens de Carga Zero</h4>
+                            <div id="zero-charge-items-container" class="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-6 gap-2"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-xl font-bold text-indigo-300 mb-2">Magias & Habilidades</h3>
+                    <div id="selected-magics-container" class="space-y-2 bg-gray-700 p-2 rounded-lg min-h-[50px]"></div>
+                    <button type="button" id="add-magic-to-char-btn" class="mt-2 w-full py-2 px-4 rounded-lg text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 transition-colors">Adicionar Magia/Habilidade</button>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-red-400 mb-2">Ataques</h3>
+                    <div id="selected-attacks-container" class="space-y-2 bg-gray-700 p-2 rounded-lg min-h-[50px]"></div>
+                    <button type="button" id="add-attack-to-char-btn" class="mt-2 w-full py-2 px-4 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors">Adicionar Ataque</button>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-indigo-300 mb-2">Relacionamentos</h3>
+                    <div id="selected-relationships-container" class="space-y-2 bg-gray-700 p-2 rounded-lg min-h-[50px]"></div>
+                    <button type="button" id="add-relationship-btn" class="mt-2 w-full py-2 px-4 rounded-lg text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 transition-colors">Adicionar Relacionamento</button>
+                </div>
+                <button type="submit" id="submitButton" class="w-full py-3 px-4 rounded-full text-lg font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 focus:outline-none transition duration-300 ease-in-out transform hover:scale-105 shadow-xl btn-gradient-pulse">
+                    Criar Cartão
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Formulário de Criação de Magia/Habilidade -->
+    <div id="spell-creation-section" class="hidden">
+        <div class="form-container">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="spell-form-title" class="text-2xl font-bold text-teal-300">Nova Magia</h2>
+                <button id="close-spell-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+            </div>
+            <form id="spellForm" class="space-y-6">
+                <!-- ... (Conteúdo do formulário de magia) ... -->
+                 <div>
+                    <h3 class="text-xl font-bold text-teal-300 mb-2">Ícone</h3>
+                    <div class="mt-4 text-center">
+                        <label for="spellImageUpload" class="block text-sm font-semibold mb-1 cursor-pointer">Faça
+                            upload de uma imagem:</label>
+                        <input type="file" id="spellImageUpload" accept="image/*" class="file-upload-input">
+                        <img id="spellImagePreview"
+                            class="mt-4 mx-auto w-32 h-32 object-cover rounded-full border-4 border-gray-600 hidden"
+                            alt="Pré-visualização da Magia">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-2">
+                        <label for="spellName" class="block text-sm font-semibold mb-1">Nome</label>
+                        <input type="text" id="spellName" placeholder="Ex: Curar Ferimentos" required class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                    </div>
+                    <div>
+                        <label for="spell-category-select" class="block text-sm font-semibold mb-1">Categoria</label>
+                        <select id="spell-category-select" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="spellCharacterOwner" class="block text-sm font-semibold mb-1">Personagem</label>
+                    <select id="spellCharacterOwner" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
+
+                <div id="mana-cost-wrapper" class="grid grid-cols-2 gap-4">
+                     <div>
+                        <label for="spellCircle" class="block text-sm font-semibold mb-1">Círculo</label>
+                        <input type="number" id="spellCircle" placeholder="1" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                    </div>
+                     <div>
+                        <label for="spellManaCost" class="block text-sm font-semibold mb-1">Custo de Mana</label>
+                        <input type="number" id="spellManaCost" placeholder="0" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                    </div>
+                </div>
+
+                <div><label for="spellExecution" class="block text-sm font-semibold mb-1">Execução</label><input type="text" id="spellExecution" placeholder="Ex: padrão" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                <div><label for="spellRange" class="block text-sm font-semibold mb-1">Alcance</label><input type="text" id="spellRange" placeholder="Ex: toque" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                <div><label for="spellTarget" class="block text-sm font-semibold mb-1">Alvo</label><input type="text" id="spellTarget" placeholder="Ex: 1 ser" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                <div><label for="spellDuration" class="block text-sm font-semibold mb-1">Duração</label><input type="text" id="spellDuration" placeholder="Ex: instantânea" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                <div><label for="spellResistencia" class="block text-sm font-semibold mb-1">Resistência</label><input type="text" id="spellResistencia" placeholder="Ex: instantânea" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></div>
+                <div><label for="spellDescription" class="block text-sm font-semibold mb-1">Descrição</label><textarea id="spellDescription" rows="4" placeholder="Ex: Você canaliza energia positiva para curar..." class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></textarea></div>
+                <div id="enhance-wrapper"><label for="spellEnhance" class="block text-sm font-semibold mb-1">Aprimorar</label><textarea id="spellEnhance" rows="3" placeholder="Ex: (+2 PM): A cura aumenta para 2d10+2..." class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></textarea></div>
+                <div id="true-wrapper"><label for="spellTrue" class="block text-sm font-semibold mb-1">Verdadeiro</label><textarea id="spellTrue" rows="3" placeholder="Ex: (+9 PM): muda o alcance para 'curto'..." class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></textarea></div>
+                
+                <div>
+                    <h3 class="text-xl font-bold text-teal-300 mb-4">Aumentos</h3>
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div class="flex-grow">
+                                <label for="spell-aumento-select" class="block text-sm font-semibold mb-1">Tipo de Aumento</label>
+                                <select id="spell-aumento-select" class="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-600"></select>
+                            </div>
+                            <div>
+                                <label for="spell-aumento-value" class="block text-sm font-semibold mb-1">Valor</label>
+                                <input type="number" id="spell-aumento-value" placeholder="0" class="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-600">
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <label class="flex items-center"><input type="radio" name="spell-aumento-type" value="fixo" class="form-radio text-teal-500" checked> <span class="ml-2">Fixo</span></label>
+                                <label class="flex items-center"><input type="radio" name="spell-aumento-type" value="temporario" class="form-radio text-teal-500"> <span class="ml-2">Temp.</span></label>
+                            </div>
+                        </div>
+                        <button type="button" id="add-spell-aumento-btn" class="mt-4 w-full py-2 px-4 rounded-lg text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 transition-colors">Adicionar Aumento</button>
+                    </div>
+                    <div id="spell-aumentos-list" class="mt-4 space-y-2"></div>
+                </div>
+
+                <button type="submit" id="spellSubmitButton" class="w-full py-3 px-4 rounded-full text-lg font-bold text-white bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 focus:outline-none transition duration-300 ease-in-out transform hover:scale-105 shadow-xl">
+                    Salvar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Formulário de Criação de Item -->
+    <div id="item-creation-section" class="hidden">
+        <div class="form-container">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="item-form-title" class="text-2xl font-bold text-amber-300">Novo Item</h2>
+                <button id="close-item-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+            </div>
+            <form id="itemForm" class="space-y-6">
+                 <!-- ... (Conteúdo do formulário de item) ... -->
+                 <div>
+                    <h3 class="text-xl font-bold text-amber-300 mb-2">Ícone</h3>
+                    <div class="mt-4 text-center">
+                        <label for="itemImageUpload" class="block text-sm font-semibold mb-1 cursor-pointer">Faça upload de uma imagem:</label>
+                        <input type="file" id="itemImageUpload" accept="image/*" class="file-upload-input">
+                        <img id="itemImagePreview" class="mt-4 mx-auto w-32 h-32 object-cover rounded-full border-4 border-gray-600 hidden" alt="Pré-visualização do Item">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-2">
+                         <label for="itemName" class="block text-sm font-semibold mb-1">Nome</label>
+                         <input type="text" id="itemName" placeholder="Ex: Poção de Cura" required class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                    </div>
+                     <div>
+                        <label for="item-category-select" class="block text-sm font-semibold mb-1">Categoria</label>
+                        <select id="item-category-select" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="itemCharacterOwner" class="block text-sm font-semibold mb-1">Personagem</label>
+                    <select id="itemCharacterOwner" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="itemType" class="block text-sm font-semibold mb-1">Tipo</label>
+                        <input type="text" id="itemType" placeholder="Ex: Arma Leve" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                    </div>
+                    <div>
+                        <label for="itemDamage" class="block text-sm font-semibold mb-1">Dano</label>
+                        <input type="text" id="itemDamage" placeholder="Ex: 1d6+For" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                    </div>
+                </div>
+                 <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="itemCharge" class="block text-sm font-semibold mb-1">Carga</label>
+                        <input type="number" id="itemCharge" placeholder="Ex: 1" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                    </div>
+                    <div>
+                        <label for="itemPrerequisite" class="block text-sm font-semibold mb-1">Pré-requisito</label>
+                        <input type="text" id="itemPrerequisite" placeholder="Ex: Força 2" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                    </div>
+                </div>
+
+                <div><label for="itemDescription" class="block text-sm font-semibold mb-1">Descrição</label><textarea id="itemDescription" rows="4" placeholder="Ex: Uma poção que restaura a vitalidade." class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></textarea></div>
+
+                <div>
+                    <h3 class="text-xl font-bold text-amber-300 mb-4">Aumentos</h3>
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                             <div class="flex-grow">
+                                <label for="item-aumento-select" class="block text-sm font-semibold mb-1">Tipo de Aumento</label>
+                                <select id="item-aumento-select" class="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-600"></select>
+                            </div>
+                            <div>
+                                <label for="item-aumento-value" class="block text-sm font-semibold mb-1">Valor</label>
+                                <input type="number" id="item-aumento-value" placeholder="0" class="w-full px-4 py-2 bg-gray-800 text-white rounded-lg border border-gray-600">
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <label class="flex items-center"><input type="radio" name="item-aumento-type" value="fixo" class="form-radio text-amber-500" checked> <span class="ml-2">Fixo</span></label>
+                                <label class="flex items-center"><input type="radio" name="item-aumento-type" value="temporario" class="form-radio text-amber-500"> <span class="ml-2">Temp.</span></label>
+                            </div>
+                        </div>
+                        <button type="button" id="add-item-aumento-btn" class="mt-4 w-full py-2 px-4 rounded-lg text-sm font-bold text-white bg-amber-600 hover:bg-amber-700 transition-colors">Adicionar Aumento</button>
+                    </div>
+                    <div id="item-aumentos-list" class="mt-4 space-y-2"></div>
+                </div>
+
+                <button type="submit" id="itemSubmitButton" class="w-full py-3 px-4 rounded-full text-lg font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 focus:outline-none transition duration-300 ease-in-out transform hover:scale-105 shadow-xl">
+                    Salvar Item
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Formulário de Criação de Ataque -->
+    <div id="attack-creation-section" class="hidden">
+        <div class="form-container">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="attack-form-title" class="text-2xl font-bold text-red-400">Novo Ataque</h2>
+                <button id="close-attack-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+            </div>
+            <form id="attackForm" class="space-y-6">
+                <!-- ... (Conteúdo do formulário de ataque) ... -->
+                <div>
+                    <h3 class="text-xl font-bold text-red-400 mb-2">Ícone</h3>
+                    <div class="mt-4 text-center">
+                        <label for="attackImageUpload" class="block text-sm font-semibold mb-1 cursor-pointer">Faça upload de uma imagem:</label>
+                        <input type="file" id="attackImageUpload" accept="image/*" class="file-upload-input">
+                        <img id="attackImagePreview" class="mt-4 mx-auto w-32 h-32 object-cover rounded-full border-4 border-gray-600 hidden" alt="Pré-visualização do Ataque">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-2">
+                        <label for="attackName" class="block text-sm font-semibold mb-1">Nome</label>
+                        <input type="text" id="attackName" placeholder="Ex: Golpe Poderoso" required class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600">
+                    </div>
+                    <div>
+                        <label for="attack-category-select" class="block text-sm font-semibold mb-1">Categoria</label>
+                        <select id="attack-category-select" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></select>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="attackCharacterOwner" class="block text-sm font-semibold mb-1">Personagem</label>
+                    <select id="attackCharacterOwner" class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></select>
+                </div>
+                <div>
+                    <label for="attackDescription" class="block text-sm font-semibold mb-1">Descrição</label>
+                    <textarea id="attackDescription" rows="4" placeholder="Ex: Um ataque concentrado que causa dano extra." class="w-full px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600"></textarea>
+                </div>
+                <button type="submit" id="attackSubmitButton" class="w-full py-3 px-4 rounded-full text-lg font-bold text-white bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 focus:outline-none transition duration-300 ease-in-out transform hover:scale-105 shadow-xl">
+                    Salvar Ataque
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- Modal de Seleção de Personagem -->
+    <div id="select-character-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4" style="z-index: 1000000000000000000;">
+        <div class="bg-gray-800 text-white rounded-lg shadow-2xl p-6 w-full max-w-sm border border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-indigo-300">Selecionar Personagem</h3>
+                <button id="select-character-close-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+            </div>
+            <div id="select-character-list" class="space-y-2 max-h-80 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Generic Selection Modal -->
+    <div id="selection-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-[110] p-4">
+        <div class="bg-gray-800 text-white rounded-lg shadow-2xl p-6 w-full max-w-lg border border-gray-700 flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="selection-modal-title" class="text-xl font-bold">Selecionar</h3>
+                <button id="selection-modal-close-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+            </div>
+            <div id="selection-modal-list" class="space-y-2 overflow-y-auto"></div>
+        </div>
+    </div>
+    
+    <!-- Stat Editor Modal -->
+    <div id="stat-editor-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center hidden z-[120] p-4 transition-opacity duration-300">
+        <div id="stat-editor-content" class="bg-gray-900/70 border-2 border-gray-700 text-white rounded-2xl shadow-2xl p-6 w-full max-w-sm transform transition-all duration-300 scale-95 opacity-0">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="stat-editor-title" class="text-2xl font-bold flex items-center gap-3">
+                    <i id="stat-editor-icon" class="fas fa-edit"></i>
+                    <span id="stat-editor-title-text">Editar Valor</span>
+                </h3>
+                <button id="stat-editor-close-btn" class="text-gray-400 hover:text-white text-2xl w-8 h-8 rounded-full hover:bg-gray-700 flex items-center justify-center transition-colors">&times;</button>
+            </div>
+            <div class="space-y-6">
+                <div>
+                    <label for="stat-editor-value" class="block text-sm font-semibold mb-2 text-gray-300">Valor a Adicionar ou Subtrair</label>
+                    <input type="number" id="stat-editor-value" placeholder="0" class="w-full text-center text-2xl px-4 py-3 bg-gray-800 text-white rounded-lg border-2 border-gray-600 focus:border-indigo-500 focus:ring focus:ring-indigo-500/50 transition-all duration-300">
+                </div>
+                <div class="flex justify-center gap-4">
+                    <button id="stat-editor-subtract-btn" class="w-16 h-16 rounded-full bg-gradient-to-br from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 text-white font-bold text-3xl flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                    <button id="stat-editor-add-btn" class="w-16 h-16 rounded-full bg-gradient-to-br from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white font-bold text-3xl flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Aspect Ratio Modal -->
+    <div id="aspect-ratio-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-[120] p-4">
+        <div class="bg-gray-800 text-white rounded-lg shadow-2xl p-6 w-full max-w-sm border border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-indigo-300">Ajustar Proporção dos Cards</h3>
+                <button id="aspect-ratio-close-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <p class="text-sm text-gray-400">Selecione uma proporção pré-definida ou insira uma personalizada (ex: 16x9).</p>
+                <div id="aspect-ratio-options" class="grid grid-cols-2 gap-2">
+                    <button class="aspect-ratio-option py-2 px-4 rounded-lg bg-gray-700 hover:bg-indigo-600" data-aspect="1.6">16:10 (Padrão)</button>
+                    <button class="aspect-ratio-option py-2 px-4 rounded-lg bg-gray-700 hover:bg-indigo-600" data-aspect="1.3333">4:3 (Clássico)</button>
+                    <button class="aspect-ratio-option py-2 px-4 rounded-lg bg-gray-700 hover:bg-indigo-600" data-aspect="1">1:1 (Quadrado)</button>
+                    <button class="aspect-ratio-option py-2 px-4 rounded-lg bg-gray-700 hover:bg-indigo-600" data-aspect="0.5625">9:16 (Story)</button>
+                </div>
+                <div>
+                    <label for="custom-aspect-ratio" class="block text-sm font-semibold mb-1">Proporção Personalizada:</label>
+                    <input type="text" id="custom-aspect-ratio" placeholder="Ex: 16x9" class="w-full px-4 py-2 bg-gray-900 text-white rounded-lg border border-gray-600">
+                </div>
+                <button id="save-aspect-ratio-btn" class="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 font-bold">Salvar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal do Rolador de Dados -->
+    <div id="dice-roller-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[150] p-4 transition-opacity duration-300">
+        <div class="bg-gray-800 border border-gray-700 text-white rounded-2xl shadow-2xl p-6 w-full max-w-md flex flex-col gap-4 max-h-[90vh]">
+            <div class="flex justify-between items-center">
+                <h3 class="text-2xl font-bold text-indigo-300 flex items-center gap-3"><i class="fas fa-dice-d20"></i> Rolador de Dados</h3>
+                <button id="dice-modal-close-btn" class="text-gray-400 hover:text-white text-2xl w-8 h-8 rounded-full hover:bg-gray-700 flex items-center justify-center transition-colors">&times;</button>
+            </div>
+    
+            <div class="bg-gray-900/50 p-4 rounded-lg min-h-[100px] flex items-center justify-center" id="dice-result-display">
+                <p class="text-gray-500">Role um dado para começar!</p>
+            </div>
+    
+            <div class="grid grid-cols-4 gap-2">
+                <button class="dice-btn" data-dice="1d4">d4</button>
+                <button class="dice-btn" data-dice="1d6">d6</button>
+                <button class="dice-btn" data-dice="1d8">d8</button>
+                <button class="dice-btn" data-dice="1d10">d10</button>
+                <button class="dice-btn" data-dice="1d12">d12</button>
+                <button class="dice-btn" data-dice="1d20">d20</button>
+                <button class="dice-btn col-span-2" data-dice="1d100">d100</button>
+            </div>
+    
+            <div class="flex gap-2">
+                <input type="text" id="custom-roll-input" placeholder="Ex: 3d8+4" class="flex-grow bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 focus:border-indigo-500 outline-none">
+                <button id="custom-roll-btn" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg font-bold">Rolar</button>
+            </div>
+    
+            <div>
+                <h4 class="text-sm font-semibold text-gray-400 mb-2">Histórico</h4>
+                <div id="dice-history-log" class="space-y-2 overflow-y-auto max-h-40 bg-gray-900/50 p-2 rounded-lg"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file input for DB import -->
+    <input type="file" id="import-db-input" accept=".json" class="hidden">
+
+    <!-- Mobile Bottom Navigation Menu -->
+    <nav class="fixed bottom-0 left-0 right-0 backdrop-blur-sm p-2 flex justify-around items-center z-50 shadow-lg md:hidden" style="width: 100%; padding: .75rem">
+        <button class="nav-button px-4 py-2 text-sm font-semibold rounded-full focus:outline-none flex items-center gap-2" data-target="personagem-em-jogo" title="Personagem em Jogo">
+            <i class="fas fa-theater-masks"></i>
+        </button>
+        <button class="nav-button px-4 py-2 text-sm font-semibold rounded-full focus:outline-none flex items-center gap-2" data-target="personagem" title="Personagens">
+            <i class="fas fa-users"></i>
+        </button>
+        <button class="nav-button px-4 py-2 text-sm font-semibold rounded-full focus:outline-none flex items-center gap-2" data-target="ataques" title="Ataques">
+            <i class="fas fa-khanda"></i>
+        </button>
+        <button class="nav-button px-4 py-2 text-sm font-semibold rounded-full focus:outline-none flex items-center gap-2" data-target="magias" title="Magias">
+            <i class="fas fa-magic"></i>
+        </button>
+        <button class="nav-button px-4 py-2 text-sm font-semibold rounded-full focus:outline-none flex items-center gap-2" data-target="habilidades" title="Habilidades">
+            <i class="fas fa-fist-raised"></i>
+        </button>
+        <button class="nav-button px-4 py-2 text-sm font-semibold rounded-full focus:outline-none flex items-center gap-2" data-target="itens" title="Itens">
+            <i class="fas fa-box"></i>
+        </button>               
+    </nav>
+
+    <script src="./splash_screen.js"></script>
+    <script type="module" src="./local_db.js"></script>
+    <script type="module" src="./settings_manager.js"></script>
+    <script type="module" src="./dice_roller.js"></script>
+    <script type="module" src="./ui_utils.js"></script>
+    <script type="module" src="./category_manager.js"></script>
+    <script type="module" src="./card-renderer.js"></script>
+    <script type="module" src="./character_manager.js"></script>
+    <script type="module" src="./magic_renderer.js"></script>
+    <script type="module" src="./magic_manager.js"></script>
+    <script type="module" src="./item_renderer.js"></script>
+    <script type="module" src="./item_manager.js"></script>
+    <script type="module" src="./attack_renderer.js"></script>
+    <script type="module" src="./attack_manager.js"></script>
+    <script type="module" src="./theme_manager.js"></script>
+    <script type="module" src="./sidebar_manager.js"></script>
+    <script type="module" src="./grimoire_manager.js"></script>
+    <script type="module" src="./navigation_manager.js"></script>
+
+    <script>
+         function myFunction() {
+            var popup = document.getElementById("myPopup");
+            popup.classList.toggle("show");
+        }
+    </script>
+</body>
+</html>
