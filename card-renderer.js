@@ -504,9 +504,13 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         }
     }
 
+    // Separate spells and skills
+    const spellsOnly = magicItems.filter(item => item.type === 'magia' || !item.type);
+    const skillsOnly = magicItems.filter(item => item.type === 'habilidade');
+
     let spellsGridHtml = '';
-    if (magicItems.length > 0) {
-        const spellCardsHtml = await Promise.all(magicItems.map(async (spell) => {
+    if (spellsOnly.length > 0) {
+        const spellCardsHtml = await Promise.all(spellsOnly.map(async (spell) => {
             const miniSheetHtml = await renderFullSpellSheet(spell, false); 
             return `
                 <div class="related-spell-grid-item" data-id="${spell.id}" data-type="spell">
@@ -518,6 +522,24 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         spellsGridHtml = `
             <div id="spells-grid-${uniqueId}" class="relationships-grid" style="overflow-y: auto;">
                  ${spellCardsHtml.join('')}
+            </div>
+        `;
+    }
+
+    let skillsGridHtml = '';
+    if (skillsOnly.length > 0) {
+        const skillCardsHtml = await Promise.all(skillsOnly.map(async (skill) => {
+            const miniSheetHtml = await renderFullSpellSheet(skill, false);
+            return `
+                <div class="related-skill-grid-item" data-id="${skill.id}" data-type="skill">
+                    ${miniSheetHtml}
+                </div>
+            `;
+        }));
+
+        skillsGridHtml = `
+            <div id="skills-grid-${uniqueId}" class="relationships-grid" style="overflow-y: auto;">
+                 ${skillCardsHtml.join('')}
             </div>
         `;
     }
@@ -536,6 +558,24 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         attacksGridHtml = `
             <div id="attacks-grid-${uniqueId}" class="relationships-grid"  style="overflow-y: auto;">
                  ${attackCardsHtml.join('')}
+            </div>
+        `;
+    }
+
+    let itemsGridHtml = '';
+    if (inventoryItems.length > 0) {
+        const itemCardsHtml = await Promise.all(inventoryItems.map(async (item) => {
+            const miniSheetHtml = await renderFullItemSheet(item, false);
+            return `
+                <div class="related-item-grid-item" data-id="${item.id}" data-type="item">
+                    ${miniSheetHtml}
+                </div>
+            `;
+        }));
+
+        itemsGridHtml = `
+            <div id="items-grid-${uniqueId}" class="relationships-grid" style="overflow-y: auto;">
+                 ${itemCardsHtml.join('')}
             </div>
         `;
     }
@@ -570,7 +610,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             
             <div class="absolute top-6 right-4 p-2 rounded-full text-center cursor-pointer flex flex-col items-center justify-center" >
                 <div style="position: relative;" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}">
-                    <i class="fa-solid fa-heart text-5xl" style="background:  linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+                    <i class="fa-solid fa-heart text-5xl" style="background:  linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
                     <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto;">
                         <span data-stat-current="vida">
                             ${characterData.attributes.vidaAtual || 0}
@@ -581,7 +621,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                         </span>
                     </div>
                 </div>
-                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, rgba(6, 24, 41, 0.3), rgb(43, 54, 64)); padding: 10px; width: 42px;">
+                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100}); padding: 10px; width: 42px;">
                     ${mainAttributes.map(key => {
                     const baseValue = parseInt(characterData.attributes[key]) || 0;
                     const fixedBonus = totalFixedBonuses[key] || 0;
@@ -592,7 +632,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     }).join('')}
                 </div>
 
-                 <div class="money-container rounded-full p-2 flex items-center justify-center text-sm text-amber-300 font-bold cursor-pointer" data-action="edit-stat" data-stat-type="dinheiro" title="Alterar Dinheiro" style="width: 42px; ${moneyContainerStyle} background: linear-gradient(to bottom, rgba(6, 24, 41, 0.3), rgb(43, 54, 64));">
+                 <div class="money-container rounded-full p-2 flex items-center justify-center text-sm text-amber-300 font-bold cursor-pointer" data-action="edit-stat" data-stat-type="dinheiro" title="Alterar Dinheiro" style="width: 42px; ${moneyContainerStyle} background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100});">
                     💰$<span data-stat-current="dinheiro">${characterData.dinheiro || 0}</span>
                 </div>
             </div>
@@ -616,13 +656,11 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     </div>
                 </div>   
                 
-                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, rgba(6, 24, 41, 0.3), rgb(43, 54, 64)); padding: 10px; width: 42px;">
+                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4 " style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); padding: 10px; width: 42px; justify-content: center; ">
                     <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
                     ${combatStatsHtml}
                     <div class="text-center">CD<br>${cdValue}</div>
                 </div>
-
-               
             </div>
            
 
@@ -661,7 +699,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         </div>
     `;
 
-    const finalRelationshipsBar = relationshipsHtml + spellsGridHtml + attacksGridHtml;
+    const finalRelationshipsBar = relationshipsHtml + spellsGridHtml + skillsGridHtml + attacksGridHtml + itemsGridHtml;
     const finalHtml = sheetHtml.replace('<!-- RELATIONSHIPS_BAR -->', finalRelationshipsBar);
 
     sheetContainer.style.background = `url('${imageBack}')`;
@@ -685,7 +723,9 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
 
     setupGridExpand(`relationships-grid-${uniqueId}`);
     setupGridExpand(`spells-grid-${uniqueId}`);
+    setupGridExpand(`skills-grid-${uniqueId}`);
     setupGridExpand(`attacks-grid-${uniqueId}`);
+    setupGridExpand(`items-grid-${uniqueId}`);
 
     // --- NOVO: Clique no centro para recolher os grids ---
     const characterSheetEl = sheetContainer.querySelector(`#character-sheet-${uniqueId}`);
@@ -725,7 +765,9 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
 
     addClickHandlers('.related-character-grid-item', (id) => getData('rpgCards', id), renderFullCharacterSheet);
     addClickHandlers('.related-spell-grid-item', (id) => getData('rpgSpells', id), renderFullSpellSheet);
+    addClickHandlers('.related-skill-grid-item', (id) => getData('rpgSpells', id), renderFullSpellSheet);
     addClickHandlers('.related-attack-grid-item', (id) => getData('rpgAttacks', id), renderFullAttackSheet);
+    addClickHandlers('.related-item-grid-item', (id) => getData('rpgItems', id), renderFullItemSheet);
 
    setTimeout(() => {
     const scaleItems = (selector, sheetIdPrefix) => {
@@ -744,7 +786,9 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     };
     scaleItems('.related-character-grid-item', 'character-sheet-');
     scaleItems('.related-spell-grid-item', 'spell-sheet-');
+    scaleItems('.related-skill-grid-item', 'spell-sheet-');
     scaleItems('.related-attack-grid-item', 'attack-sheet-');
+    scaleItems('.related-item-grid-item', 'item-sheet-');
 }, 100); 
 
     populateInventory(sheetContainer, characterData, uniqueId);

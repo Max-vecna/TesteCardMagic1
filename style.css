@@ -680,7 +680,9 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
 
 .related-character-grid-item,
 .related-spell-grid-item,
-.related-attack-grid-item {
+.related-attack-grid-item,
+.related-item-grid-item,
+.related-skill-grid-item {
     flex-shrink: 0;
     width: 60px;
     height: 92px;
@@ -692,28 +694,36 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
 
 .related-character-grid-item:first-child,
 .related-spell-grid-item:first-child,
-.related-attack-grid-item:first-child {
+.related-attack-grid-item:first-child,
+.related-item-grid-item:first-child,
+.related-skill-grid-item:first-child {
     margin-left: 0;
 }
 
 /* Estado expandido: cards lado a lado */
 .relationships-grid.expanded .related-character-grid-item,
 .relationships-grid.expanded .related-spell-grid-item,
-.relationships-grid.expanded .related-attack-grid-item {
+.relationships-grid.expanded .related-attack-grid-item,
+.relationships-grid.expanded .related-item-grid-item,
+.relationships-grid.expanded .related-skill-grid-item {
     margin-left: 4px;
     margin-right: 2px;
 }
 
 .relationships-grid.expanded .related-character-grid-item:first-child,
 .relationships-grid.expanded .related-spell-grid-item:first-child,
-.relationships-grid.expanded .related-attack-grid-item:first-child {
-    margin-left: 4px;
+.relationships-grid.expanded .related-attack-grid-item:first-child,
+.relationships-grid.expanded .related-item-grid-item:first-child,
+.relationships-grid.expanded .related-skill-grid-item:first-child {
+    margin-left: 0px;
 }
 
 
 .related-character-grid-item > div[id^="character-sheet-"],
 .related-spell-grid-item > div[id^="spell-sheet-"],
-.related-attack-grid-item > div[id^="attack-sheet-"] { 
+.related-attack-grid-item > div[id^="attack-sheet-"],
+.related-item-grid-item > div[id^="item-sheet-"],
+.related-skill-grid-item > div[id^="spell-sheet-"] { 
     transform: scale(0.11) !important;
     transform-origin: top left;
     box-shadow: 0 2px 8px rgba(0,0,0,0.7) !important;
@@ -995,7 +1005,7 @@ body:not(.dark) .text-white { color: var(--text-color) !important; }
   display: none;
 }
 
-#spell-sheet-container
+#spell-sheet-container, #item-sheet-container, #attack-sheet-container, #nested-sheet-container, #character-sheet-container
 {
     position: absolute;
     width: 100%;

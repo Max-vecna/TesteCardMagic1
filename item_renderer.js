@@ -80,16 +80,20 @@ export async function renderFullItemSheet(itemData, isModal) {
     }
 
     const sheetHtml = `
-        <button id="close-item-sheet-btn-${uniqueId}" class="absolute top-4 right-4 bg-red-600 hover:text-white z-20 thumb-btn" style="display:${isModal? "block": "none"}"><i class="fa-solid fa-xmark"></i></button>
+        <button id="close-item-sheet-btn-${uniqueId}" class="absolute top-4 right-4 bg-red-600 hover:text-white z-20 thumb-btn" style="display:${isModal? "block": "none"};"><i class="fa-solid fa-xmark"></i></button>
         <div id="item-sheet-${uniqueId}" class="w-full h-full rounded-lg shadow-2xl overflow-hidden relative text-white" style="${origin}; background-image: url('${imageUrl}'); background-size: cover; background-position: center; box-shadow: 0 0 20px ${predominantColor.color100}; width: ${finalWidth}px; height: ${finalHeight}px; ${transformProp} margin: 0 auto;">        
             <div class="w-full h-full" style="background: linear-gradient(-180deg, #000000a4, transparent, transparent, #0000008f, #0000008f, #000000a4); display: flex; align-items: center; justify-content: center;">
-                <div class="rounded-lg" style="width: 96%; height: 96%; border: 3px solid ${predominantColor.color100};"></div>
+                <div class="rounded-lg" style="width: 100%; height: calc(100% - 20px); border: 3px solid ${predominantColor.color100}; margin: 10px;"></div>
             </div>
-            <div class="mt-auto p-6 md:p-6 w-full text-left absolute bottom-0" style="background-color: ${predominantColor.color30};">
-                <div class="sheet-card-text-panel">
-                    <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-white pr-2">${itemData.name}</h2>
-                    <div class="sheet-card-divider"></div>
-                    <div class="space-y-3 max-h-40 overflow-y-auto pr-2">
+            
+            <div class="w-full text-left absolute top-0 line-top" style="background-color: ${predominantColor.color30}; padding-top: 20px; padding-bottom: 10px; text-align: center; --minha-cor: ${predominantColor.color100};">
+                <h3 class="font-bold tracking-tight text-white" style="font-size: 1.3rem">${itemData.name}</h3>
+            </div>
+           <div class="circle-container"><div class="circle"><div class="icon">🎯</div></div></div>
+            
+            <div class="mt-auto p-6 pt-3 md:p-6 w-full text-left absolute bottom-0 line-bottom" style="background-color: ${predominantColor.color30}; --minha-cor: ${predominantColor.color100};">                
+                <div class="sheet-card-text-panel">                      
+                  <div class="space-y-3 max-h-40 overflow-y-auto pr-2">
                         ${itemData.effect ? `
                             <div class="pt-2">
                                 <h3 class="text-sm font-semibold flex items-center gap-2">Descrição</h3>
@@ -101,7 +105,7 @@ export async function renderFullItemSheet(itemData, isModal) {
                     </div>
                 </div>
             </div>            
-        </div>
+        </div>       
     `;
 
     if (!isModal) return sheetHtml;
