@@ -620,17 +620,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                             ${permanentMaxVida}
                         </span>
                     </div>
-                </div>
-                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100}); padding: 10px; width: 42px;">
-                    ${mainAttributes.map(key => {
-                    const baseValue = parseInt(characterData.attributes[key]) || 0;
-                    const fixedBonus = totalFixedBonuses[key] || 0;
-                    const fixedBonusHtml = fixedBonus !== 0 ? ` <span class="text-green-400 font-semibold">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
-                    return `                        
-                        <label class="text-center" title="${key}">${key.slice(0, 3).toUpperCase()}<br>${baseValue}${fixedBonusHtml}</label>                                                      
-                    `;
-                    }).join('')}
-                </div>
+                </div>                
 
                  <div class="money-container rounded-full p-2 flex items-center justify-center text-sm text-amber-300 font-bold cursor-pointer" data-action="edit-stat" data-stat-type="dinheiro" title="Alterar Dinheiro" style="width: 42px; ${moneyContainerStyle} background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100});">
                     💰$<span data-stat-current="dinheiro">${characterData.dinheiro || 0}</span>
@@ -642,7 +632,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                 <p class="text-md italic text-gray-300">${characterData.subTitle}</p>
             </div>
             
-            <div class="absolute top-6 left-4 p-2 rounded-full text-center cursor-pointer" style="display: flex; justify-content: center; flex-direction: column;">
+            <div class="absolute top-6 left-4 p-2 rounded-full text-center cursor-pointer" style="display: flex; justify-content: space-between; flex-direction: column; height: calc(100% - 30px);">
                 <div class="mb-2 icon-container mana-icon-container" data-action="edit-stat" data-stat-type="mana" data-stat-max="${permanentMaxMana}" style="${hasMana ? 'display: none' : ''}">
                     <i class="fas fa-fire text-blue-500 text-5xl" style="background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
                     <div class="absolute left-0 right-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="top: 20px;">
@@ -655,11 +645,23 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                         </span>
                     </div>
                 </div>   
-                
-                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4 " style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); padding: 10px; width: 42px; justify-content: center; ">
-                    <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
-                    ${combatStatsHtml}
-                    <div class="text-center">CD<br>${cdValue}</div>
+                <div>
+                    <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4 " style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); padding: 10px; width: 42px; justify-content: center; ">
+                        <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
+                        ${combatStatsHtml}
+                        <div class="text-center">CD<br>${cdValue}</div>
+                    </div>
+
+                    <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100}); padding: 10px; width: 42px;">
+                        ${mainAttributes.map(key => {
+                        const baseValue = parseInt(characterData.attributes[key]) || 0;
+                        const fixedBonus = totalFixedBonuses[key] || 0;
+                        const fixedBonusHtml = fixedBonus !== 0 ? ` <span class="text-green-400 font-semibold">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
+                        return `                        
+                            <label class="text-center" title="${key}">${key.slice(0, 3).toUpperCase()}<br>${baseValue}${fixedBonusHtml}</label>                                                      
+                        `;
+                        }).join('')}
+                    </div>
                 </div>
             </div>
            
@@ -680,7 +682,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             </div>
             
             <div class="absolute bottom-0 w-full p-4">
-                <div class="pb-1 scrollable-content text-sm text-left" style="display: flex; flex-direction: row; overflow-y: scroll;gap: 12px; scroll-snap-type: x mandatory;">
+                <div class="pb-1 scrollable-content text-sm text-left ml-2" style="display: flex; flex-direction: row; overflow-y: scroll;gap: 12px; scroll-snap-type: x mandatory; margin-left: 65px;">
                     <div class="rounded-3xl w-full" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; border-color: ${palette.borderColor}; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end;">
                         <!-- RELATIONSHIPS_BAR -->
                     </div>
