@@ -38,6 +38,11 @@ export function resetCharacterFormState() {
     renderInventoryForForm([], 0);
 }
 
+// Função exportada para permitir que o navigation_manager acesse os itens atuais
+export function getCharacterItems() {
+    return currentCharacterItems;
+}
+
 function getCustomPericias() {
     return JSON.parse(localStorage.getItem('customPericias')) || {};
 }

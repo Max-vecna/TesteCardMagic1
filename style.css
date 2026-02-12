@@ -689,7 +689,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     position: relative;
     cursor: pointer;
     transition: margin 0.4s ease-in-out, transform 0.4s ease-in-out;
-    margin-left: -30px;
+    margin-left: -50px;
 }
 
 .related-character-grid-item:first-child,

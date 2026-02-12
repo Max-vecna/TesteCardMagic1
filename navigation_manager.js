@@ -1,4 +1,4 @@
-import { saveCharacterCard, editCard, importCard, getCurrentEditingCardId, exportCard, resetCharacterFormState, populateCharacterSelect } from './character_manager.js';
+import { saveCharacterCard, editCard, importCard, getCurrentEditingCardId, exportCard, resetCharacterFormState, populateCharacterSelect, getCharacterItems } from './character_manager.js';
 import { populateSpellAumentosSelect, saveSpellCard, editSpell, importSpell, exportSpell, showImagePreview } from './magic_manager.js';
 import { populateItemAumentosSelect, saveItemCard, editItem, importItem, removeItem, exportItem } from './item_manager.js';
 import { saveAttackCard, editAttack, removeAttack, exportAttack, importAttack } from './attack_manager.js';
@@ -90,13 +90,18 @@ export async function openCharacterSelectionForRelationship() {
     const currentCharacterId = getCurrentEditingCardId();
 
     const charactersToShow = allCharacters.filter(c => c.id !== currentCharacterId);
+    
+    // Obter relacionamentos já selecionados
+    const selectedIds = new Set();
+    document.querySelectorAll('#selected-relationships-container [data-id]').forEach(el => selectedIds.add(el.dataset.id));
+
 
     if (charactersToShow.length === 0) {
         selectCharacterList.innerHTML = '<p class="text-gray-400 text-center p-4">Não há outros personagens para relacionar.</p>';
     } else {
         charactersToShow.forEach(char => {
             const charItem = document.createElement('button');
-            charItem.className = 'w-full text-left p-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-3';
+            charItem.className = 'w-full text-left p-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-3 justify-between';
 
             let iconHtml = '';
              if (char.image) {
@@ -106,7 +111,19 @@ export async function openCharacterSelectionForRelationship() {
                 iconHtml = `<div class="w-8 h-8 rounded-full bg-gray-600 flex-shrink-0 flex items-center justify-center"><i class="fas fa-user"></i></div>`;
             }
 
-            charItem.innerHTML = `${iconHtml}<span>${char.title}</span>`;
+            const isSelected = selectedIds.has(char.id);
+            if (isSelected) {
+                charItem.classList.add('bg-indigo-900', 'border', 'border-indigo-500');
+            }
+
+            charItem.innerHTML = `
+                <div class="flex items-center gap-3">
+                    ${iconHtml}
+                    <span>${char.title}</span>
+                </div>
+                ${isSelected ? '<span class="text-xs text-indigo-300 font-bold px-2 py-1 bg-black/30 rounded">Selecionado</span>' : ''}
+            `;
+            
             charItem.dataset.characterId = char.id;
 
             charItem.addEventListener('click', async () => {
@@ -171,6 +188,19 @@ export async function openSelectionModal(type) {
         listContainer.innerHTML = '<div class="text-center p-4"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i></div>';
         let data = await getData(storeName);
 
+        // Identificar IDs já selecionados no formulário
+        const selectedIds = new Set();
+        if (type === 'magic') {
+            document.querySelectorAll('#selected-magics-container [data-id]').forEach(el => selectedIds.add(el.dataset.id));
+        } else if (type === 'attack') {
+            document.querySelectorAll('#selected-attacks-container [data-id]').forEach(el => selectedIds.add(el.dataset.id));
+        } else if (type === 'relationship') {
+            document.querySelectorAll('#selected-relationships-container [data-id]').forEach(el => selectedIds.add(el.dataset.id));
+        } else if (type === 'item') {
+            const currentItems = getCharacterItems();
+            currentItems.forEach(item => selectedIds.add(item.id));
+        }
+
         if (type === 'relationship') {
             const currentCharacterId = getCurrentEditingCardId();
             if (data && Array.isArray(data)) {
@@ -180,16 +210,18 @@ export async function openSelectionModal(type) {
              data = data.filter(item => {
                 const characterMatch = item.characterId === characterId;
                 if (storeName === 'rpgSpells') {
-                    const typeMatch = (type === 'magic' && item.type !== 'habilidade') || (type !== 'magic' && item.type === 'habilidade');
-                    return characterMatch && typeMatch;
+                    // Modificação: Removendo o filtro restritivo de habilidade quando tipo é magic
+                    // Se type for magic, queremos ver magias E habilidades, pois o container é 'Magias/Hab.'
+                    // Se type não for magic (ex: um botão específico para habilidade), então filtra
+                    // Mas como o botão principal é 'add-magic-to-char-btn' com type='magic', removemos a restrição.
+                    return characterMatch;
                 }
                 return characterMatch;
             });
-        } else if (storeName === 'rpgSpells' && type === 'magic') {
-            data = data.filter(item => item.type !== 'habilidade');
-        } else if (storeName === 'rpgSpells' && type !== 'magic') {
-             data = data.filter(item => item.type === 'habilidade');
         }
+        
+        // Se for explicitamente chamado como 'magic' e for rpgSpells, não filtramos 'habilidade'
+        // pois queremos que habilidades apareçam na lista de seleção.
 
         listContainer.innerHTML = '';
 
@@ -205,7 +237,7 @@ export async function openSelectionModal(type) {
 
         data.forEach(item => {
             const el = document.createElement('button');
-            el.className = 'w-full text-left p-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-3';
+            el.className = 'w-full text-left p-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-3 justify-between';
 
             let iconHtml = '';
             if (item.image) {
@@ -223,12 +255,21 @@ export async function openSelectionModal(type) {
                 iconHtml = `<i class="fas ${iconClass} w-8 text-center text-xl text-gray-400"></i>`;
             }
 
+            const isSelected = selectedIds.has(item.id);
+            if (isSelected) {
+                // Estilo para item já selecionado
+                el.classList.add('bg-indigo-900', 'border', 'border-indigo-500');
+            }
+
             el.innerHTML = `
-                ${iconHtml}
-                <div>
-                    <p class="font-semibold">${item.name || item.title}</p>
-                    ${type === 'magic' && item.type ? `<p class="text-xs text-gray-400 capitalize">${item.type}</p>` : ''}
+                <div class="flex items-center gap-3">
+                    ${iconHtml}
+                    <div>
+                        <p class="font-semibold">${item.name || item.title}</p>
+                        ${(type === 'magic' && item.type) ? `<p class="text-xs text-gray-400 capitalize">${item.type}</p>` : ''}
+                    </div>
                 </div>
+                ${isSelected ? '<span class="text-xs text-indigo-300 font-bold px-2 py-1 bg-black/30 rounded">Selecionado</span>' : ''}
             `;
 
             el.addEventListener('click', () => {
@@ -863,7 +904,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.getElementById('add-relationship-btn').addEventListener('click', () => {
-        openSelectionModal('relationship');
+        openCharacterSelectionForRelationship();
     });
 
     document.getElementById('add-magic-to-char-btn').addEventListener('click', () => openSelectionModal('magic'));
