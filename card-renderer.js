@@ -568,7 +568,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                 <div class="rounded-lg" style="width: 96%; height: 96%; border: 3px solid ${predominantColor.colorLight};"></div>
             </div>
             
-            <div class="absolute top-6 right-4 p-2 rounded-full text-center cursor-pointer" >
+            <div class="absolute top-6 right-4 p-2 rounded-full text-center cursor-pointer flex flex-col items-center justify-center" >
                 <div style="position: relative;" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}">
                     <i class="fa-solid fa-heart text-5xl" style="background:  linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
                     <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto;">
@@ -581,7 +581,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                         </span>
                     </div>
                 </div>
-                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, rgba(6, 24, 41, 0.3), rgb(43, 54, 64)); padding: 10px;">
+                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, rgba(6, 24, 41, 0.3), rgb(43, 54, 64)); padding: 10px; width: 42px;">
                     ${mainAttributes.map(key => {
                     const baseValue = parseInt(characterData.attributes[key]) || 0;
                     const fixedBonus = totalFixedBonuses[key] || 0;
@@ -592,7 +592,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     }).join('')}
                 </div>
 
-                 <div class="money-container rounded-full p-2 flex items-center justify-center text-sm text-amber-300 font-bold cursor-pointer" data-action="edit-stat" data-stat-type="dinheiro" title="Alterar Dinheiro" style="${moneyContainerStyle} background: linear-gradient(to bottom, rgba(6, 24, 41, 0.3), rgb(43, 54, 64));">
+                 <div class="money-container rounded-full p-2 flex items-center justify-center text-sm text-amber-300 font-bold cursor-pointer" data-action="edit-stat" data-stat-type="dinheiro" title="Alterar Dinheiro" style="width: 42px; ${moneyContainerStyle} background: linear-gradient(to bottom, rgba(6, 24, 41, 0.3), rgb(43, 54, 64));">
                     💰$<span data-stat-current="dinheiro">${characterData.dinheiro || 0}</span>
                 </div>
             </div>
@@ -616,7 +616,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     </div>
                 </div>   
                 
-                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, rgba(6, 24, 41, 0.3), rgb(43, 54, 64)); padding: 10px;">
+                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, rgba(6, 24, 41, 0.3), rgb(43, 54, 64)); padding: 10px; width: 42px;">
                     <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
                     ${combatStatsHtml}
                     <div class="text-center">CD<br>${cdValue}</div>
