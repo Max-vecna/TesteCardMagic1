@@ -568,8 +568,8 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                 <div class="rounded-lg" style="width: 96%; height: 96%; border: 3px solid ${predominantColor.colorLight};"></div>
             </div>
             
-            <div class="absolute top-6 right-4 p-2 rounded-full text-center cursor-pointer" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}">
-                <div style="position: relative;">
+            <div class="absolute top-6 right-4 p-2 rounded-full text-center cursor-pointer" >
+                <div style="position: relative;" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}">
                     <i class="fa-solid fa-heart text-5xl" style="background:  linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
                     <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto;">
                         <span data-stat-current="vida">
@@ -582,19 +582,21 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     </div>
                 </div>
                 <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, rgba(6, 24, 41, 0.3), rgb(43, 54, 64)); padding: 10px;">
-                            ${mainAttributes.map(key => {
-                            const baseValue = parseInt(characterData.attributes[key]) || 0;
-                            const fixedBonus = totalFixedBonuses[key] || 0;
-                            const fixedBonusHtml = fixedBonus !== 0 ? ` <span class="text-green-400 font-semibold">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
-                            return `
-                                <div class="mt-2 flex flex-col text-xs" style="align-items: center;">
-                                    <p class="font-bold" title="${key}">${key.slice(0, 3).toUpperCase()}</p>                           
-                                    <p class="text-xs font-bold ">${baseValue}${fixedBonusHtml}</p>
-                                </div>                            
-                            `;
-                            }).join('')}
-                        </div>
+                    ${mainAttributes.map(key => {
+                    const baseValue = parseInt(characterData.attributes[key]) || 0;
+                    const fixedBonus = totalFixedBonuses[key] || 0;
+                    const fixedBonusHtml = fixedBonus !== 0 ? ` <span class="text-green-400 font-semibold">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
+                    return `                        
+                        <label class="text-center" title="${key}">${key.slice(0, 3).toUpperCase()}<br>${baseValue}${fixedBonusHtml}</label>                                                      
+                    `;
+                    }).join('')}
+                </div>
+
+                 <div class="money-container rounded-full p-2 flex items-center justify-center text-sm text-amber-300 font-bold cursor-pointer" data-action="edit-stat" data-stat-type="dinheiro" title="Alterar Dinheiro" style="${moneyContainerStyle} background: linear-gradient(to bottom, rgba(6, 24, 41, 0.3), rgb(43, 54, 64));">
+                    💰$<span data-stat-current="dinheiro">${characterData.dinheiro || 0}</span>
+                </div>
             </div>
+
             <div id="lore-icon-${uniqueId}" class="absolute top-8 left-1/2 -translate-x-1/2 text-center z-10"  data-action="toggle-lore">
                 <h3 class="text-2xl font-bold">${characterData.title}</h3>
                 <p class="text-md italic text-gray-300">${characterData.subTitle}</p>
@@ -620,9 +622,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     <div class="text-center">CD<br>${cdValue}</div>
                 </div>
 
-                <div class="money-container rounded-full p-2 flex items-center justify-center text-sm text-amber-300 font-bold cursor-pointer" data-action="edit-stat" data-stat-type="dinheiro" title="Alterar Dinheiro" style="${moneyContainerStyle} background: linear-gradient(to bottom, rgba(6, 24, 41, 0.3), rgb(43, 54, 64));">
-                    💰$<span data-stat-current="dinheiro">${characterData.dinheiro || 0}</span>
-                </div>
+               
             </div>
            
 
@@ -644,8 +644,6 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             <div class="absolute bottom-0 w-full p-4">
                 <div class="pb-1 scrollable-content text-sm text-left" style="display: flex; flex-direction: row; overflow-y: scroll;gap: 12px; scroll-snap-type: x mandatory;">
                     <div class="rounded-3xl w-full" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; border-color: ${palette.borderColor}; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end;">
-                        
-                        
                         <!-- RELATIONSHIPS_BAR -->
                     </div>
                     <div class="pb-4 rounded-3xl w-full" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; border-color: ${palette.borderColor}; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end;">
