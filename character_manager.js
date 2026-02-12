@@ -1,128 +1,21 @@
-import { openDatabase, saveData, getData, removeData } from './local_db.js';
-import { renderFullCharacterSheet } from './card-renderer.js';
+import { saveData, getData } from './local_db.js';
 import { renderInventoryForForm } from './item_manager.js';
 import { openSelectionModal as openItemSelectionModal } from './navigation_manager.js';
-
+import { readFileAsArrayBuffer, bufferToBlob, arrayBufferToBase64, base64ToArrayBuffer, showImagePreview, calculateColor } from './ui_utils.js';
 
 const PERICIAS_DATA = {
-    "AGILIDADE": {
-        "Acrobacia": "Capacidade de realizar movimentos ágeis e controlados...",
-        "Iniciativa": "Velocidade de reação quando o combate começa...",
-        "Montaria": "Controle de veículos e montarias complexas...",
-        "Furtividade": "A arte de mover-se sem ser notado...",
-        "Pontaria": "Precisão com armas de longo alcance...",
-        "Ladinagem": "Manipulação veloz e precisa com as mãos...",
-        "Reflexos": "Rapidez em reagir a estímulos..."
-    },
-    "CARISMA": {
-        "Adestramento": "Treinamento e comando de animais...",
-        "Enganação": "A arte de manipular a verdade...",
-        "Intimidação": "Uso da força de personalidade para impor medo...",
-        "Persuasão": "A habilidade de influenciar e inspirar..."
-    },
-    "INTELIGÊNCIA": {
-        "Arcanismo": "Conhecimento das artes místicas...",
-        "História": "Memória de tempos antigos...",
-        "Investigação": "Capacidade de analisar cenários e reunir pistas...",
-        "Ofício": "Criação, manutenção e reparo de objetos...",
-        "Religião": "Conhecimento sobre divindades e rituais...",
-        "Tecnologia": "Compreensão de mecanismos e engenhocas..."
-    },
-    "FORÇA": {
-        "Atletismo": "Medida da força bruta aplicada com técnica...",
-        "Luta": "Combate corpo a corpo com armas simples ou improvisadas..."
-    },
-    "SABEDORIA": {
-        "Intuição": "Habilidade de ler emoções e detectar mentiras...",
-        "Percepção": "Capacidade de notar detalhes ao redor...",
-        "Medicina": "Conhecimento de curas e tratamento de feridas...",
-        "Natureza": "Sabedoria sobre o mundo natural...",
-        "Sobrevivência": "A perícia de se adaptar ao mundo selvagem...",
-        "Vontade": "Força interior e estabilidade emocional..."
-    },
-    "VIGOR": {
-        "Fortitude": "Resistência física e imunológica do personagem..."
-    }
+    "AGILIDADE": { "Acrobacia": "...", "Iniciativa": "...", "Montaria": "...", "Furtividade": "...", "Pontaria": "...", "Ladinagem": "...", "Reflexos": "..." },
+    "CARISMA": { "Adestramento": "...", "Enganação": "...", "Intimidação": "...", "Persuasão": "..." },
+    "INTELIGÊNCIA": { "Arcanismo": "...", "História": "...", "Investigação": "...", "Ofício": "...", "Religião": "...", "Tecnologia": "..." },
+    "FORÇA": { "Atletismo": "...", "Luta": "..." },
+    "SABEDORIA": { "Intuição": "...", "Percepção": "...", "Medicina": "...", "Natureza": "...", "Sobrevivência": "...", "Vontade": "..." },
+    "VIGOR": { "Fortitude": "..." }
 };
 
 let currentEditingCardId = null;
 let characterImageFile = null;
 let backgroundImageFile = null;
 let currentCharacterItems = [];
-
-// --- Funções de Cálculo de Cor ---
-function getPredominantColor(imageUrl) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = "Anonymous";
-        img.src = imageUrl;
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0, img.width, img.height);
-            try {
-                const data = ctx.getImageData(0, 0, img.width, img.height).data;
-                let r = 0, g = 0, b = 0, count = 0;
-                for (let i = 0; i < data.length; i += 20) { // amostragem de pixels
-                    r += data[i];
-                    g += data[i + 1];
-                    b += data[i + 2];
-                    count++;
-                }
-                r = Math.floor(r / count);
-                g = Math.floor(g / count);
-                b = Math.floor(b / count);
-
-                // Clareia a cor aproximando de branco
-                const lighten = (value, amount = 0.4) =>
-                    Math.min(255, Math.floor(value + (100 - value) * amount));
-
-                const lr = lighten(r);
-                const lg = lighten(g);
-                const lb = lighten(b);
-
-                resolve({
-                    color30: `rgba(${r}, ${g}, ${b}, 0.3)`,
-                    color100: `rgb(${r}, ${g}, ${b})`,
-                    colorLight: `rgb(${lr}, ${lg}, ${lb})`
-                });
-            } catch (e) {
-                reject(e);
-            }
-        };
-        img.onerror = reject;
-    });
-}
-
-
-async function calculateColor(imageBuffer, imageMimeType) {
-    let imageUrl;
-    let createdObjectUrl = null;
-    const defaultColor = { color30: 'rgba(74, 85, 104, 0.3)', color100: 'rgb(74, 85, 104)' };
-
-    if (imageBuffer) {
-        createdObjectUrl = URL.createObjectURL(bufferToBlob(imageBuffer, imageMimeType));
-        imageUrl = createdObjectUrl;
-    } else {
-        imageUrl = './icons/back.png'; // Imagem padrão
-    }
-
-    let predominantColor;
-    try {
-        predominantColor = await getPredominantColor(imageUrl);
-    } catch (error) {
-        console.error('Não foi possível obter a cor predominante, usando padrão.', error);
-        predominantColor = defaultColor;
-    } finally {
-        if (createdObjectUrl) {
-            URL.revokeObjectURL(createdObjectUrl);
-        }
-    }
-    return predominantColor;
-}
-// --- Fim das Funções de Cálculo de Cor ---
 
 export function resetCharacterFormState() {
     currentEditingCardId = null;
@@ -145,7 +38,6 @@ export function resetCharacterFormState() {
     renderInventoryForForm([], 0);
 }
 
-
 function getCustomPericias() {
     return JSON.parse(localStorage.getItem('customPericias')) || {};
 }
@@ -162,11 +54,8 @@ function saveCustomPericia(attribute, periciaName, periciaDescription) {
 function getMergedPericiasData() {
     const customPericias = getCustomPericias();
     const merged = JSON.parse(JSON.stringify(PERICIAS_DATA)); 
-    
     for (const attr in customPericias) {
-        if (!merged[attr]) {
-            merged[attr] = {};
-        }
+        if (!merged[attr]) merged[attr] = {};
         Object.assign(merged[attr], customPericias[attr]);
     }
     return merged;
@@ -182,72 +71,17 @@ export function getAumentosData() {
 
     for (const attr in mergedPericias) {
         const capitalizedAttr = attr.toUpperCase();
-        if (!aumentosData.Perícias[capitalizedAttr]) {
-             aumentosData.Perícias[capitalizedAttr] = [];
-        }
+        if (!aumentosData.Perícias[capitalizedAttr]) aumentosData.Perícias[capitalizedAttr] = [];
         aumentosData.Perícias[capitalizedAttr].push(...Object.keys(mergedPericias[attr]));
     }
     return aumentosData;
 }
 
-function showImagePreview(element, url, isImageElement) {
-    if (url) {
-        if (isImageElement) element.src = url;
-        else element.style.backgroundImage = 'url(' + url + ')';
-        element.classList.remove('hidden');
-    } else {
-        element.classList.add('hidden');
-    }
-}
-
-function readFileAsArrayBuffer(file) {
-    return new Promise((resolve, reject) => {
-        if (!file) {
-            resolve(null);
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = (e) => reject(e.target.error);
-        reader.readAsArrayBuffer(file);
-    });
-}
-
-function bufferToBlob(buffer, mimeType) {
-    return new Blob([buffer], { type: mimeType });
-}
-
-function arrayBufferToBase64(buffer) {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return window.btoa(binary);
-}
-
-function base64ToArrayBuffer(base64) {
-    const binary_string = window.atob(base64);
-    const len = binary_string.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binary_string.charCodeAt(i);
-    }
-    return bytes.buffer;
-}
-
-/**
- * Populates a select element with a list of characters.
- * @param {string} selectId - The ID of the select element to populate.
- * @param {boolean} includeNoneOption - Whether to include a "None" or "All" option.
- * @param {string} noneOptionText - The text for the none/all option.
- */
 export async function populateCharacterSelect(selectId, includeNoneOption = true, noneOptionText = 'Nenhum') {
     const selectElement = document.getElementById(selectId);
     if (!selectElement) return;
 
-    selectElement.innerHTML = ''; // Clear existing options
+    selectElement.innerHTML = ''; 
 
     if (includeNoneOption) {
         const noneOption = document.createElement('option');
@@ -270,7 +104,6 @@ export async function populateCharacterSelect(selectId, includeNoneOption = true
 function createSelectedItemElement(data, type) {
     const containerId = type === 'item' ? 'selected-items-container' : 'selected-magics-container';
     const container = document.getElementById(containerId);
-    
     if (!container || container.querySelector(`[data-id="${data.id}"]`)) return;
 
     const itemElement = document.createElement('div');
@@ -294,10 +127,7 @@ function createSelectedItemElement(data, type) {
         <button type="button" class="text-red-500 hover:text-red-400 remove-selection-btn text-xl leading-none">&times;</button>
     `;
 
-    itemElement.querySelector('.remove-selection-btn').addEventListener('click', () => {
-        itemElement.remove();
-    });
-
+    itemElement.querySelector('.remove-selection-btn').addEventListener('click', () => itemElement.remove());
     container.appendChild(itemElement);
 }
 
@@ -325,10 +155,7 @@ function createSelectedAttackElement(data) {
         <button type="button" class="text-red-500 hover:text-red-400 remove-selection-btn text-xl leading-none">&times;</button>
     `;
 
-    itemElement.querySelector('.remove-selection-btn').addEventListener('click', () => {
-        itemElement.remove();
-    });
-
+    itemElement.querySelector('.remove-selection-btn').addEventListener('click', () => itemElement.remove());
     container.appendChild(itemElement);
 }
 
@@ -356,25 +183,16 @@ function createSelectedRelationshipElement(data) {
         <button type="button" class="text-red-500 hover:text-red-400 remove-selection-btn text-xl leading-none">&times;</button>
     `;
 
-    itemElement.querySelector('.remove-selection-btn').addEventListener('click', () => {
-        itemElement.remove();
-    });
-
+    itemElement.querySelector('.remove-selection-btn').addEventListener('click', () => itemElement.remove());
     container.appendChild(itemElement);
 }
 
-
-/**
- * Função para renderizar as perícias no formulário.
- * @param {Array} [selectedPericias] - Um array de objetos de perícias para pré-selecionar.
- */
 export function populatePericiasCheckboxes(selectedPericias = []) {
     const container = document.getElementById('pericias-checkboxes-container');
     if (!container) return;
     container.innerHTML = '';
     
     const ALL_PERICIAS = getMergedPericiasData();
-
     const periciaDescriptionDisplay = document.getElementById('pericia-description-display');
     const periciaDescriptionTitle = document.getElementById('periciaDescriptionTitle');
     const periciaDescriptionText = document.getElementById('periciaDescriptionText');
@@ -540,17 +358,14 @@ export async function saveCharacterCard(cardForm) {
             backgroundImage: backgroundBuffer,
             imageMimeType: imageMimeType,
             backgroundMimeType: backgroundMimeType,
-            inPlay: false,
-            activeBuffs: [], // Inicializa a propriedade de buffs
+            inPlay: false
         };
     }
 
     cardData.predominantColor = await calculateColor(cardData.image, cardData.imageMimeType);
 
     await saveData('rpgCards', cardData);
-    
     document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: 'personagem' } }));
-
     resetCharacterFormState();
 }
 
@@ -560,75 +375,52 @@ export async function editCard(cardId) {
     
     resetCharacterFormState();
 
-    const formTitle = document.getElementById('form-title');
-    const submitButton = document.getElementById('submitButton');
-    const cardTitleInput = document.getElementById('cardTitle');
-    const cardSubTitleInput = document.getElementById('cardSubTitle');
-    const cardLevelInput = document.getElementById('cardLevel');
-    const dinheiroInput = document.getElementById('dinheiro');
-    const vidaInput = document.getElementById('vida');
-    const manaInput = document.getElementById('mana');
-    const vidaAtualInput = document.getElementById('vidaAtual');
-    const manaAtualInput = document.getElementById('manaAtual');
-    const armaduraInput = document.getElementById('armadura');
-    const esquivaInput = document.getElementById('esquiva');
-    const bloqueioInput = document.getElementById('bloqueio');
-    const deslocamentoInput = document.getElementById('deslocamento');
-    const agilidadeInput = document.getElementById('agilidade');
-    const carismaInput = document.getElementById('carisma');
-    const forcaInput = document.getElementById('forca');
-    const inteligenciaInput = document.getElementById('inteligencia');
-    const sabedoriaInput = document.getElementById('sabedoria');
-    const vigorInput = document.getElementById('vigor');
-    const historiaInput = document.getElementById('historia');
-    const personalidadeInput = document.getElementById('personalidade');
-    const motivacaoInput = document.getElementById('motivacao');
-    const characterImagePreview = document.getElementById('characterImagePreview');
-    const backgroundImagePreview = document.getElementById('backgroundImagePreview');
-    
-    formTitle.textContent = 'Editando: ' + cardData.title;
-    submitButton.textContent = 'Salvar Edição';
+    document.getElementById('form-title').textContent = 'Editando: ' + cardData.title;
+    document.getElementById('submitButton').textContent = 'Salvar Edição';
     currentEditingCardId = cardId;
     
-    cardTitleInput.value = cardData.title;
-    cardSubTitleInput.value = cardData.subTitle;
-    cardLevelInput.value = cardData.level;
-    dinheiroInput.value = cardData.dinheiro || 0;
-    vidaInput.value = cardData.attributes.vida;
-    manaInput.value = cardData.attributes.mana;
-    vidaAtualInput.value = cardData.attributes.vidaAtual;
-    manaAtualInput.value = cardData.attributes.manaAtual;
-    armaduraInput.value = cardData.attributes.armadura;
-    esquivaInput.value = cardData.attributes.esquiva;
-    bloqueioInput.value = cardData.attributes.bloqueio;
-    deslocamentoInput.value = cardData.attributes.deslocamento;
-    agilidadeInput.value = cardData.attributes.agilidade;
-    carismaInput.value = cardData.attributes.carisma;
-    forcaInput.value = cardData.attributes.forca;
-    inteligenciaInput.value = cardData.attributes.inteligencia;
-    sabedoriaInput.value = cardData.attributes.sabedoria;
-    vigorInput.value = cardData.attributes.vigor;
-    historiaInput.value = cardData.lore?.historia || '';
-    personalidadeInput.value = cardData.lore?.personalidade || '';
-    motivacaoInput.value = cardData.lore?.motivacao || '';
+    document.getElementById('cardTitle').value = cardData.title;
+    document.getElementById('cardSubTitle').value = cardData.subTitle;
+    document.getElementById('cardLevel').value = cardData.level;
+    document.getElementById('dinheiro').value = cardData.dinheiro || 0;
+    
+    const attrs = cardData.attributes;
+    document.getElementById('vida').value = attrs.vida;
+    document.getElementById('mana').value = attrs.mana;
+    document.getElementById('vidaAtual').value = attrs.vidaAtual;
+    document.getElementById('manaAtual').value = attrs.manaAtual;
+    document.getElementById('armadura').value = attrs.armadura;
+    document.getElementById('esquiva').value = attrs.esquiva;
+    document.getElementById('bloqueio').value = attrs.bloqueio;
+    document.getElementById('deslocamento').value = attrs.deslocamento;
+    document.getElementById('agilidade').value = attrs.agilidade;
+    document.getElementById('carisma').value = attrs.carisma;
+    document.getElementById('forca').value = attrs.forca;
+    document.getElementById('inteligencia').value = attrs.inteligencia;
+    document.getElementById('sabedoria').value = attrs.sabedoria;
+    document.getElementById('vigor').value = attrs.vigor;
+    
+    document.getElementById('historia').value = cardData.lore?.historia || '';
+    document.getElementById('personalidade').value = cardData.lore?.personalidade || '';
+    document.getElementById('motivacao').value = cardData.lore?.motivacao || '';
 
-    populatePericiasCheckboxes(cardData.attributes.pericias);
+    populatePericiasCheckboxes(attrs.pericias);
 
-    if (cardData.spells && Array.isArray(cardData.spells)) {
+    if (cardData.spells) {
         for (const magicId of cardData.spells) {
             const magicData = await getData('rpgSpells', magicId);
             if (magicData) createSelectedItemElement(magicData, 'magic');
         }
     }
 
-    if (cardData.attacks && Array.isArray(cardData.attacks)) {
+    if (cardData.attacks) {
         for (const attackId of cardData.attacks) {
             const attackData = await getData('rpgAttacks', attackId);
             if (attackData) createSelectedAttackElement(attackData);
         }
     }
 
-    if (cardData.relationships && Array.isArray(cardData.relationships)) {
+    if (cardData.relationships) {
         for (const charId of cardData.relationships) {
             const relatedCharData = await getData('rpgCards', charId);
             if (relatedCharData) createSelectedRelationshipElement(relatedCharData);
@@ -637,19 +429,17 @@ export async function editCard(cardId) {
 
     if (cardData.image) {
         const imageBlob = bufferToBlob(cardData.image, cardData.imageMimeType);
-        showImagePreview(characterImagePreview, URL.createObjectURL(imageBlob), true);
+        showImagePreview(document.getElementById('characterImagePreview'), URL.createObjectURL(imageBlob), true);
     }
     if (cardData.backgroundImage) {
         const backgroundBlob = bufferToBlob(cardData.backgroundImage, cardData.backgroundMimeType);
-        showImagePreview(backgroundImagePreview, URL.createObjectURL(backgroundBlob), false);
+        showImagePreview(document.getElementById('backgroundImagePreview'), URL.createObjectURL(backgroundBlob), false);
     }
     
-    const forcaValue = cardData.attributes.forca || 0;
     const items = cardData.items ? (await Promise.all(cardData.items.map(id => getData('rpgItems', id)))).filter(Boolean) : [];
     currentCharacterItems = items;
-    
     document.getElementById('form-inventory-section').classList.remove('hidden');
-    renderInventoryForForm(currentCharacterItems, forcaValue);
+    renderInventoryForForm(currentCharacterItems, attrs.forca || 0);
 }
 
 export async function exportCard(cardId) {
@@ -663,8 +453,7 @@ export async function exportCard(cardId) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        const safeTitle = (dataToExport.title || 'card').replace(/\s+/g, '_');
-        a.download = `${safeTitle}.json`;
+        a.download = `${(dataToExport.title || 'card').replace(/\s+/g, '_')}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -678,46 +467,24 @@ export async function importCard(file) {
         reader.onload = async (e) => {
             try {
                 const importedCard = JSON.parse(e.target.result);
-                if (!importedCard || importedCard.id === undefined) {
-                    throw new Error("Formato de arquivo inválido. Esperado um único objeto de personagem com um ID.");
-                }
+                if (!importedCard || importedCard.id === undefined) throw new Error("Formato inválido.");
 
                 importedCard.id = Date.now().toString();
                 importedCard.inPlay = false; 
 
-                if (importedCard.image) {
-                    importedCard.image = base64ToArrayBuffer(importedCard.image);
-                }
-                if (importedCard.backgroundImage) {
-                    importedCard.backgroundImage = base64ToArrayBuffer(importedCard.backgroundImage);
-                }
+                if (importedCard.image) importedCard.image = base64ToArrayBuffer(importedCard.image);
+                if (importedCard.backgroundImage) importedCard.backgroundImage = base64ToArrayBuffer(importedCard.backgroundImage);
                 
                 importedCard.predominantColor = await calculateColor(importedCard.backgroundImage, importedCard.backgroundMimeType);
 
                 await saveData('rpgCards', importedCard);
                 resolve(importedCard);
             } catch (error) {
-                console.error("Erro ao importar cartão:", error);
                 reject(error);
             }
         };
         reader.onerror = (e) => reject(e.target.error);
         reader.readAsText(file);
-    });
-}
-
-function showCustomAlert(message) {
-    const modalHtml = `
-        <div id="custom-alert-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-            <div class="bg-gray-800 text-white rounded-lg shadow-2xl p-6 w-full max-w-sm border border-gray-700">
-                <p class="text-center text-lg mb-4">${message}</p>
-                <button id="close-alert-btn" class="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 font-bold">OK</button>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    document.getElementById('close-alert-btn').addEventListener('click', () => {
-        document.getElementById('custom-alert-modal').remove();
     });
 }
 
@@ -739,7 +506,6 @@ function getCurrentlySelectedPericias() {
     return selectedPericias;
 }
 
-
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('characterImageUpload').addEventListener('change', (e) => {
         const file = e.target.files[0];
@@ -759,81 +525,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('addItemToCharacter', (e) => {
         const { data, type } = e.detail;
-        if (type === 'magic') {
-            createSelectedItemElement(data, type);
-        } else if (type === 'item') {
+        if (type === 'magic') createSelectedItemElement(data, type);
+        else if (type === 'item') {
             currentCharacterItems.push(data);
-            const strength = parseInt(document.getElementById('forca').value) || 0;
-            renderInventoryForForm(currentCharacterItems, strength);
-        } else if (type === 'attack') {
-            createSelectedAttackElement(data);
-        }
+            renderInventoryForForm(currentCharacterItems, parseInt(document.getElementById('forca').value) || 0);
+        } else if (type === 'attack') createSelectedAttackElement(data);
     });
     
-    document.addEventListener('addRelationshipToCharacter', (e) => {
-        const { data } = e.detail;
-        createSelectedRelationshipElement(data);
-    });
+    document.addEventListener('addRelationshipToCharacter', (e) => createSelectedRelationshipElement(e.detail.data));
 
     document.addEventListener('requestItemRemoval', (e) => {
         const { itemIndex } = e.detail;
         if (itemIndex > -1 && itemIndex < currentCharacterItems.length) {
             currentCharacterItems.splice(itemIndex, 1);
-            const strength = parseInt(document.getElementById('forca').value) || 0;
-            renderInventoryForForm(currentCharacterItems, strength);
+            renderInventoryForForm(currentCharacterItems, parseInt(document.getElementById('forca').value) || 0);
         }
     });
 
-    const forcaInput = document.getElementById('forca');
-    forcaInput.addEventListener('input', () => {
-        const strength = parseInt(forcaInput.value) || 0;
-        renderInventoryForForm(currentCharacterItems, strength);
+    document.getElementById('forca').addEventListener('input', (e) => {
+        renderInventoryForForm(currentCharacterItems, parseInt(e.target.value) || 0);
     });
     
-    document.getElementById('add-item-to-inventory-btn').addEventListener('click', () => {
-        openItemSelectionModal('item');
-    });
+    document.getElementById('add-item-to-inventory-btn').addEventListener('click', () => openItemSelectionModal('item'));
 
     const showBtn = document.getElementById('show-add-pericia-form-btn');
     const addForm = document.getElementById('add-pericia-form');
     const addBtn = document.getElementById('add-new-pericia-btn');
     const cancelBtn = document.getElementById('cancel-add-pericia-btn');
-    const nameInput = document.getElementById('new-pericia-name');
-    const attributeSelect = document.getElementById('new-pericia-attribute');
-    const descriptionInput = document.getElementById('new-pericia-description');
 
-    if (showBtn && addForm) {
-        showBtn.addEventListener('click', () => {
-            addForm.classList.toggle('hidden');
-        });
-    }
-
-    if (cancelBtn && addForm) {
-        cancelBtn.addEventListener('click', () => {
-            addForm.classList.add('hidden');
-            if (nameInput) nameInput.value = '';
-            if (descriptionInput) descriptionInput.value = '';
-        });
-    }
+    if (showBtn && addForm) showBtn.addEventListener('click', () => addForm.classList.toggle('hidden'));
+    if (cancelBtn && addForm) cancelBtn.addEventListener('click', () => addForm.classList.add('hidden'));
 
     if (addBtn) {
         addBtn.addEventListener('click', () => {
-            const name = nameInput.value.trim();
-            const attribute = attributeSelect.value;
-            const description = descriptionInput.value.trim();
+            const name = document.getElementById('new-pericia-name').value.trim();
+            const attribute = document.getElementById('new-pericia-attribute').value;
+            const description = document.getElementById('new-pericia-description').value.trim();
 
             if (name && attribute) {
                 saveCustomPericia(attribute, name, description);
                 populatePericiasCheckboxes(getCurrentlySelectedPericias());
-
                 addForm.classList.add('hidden');
-                nameInput.value = '';
-                descriptionInput.value = '';
-
+                document.getElementById('new-pericia-name').value = '';
+                document.getElementById('new-pericia-description').value = '';
                 document.dispatchEvent(new CustomEvent('periciasUpdated'));
-
             } else {
-                showCustomAlert('Por favor, preencha o nome da perícia e selecione um atributo.');
+                alert('Por favor, preencha o nome da perícia e selecione um atributo.');
             }
         });
     }

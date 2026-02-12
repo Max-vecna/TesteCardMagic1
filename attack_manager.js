@@ -1,18 +1,10 @@
 import { saveData, getData, removeData } from './local_db.js';
 import { populateCharacterSelect } from './character_manager.js';
 import { populateCategorySelect } from './category_manager.js';
+import { showImagePreview } from './ui_utils.js';
 
 let currentEditingAttackId = null;
 let attackImageFile = null;
-
-function showImagePreview(element, url) {
-    if (url) {
-        element.src = url;
-        element.classList.remove('hidden');
-    } else {
-        element.classList.add('hidden');
-    }
-}
 
 function readFileAsArrayBuffer(file) {
     return new Promise((resolve, reject) => {

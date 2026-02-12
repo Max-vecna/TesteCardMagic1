@@ -1,6 +1,4 @@
-/* === ARQUIVO: navigation_manager.js === */
-import { populatePericiasCheckboxes, saveCharacterCard, editCard, importCard, getCurrentEditingCardId, exportCard, resetCharacterFormState, populateCharacterSelect } from './character_manager.js';
-// *** MODIFICAÇÃO: Importa showImagePreview ***
+import { saveCharacterCard, editCard, importCard, getCurrentEditingCardId, exportCard, resetCharacterFormState, populateCharacterSelect } from './character_manager.js';
 import { populateSpellAumentosSelect, saveSpellCard, editSpell, importSpell, exportSpell, showImagePreview } from './magic_manager.js';
 import { populateItemAumentosSelect, saveItemCard, editItem, importItem, removeItem, exportItem } from './item_manager.js';
 import { saveAttackCard, editAttack, removeAttack, exportAttack, importAttack } from './attack_manager.js';
@@ -8,23 +6,19 @@ import { renderCategoryScreen, populateCategorySelect } from './category_manager
 import { renderGrimoireScreen } from './grimoire_manager.js';
 import { renderFullAttackSheet } from './attack_renderer.js';
 import { openDatabase, removeData, getData, saveData, exportDatabase, importDatabase, exportImagesAsPng, showProgressModal, hideProgressModal, updateProgress } from './local_db.js';
-import { renderFullCharacterSheet, updateStatDisplay } from './card-renderer.js';
+import { renderFullCharacterSheet } from './card-renderer.js';
 import { renderFullSpellSheet } from './magic_renderer.js';
 import { renderFullItemSheet } from './item_renderer.js';
-import { showCustomAlert, showCustomConfirm, showMultiplierPrompt, showTopAlert } from './ui_utils.js';
+import { showCustomAlert, showCustomConfirm } from './ui_utils.js';
+import { bufferToBlob } from './ui_utils.js';
 
 let renderContent;
-const viewCache = {}; // Objeto para armazenar o HTML das seções já renderizadas
-let isCombatModeActive = false;
+const viewCache = {};
 let contentDisplay;
 let mainContainer;
 
-/**
- * Retorna se o modo de combate está ativo.
- * @returns {boolean}
- */
 export function isCombatActive() {
-    return isCombatModeActive;
+    return false; // Modo de combate desativado/simplificado
 }
 
 async function renderCharacterInGame() {
@@ -36,63 +30,10 @@ async function renderCharacterInGame() {
     contentDisplay.style.boxShadow = '';
     if (mainContainer) mainContainer.style.overflowY = 'hidden';
     contentDisplay.style.overflowY = 'visible';
-    contentDisplay.classList.add('justify-center'); // Centraliza o card em jogo
+    contentDisplay.classList.add('justify-center');
 
     if (characterInPlay) {
-
-        // *** NOVO: Restaura o estado de combate do personagem ***
-        if (characterInPlay.isInCombat) {
-            isCombatModeActive = true;
-        } else {
-            isCombatModeActive = false;
-        }
-        // *** FIM DA MODIFICAÇÃO ***
-
-        // A chamada completa só acontece na carga inicial da aba
         await renderFullCharacterSheet(characterInPlay, false, true, contentDisplay);
-
-        const combatButton = document.createElement('button');
-        combatButton.id = 'combat-mode-btn';
-        combatButton.className = 'absolute top-4 left-4 z-20 rounded-full font-bold text-white transition-colors shadow-lg btnBatalha hidden';
-        if (isCombatModeActive) {
-            combatButton.innerHTML = '<i class="fa-solid fa-khanda"></i>';
-            combatButton.classList.add('bg-red-600', 'hover:bg-red-700');
-        } else {
-            combatButton.innerHTML = '<i class="fa-solid fa-khanda"></i>';
-            combatButton.classList.add('bg-green-600', 'hover:bg-green-700');
-        }
-
-        combatButton.addEventListener('click', async () => { // *** TORNADO ASSÍNCRONO ***
-            if (isCombatModeActive) {
-                endCombat(); // Esta função já é assíncrona
-            } else {
-                isCombatModeActive = true;
-
-                // *** NOVO: Salva o estado de combate no DB ***
-                if (characterInPlay) {
-                    characterInPlay.isInCombat = true;
-                    await saveData('rpgCards', characterInPlay);
-                }
-                // *** FIM DA MODIFICAÇÃO ***
-
-                // MODIFICAÇÃO: Apenas atualiza o botão, não recarrega a ficha
-                combatButton.innerHTML = '<i class="fa-solid fa-khanda"></i>';
-                combatButton.classList.remove('bg-green-600', 'hover:bg-green-700');
-                combatButton.classList.add('bg-red-600', 'hover:bg-red-700');
-            }
-        });
-
-        const sheetElement = contentDisplay.querySelector('[id^="character-sheet-"]');
-        if(sheetElement) {
-            // Garante que o botão seja filho direto do contentDisplay para não ser removido em updates parciais
-             contentDisplay.appendChild(combatButton);
-             // Ajusta posicionamento relativo ao contentDisplay se necessário
-             combatButton.style.position = 'fixed'; // Ou absolute se contentDisplay for relative
-        } else {
-             contentDisplay.appendChild(combatButton);
-        }
-
-
     } else {
         contentDisplay.innerHTML = `
             <div class="w-full h-full flex flex-col items-center justify-center">
@@ -105,168 +46,23 @@ async function renderCharacterInGame() {
     }
 }
 
-/**
- * Aplica os bônus temporários de um item/magia ao personagem em jogo.
- * @param {object} sourceItem - O item ou magia que concede os bônus.
- */
-async function useAbilityInCombat(sourceItem) {
-    if (!sourceItem) return;
-
-    // Busca os dados MAIS RECENTES do personagem
-    const characterInPlay = (await getData('rpgCards')).find(char => char.inPlay);
-    if (!characterInPlay) {
-        showCustomAlert("Nenhum personagem está em jogo para usar habilidades.");
-        return;
-    }
-
-    let multiplier = 1;
-    const baseManaCost = sourceItem.manaCost || 0;
-
-    if (baseManaCost > 0) {
-        const result = await showMultiplierPrompt({
-            title: `Usar ${sourceItem.name}`,
-            baseCost: baseManaCost,
-            costType: "PM"
-        });
-
-        if (result === null) return; // O usuário cancelou
-        multiplier = result;
-    }
-
-    const totalManaCost = baseManaCost * multiplier;
-
-    // Verifica mana ANTES de aplicar qualquer efeito
-    if (characterInPlay.attributes.manaAtual < totalManaCost) {
-        showCustomAlert("Mana insuficiente!");
-        return;
-    }
-
-    // Deduz a mana
-    characterInPlay.attributes.manaAtual -= totalManaCost;
-
-    // Aplica os bônus
-    let hasInstantEffect = false;
-    const lingeringBuffs = [];
-
-    if (sourceItem.aumentos && sourceItem.aumentos.length > 0) {
-        const tempBuffs = sourceItem.aumentos.filter(a => a.tipo === 'temporario');
-
-        tempBuffs.forEach(buff => {
-            if (buff.nome && typeof buff.valor === 'number') { // Validação extra
-                const totalValue = buff.valor * multiplier;
-                // Adiciona o buff à lista de buffs persistentes
-                lingeringBuffs.push({ ...buff, valor: totalValue });
-                hasInstantEffect = true; // Marca que um buff foi aplicado
-            } else {
-                console.warn("Buff inválido encontrado:", buff, "em", sourceItem.name);
-            }
-        });
-    }
-
-    if (lingeringBuffs.length > 0) {
-        if (!characterInPlay.activeBuffs) {
-            characterInPlay.activeBuffs = [];
-        }
-        // Adiciona a nova fonte de buff
-        characterInPlay.activeBuffs.push({
-            sourceId: `${sourceItem.id}-${Date.now()}`,
-            sourceName: `${sourceItem.name} (x${multiplier})`,
-            buffs: lingeringBuffs
-        });
-        hasInstantEffect = true;
-    }
-
-    // Salva os dados ATUALIZADOS do personagem (com mana deduzida e buffs adicionados)
-    await saveData('rpgCards', characterInPlay);
-
-    // --- MODIFICAÇÃO ---
-    // Recarrega a tela inteira "Em Jogo" para garantir que os bônus temporários apareçam
-    await renderCharacterInGame();
-
-    let alertMessage = `Custo: ${totalManaCost} PM.`;
-    if (hasInstantEffect) {
-        alertMessage = `Habilidade ${sourceItem.name} (x${multiplier}) usada. ${alertMessage}`;
-    }
-    // *** MODIFICAÇÃO: Usar showTopAlert ***
-    showTopAlert(alertMessage, 5000); // Mostra por 5 segundos
-    // O modal da habilidade usada NÃO é fechado aqui.
-}
-
-
-/**
- * Encerra o modo de combate, removendo todos os bônus temporários.
- */
-async function endCombat() {
-    const characterInPlay = (await getData('rpgCards')).find(char => char.inPlay);
-    let updated = false;
-    if (characterInPlay) { // *** Verificação simplificada ***
-        if (characterInPlay.activeBuffs && characterInPlay.activeBuffs.length > 0) { // Verifica se há buffs para limpar
-            characterInPlay.activeBuffs = []; // Limpa todos os buffs
-            updated = true;
-        }
-
-        // *** NOVO: Limpa o estado de combate no DB ***
-        if (characterInPlay.isInCombat) {
-            characterInPlay.isInCombat = false;
-            updated = true;
-        }
-        // *** FIM DA MODIFICAÇÃO ***
-
-        if (updated) {
-            await saveData('rpgCards', characterInPlay);
-        }
-    }
-    isCombatModeActive = false; // Define a variável local
-
-    // --- MODIFICAÇÃO ---
-    // Recarrega a tela inteira "Em Jogo" para garantir que os bônus sejam removidos da UI
-    await renderCharacterInGame();
-    // --- FIM DA MODIFICAÇÃO ---
-
-    // *** MODIFICAÇÃO: Usar showTopAlert em vez de showCustomAlert ***
-    showTopAlert("Combate encerrado. Bônus temporários removidos.");
-}
-
-
-/**
- * Invalida (limpa) o cache para uma seção específica.
- * @param {string} target - O nome da seção a ser invalidada (ex: 'personagem').
- */
 function invalidateCache(target) {
-    if (viewCache[target]) {
-        delete viewCache[target];
-    }
+    if (viewCache[target]) delete viewCache[target];
 }
 
-
-function bufferToBlob(buffer, mimeType) {
-    return new Blob([buffer], { type: mimeType });
-}
-
-/**
- * Aplica a escala correta aos thumbnails de cards dentro de um contêiner.
- * @param {HTMLElement} container - O elemento que contém os thumbnails.
- */
 function applyThumbnailScaling(container) {
     requestAnimationFrame(() => {
         container.querySelectorAll('.rpg-thumbnail').forEach(thumbnail => {
-            const innerSheet = thumbnail.querySelector('.miniCard > div[style*="width"]'); // Alvo mais específico
+            const innerSheet = thumbnail.querySelector('.miniCard > div[style*="width"]');
             if (innerSheet) {
                 const sheetWidth = parseFloat(innerSheet.style.width);
                 const sheetHeight = parseFloat(innerSheet.style.height);
 
                 if (sheetWidth > 0 && sheetHeight > 0) {
-                    // Define o aspect-ratio do contêiner do thumbnail para corresponder ao da ficha
                     thumbnail.style.aspectRatio = `${sheetWidth} / ${sheetHeight}`;
-
                     const thumbWidth = thumbnail.offsetWidth;
-                     // Usa offsetHeight GERALMENTE funciona, mas se o elemento pai tiver altura flexível, pode ser 0.
-                     // Fallback para calcular altura baseada na largura e aspect ratio
                     const thumbHeight = thumbnail.offsetHeight || (thumbWidth * (sheetHeight / sheetWidth));
-
-
-                    // Calcula a escala baseada na dimensão que mais restringe
-                    const scaleX = thumbWidth > 0 ? thumbWidth / sheetWidth : 1; // Evita divisão por zero
+                    const scaleX = thumbWidth > 0 ? thumbWidth / sheetWidth : 1;
                     const scaleY = thumbHeight > 0 ? thumbHeight / sheetHeight : 1;
                     const scale = Math.min(scaleX, scaleY);
 
@@ -276,16 +72,12 @@ function applyThumbnailScaling(container) {
             }
         });
 
-        // Aplica a animação de visibilidade após o dimensionamento
         const thumbnails = container.querySelectorAll('.rpg-thumbnail');
         thumbnails.forEach((cardWrapper, index) => {
-            setTimeout(() => {
-                cardWrapper.classList.add('visible');
-            }, index * 50);
+            setTimeout(() => cardWrapper.classList.add('visible'), index * 50);
         });
     });
 }
-
 
 export async function openCharacterSelectionForRelationship() {
     const selectCharacterModal = document.getElementById('select-character-modal');
@@ -377,7 +169,6 @@ export async function openSelectionModal(type) {
 
     const renderList = async (characterId) => {
         listContainer.innerHTML = '<div class="text-center p-4"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i></div>';
-
         let data = await getData(storeName);
 
         if (type === 'relationship') {
@@ -386,7 +177,6 @@ export async function openSelectionModal(type) {
                 data = data.filter(c => c.id !== currentCharacterId);
             }
         } else if (characterId && characterId !== 'all') {
-             // Filtra por ID do personagem E também remove itens do tipo errado (magia vs habilidade)
              data = data.filter(item => {
                 const characterMatch = item.characterId === characterId;
                 if (storeName === 'rpgSpells') {
@@ -396,13 +186,10 @@ export async function openSelectionModal(type) {
                 return characterMatch;
             });
         } else if (storeName === 'rpgSpells' && type === 'magic') {
-            // Se 'Todos', ainda filtra para mostrar só magias
             data = data.filter(item => item.type !== 'habilidade');
         } else if (storeName === 'rpgSpells' && type !== 'magic') {
-             // Se 'Todos', ainda filtra para mostrar só habilidades (assumindo type='habilidade' ou similar)
              data = data.filter(item => item.type === 'habilidade');
         }
-
 
         listContainer.innerHTML = '';
 
@@ -428,7 +215,7 @@ export async function openSelectionModal(type) {
                 let iconClass;
                 switch(type) {
                     case 'item': iconClass = 'fa-box'; break;
-                    case 'magic': iconClass = item.type === 'habilidade' ? 'fa-fist-raised' : 'fa-magic'; break; // Icon based on item type
+                    case 'magic': iconClass = item.type === 'habilidade' ? 'fa-fist-raised' : 'fa-magic'; break;
                     case 'relationship': iconClass = 'fa-user'; break;
                     case 'attack': iconClass = 'fa-khanda'; break;
                     default: iconClass = 'fa-question-circle';
@@ -446,13 +233,9 @@ export async function openSelectionModal(type) {
 
             el.addEventListener('click', () => {
                 let eventType = 'addItemToCharacter';
-                 // Passa o tipo correto ('item', 'magic', 'attack') para o evento
                 let detail = { data: item, type: type === 'relationship' ? 'relationship' : (storeName === 'rpgItems' ? 'item' : (storeName === 'rpgSpells' ? 'magic' : 'attack')) };
 
-                if (type === 'relationship') {
-                    eventType = 'addRelationshipToCharacter';
-                    // detail.type = 'relationship'; // Already set correctly by switch logic? Redundant.
-                }
+                if (type === 'relationship') eventType = 'addRelationshipToCharacter';
 
                 document.dispatchEvent(new CustomEvent(eventType, { detail }));
                 selectionModal.classList.add('hidden');
@@ -494,16 +277,11 @@ async function createItemGrid(items, type, renderSheetFunction) {
     const cardElements = await Promise.all(items.map(async (item) => {
         const sheetHtml = await renderSheetFunction(item, false);
         const cardWrapper = document.createElement('div');
-        let cardType = type; // e.g., 'magias', 'habilidades', 'itens', 'ataques'
+        let cardType = type;
 
-        // Normalize type for data-attribute consistency
-        if (type === 'magias' || type === 'habilidades') {
-            cardType = 'spell';
-        } else if (type === 'itens') {
-            cardType = 'item';
-        } else if (type === 'ataques') {
-            cardType = 'attack';
-        }
+        if (type === 'magias' || type === 'habilidades') cardType = 'spell';
+        else if (type === 'itens') cardType = 'item';
+        else if (type === 'ataques') cardType = 'attack';
 
 
         cardWrapper.className = 'rpg-thumbnail bg-cover bg-center relative';
@@ -531,24 +309,12 @@ async function createItemGrid(items, type, renderSheetFunction) {
 }
 
 
-async function renderGroupedList({
-    type,
-    storeName,
-    buttonText,
-        buttonAction,
-        importBtnId,
-        importInputId,
-        importTitle,
-        importFunction,
-        themeColor,
-        renderSheetFunction,
-        unassignedTitle
-}) {
+async function renderGroupedList({ type, storeName, buttonText, buttonAction, importBtnId, importInputId, importTitle, importFunction, themeColor, renderSheetFunction, unassignedTitle }) {
     contentDisplay.innerHTML = '';
 
     const allItems = await getData(storeName);
     const allCharacters = await getData('rpgCards');
-    const allCategories = (await getData('rpgCategories')) || []; // Default to empty array
+    const allCategories = (await getData('rpgCategories')) || [];
 
     const charactersById = allCharacters.reduce((acc, char) => { acc[char.id] = char; return acc; }, {});
     const categoriesById = allCategories.reduce((acc, cat) => { acc[cat.id] = cat; return acc; }, {});
@@ -578,7 +344,7 @@ async function renderGroupedList({
     addGrid.className = 'grid gap-4 w-full justify-items-center grid-cols-3 md:grid-cols-4 lg:grid-cols-5';
     const addButtonWrapper = document.createElement('div');
     addButtonWrapper.className = 'relative w-full h-full';
-    addButtonWrapper.style.aspectRatio = '120 / 160'; // Mantém proporção
+    addButtonWrapper.style.aspectRatio = '120 / 160'; 
     addButtonWrapper.innerHTML = `
         <button class="add-card-button absolute inset-0" data-action="${buttonAction}">
             <i class="fas fa-plus text-2xl mb-2"></i>
@@ -612,22 +378,19 @@ async function renderGroupedList({
             if (b === 'unassigned') return -1;
             const catA = categoriesById[a];
             const catB = categoriesById[b];
-            if (!catA || !catA.name) return 1; // Put categories without names last (after unassigned)
+            if (!catA || !catA.name) return 1;
             if (!catB || !catB.name) return -1;
             return catA.name.localeCompare(catB.name);
         });
 
-
-
         for(const catId of categoryIds) {
             const category = categoriesById[catId];
             const categoryName = catId === 'unassigned' ? 'Sem Categoria' : (category?.name || 'Categoria Inválida');
-            const categoryDesc = catId === 'unassigned' ? '' : (category?.description || ''); // No description for invalid category
+            const categoryDesc = catId === 'unassigned' ? '' : (category?.description || '');
 
             const subSection = document.createElement('div');
             subSection.className = 'mb-6';
 
-            // Tooltip only if description exists
              const tooltipHtml = categoryDesc ? ` data-tooltip="${categoryDesc}"` : '';
              subSection.innerHTML = `<h3 class="category-title text-lg font-semibold text-gray-300 mb-3 relative inline-block cursor-help"${tooltipHtml}>
                                         ${categoryName}
@@ -652,9 +415,8 @@ async function renderGroupedList({
     }
 
     contentDisplay.appendChild(pageContainer);
-    applyThumbnailScaling(pageContainer); // Apply scaling after adding all elements
+    applyThumbnailScaling(pageContainer);
 
-     // Add tooltip listeners AFTER rendering everything
     pageContainer.querySelectorAll('.category-title[data-tooltip]').forEach(title => {
         let tooltipElement = null;
         title.addEventListener('mouseenter', (e) => {
@@ -665,7 +427,7 @@ async function renderGroupedList({
 
             const rect = title.getBoundingClientRect();
             tooltipElement.style.left = `${rect.left + window.scrollX}px`;
-            tooltipElement.style.top = `${rect.bottom + window.scrollY + 5}px`; // Position below the title
+            tooltipElement.style.top = `${rect.bottom + window.scrollY + 5}px`;
         });
         title.addEventListener('mouseleave', () => {
             if (tooltipElement) {
@@ -683,20 +445,18 @@ async function renderGroupedList({
     document.getElementById(importInputId).addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) {
-            try { // Add try-catch for import errors
+            try {
                 await importFunction(file, type);
-                renderContent(type, true); // Force rerender after import
+                renderContent(type, true);
              } catch (error) {
                  showCustomAlert(`Erro ao importar ${type}: ${error.message}`);
                  console.error("Import error:", error);
              } finally {
-                 e.target.value = ''; // Reset input
+                 e.target.value = '';
              }
         }
     });
 }
-
-
 
 async function renderCharacterList() {
     const allCharacters = await getData('rpgCards');
@@ -706,7 +466,7 @@ async function renderCharacterList() {
 
     const addButtonWrapper = document.createElement('div');
     addButtonWrapper.className = 'relative w-full h-full aspect-square';
-    addButtonWrapper.style.aspectRatio = '120 / 160'; // Mantém proporção
+    addButtonWrapper.style.aspectRatio = '120 / 160';
     addButtonWrapper.innerHTML = `
         <button class="add-card-button absolute inset-0" data-action="add-character">
             <i class="fas fa-plus text-2xl mb-2"></i>
@@ -723,10 +483,8 @@ async function renderCharacterList() {
 
     const cardElements = await Promise.all(allCharacters.map(async (char) => {
         const characterSheetHtml = await renderFullCharacterSheet(char, false, false);
-        // Background image handled internally by renderFullCharacterSheet
-
         const cardWrapper = document.createElement('div');
-        cardWrapper.className = 'rpg-thumbnail bg-cover bg-center relative'; // Keep relative for actions positioning
+        cardWrapper.className = 'rpg-thumbnail bg-cover bg-center relative';
         cardWrapper.dataset.action = "view";
         cardWrapper.dataset.type = "character";
         cardWrapper.dataset.id = char.id;
@@ -755,7 +513,7 @@ async function renderCharacterList() {
     cardElements.forEach(el => container.appendChild(el));
     contentDisplay.appendChild(container);
 
-    applyThumbnailScaling(container); // Apply scaling after adding all elements
+    applyThumbnailScaling(container);
 
     document.getElementById('import-cards-btn').addEventListener('click', () => {
         document.getElementById('import-json-input').click();
@@ -766,12 +524,12 @@ async function renderCharacterList() {
         if (file) {
              try {
                 await importCard(file);
-                renderContent('personagem', true); // Force rerender
+                renderContent('personagem', true);
             } catch (error) {
                 showCustomAlert(`Erro ao importar personagem: ${error.message}`);
                 console.error("Import error:", error);
             } finally {
-                e.target.value = ''; // Reset input
+                e.target.value = '';
             }
         }
     });
@@ -829,47 +587,13 @@ async function renderAttackList() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     const style = document.createElement('style');
-     // Adiciona estilos para tooltip de categoria
     style.innerHTML = `
-        .rpg-thumbnail {
-            opacity: 0;
-            transform: translateY(20px) scale(0.95);
-            transition: opacity 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.2s ease-in-out;
-            will-change: transform, opacity; /* Otimização */
-        }
-        .rpg-thumbnail.visible {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-        }
-        .category-tooltip {
-            position: absolute;
-            background-color: rgba(0, 0, 0, 0.85);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            white-space: pre-wrap; /* Permite quebras de linha */
-            z-index: 1000;
-            max-width: 250px;
-            pointer-events: none; /* Não interfere com o mouse */
-            border: 1px solid #4a5568;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        }
-        .category-title[data-tooltip]::after { /* Seta opcional */
-            /* content: ''; */
-            /* position: absolute; */
-            /* bottom: 100%; */
-            /* left: 50%; */
-            /* margin-left: -5px; */
-            /* border-width: 5px; */
-            /* border-style: solid; */
-            /* border-color: transparent transparent rgba(0, 0, 0, 0.85) transparent; */
-        }
-
+        .rpg-thumbnail { opacity: 0; transform: translateY(20px) scale(0.95); transition: opacity 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.2s ease-in-out; will-change: transform, opacity; }
+        .rpg-thumbnail.visible { opacity: 1; transform: translateY(0) scale(1); }
+        .category-tooltip { position: absolute; background-color: rgba(0, 0, 0, 0.85); color: white; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; white-space: pre-wrap; z-index: 1000; max-width: 250px; pointer-events: none; border: 1px solid #4a5568; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
     `;
     document.head.appendChild(style);
 
-    const contentLoader = document.getElementById('content-loader');
     const navButtons = document.querySelectorAll('[data-target]');
     contentDisplay = document.getElementById('content-display');
     mainContainer = document.querySelector('main.max-w-6xl');
@@ -878,7 +602,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const itemCreationSection = document.getElementById('item-creation-section');
     const attackCreationSection = document.getElementById('attack-creation-section');
     const selectCharacterModal = document.getElementById('select-character-modal');
-    const selectCharacterList = document.getElementById('select-character-list');
 
     const selectCharacterCloseBtn = document.getElementById('select-character-close-btn');
     const closeFormBtn = document.getElementById('close-form-btn');
@@ -917,19 +640,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderContent = async (target, force = false) => {
         contentDisplay.classList.remove('justify-center');
-        contentDisplay.removeAttribute('style'); // Limpa estilos para corrigir o bug do background
+        contentDisplay.removeAttribute('style');
 
-        // Telas complexas com múltiplos event listeners e estado não devem usar cache de HTML.
         const complexScreens = ['personagem-em-jogo', 'grimorio'];
 
-        // Se a view estiver em cache e não for uma tela complexa, use o cache.
         if (!force && viewCache[target] && !complexScreens.includes(target)) {
             contentDisplay.innerHTML = viewCache[target];
-            applyThumbnailScaling(contentDisplay); // Reapply scaling on cached content
+            applyThumbnailScaling(contentDisplay);
             return;
         }
 
-        contentDisplay.innerHTML = ''; // Limpa antes de renderizar
+        contentDisplay.innerHTML = '';
         creationSection.classList.add('hidden');
         spellCreationSection.classList.add('hidden');
         itemCreationSection.classList.add('hidden');
@@ -941,7 +662,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (mainContainer) mainContainer.style.overflowY = 'auto';
             contentDisplay.style.overflowY = 'scroll';
         }
-        invalidateCache(target);// Invalida o cache antes de renderizar (caso force=true)
+        invalidateCache(target);
 
         if (target === 'personagem') await renderCharacterList();
         else if (target === 'magias') await renderSpellList('magias');
@@ -952,26 +673,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         else if (target === 'grimorio') await renderGrimoireScreen();
         else if (target === 'personagem-em-jogo') await renderCharacterInGame();
 
-        // Não salva telas complexas no cache por serem muito dinâmicas
         if (target && !complexScreens.includes(target)) {
             viewCache[target] = contentDisplay.innerHTML;
-            applyThumbnailScaling(contentDisplay); // Apply scaling after fresh render too
+            applyThumbnailScaling(contentDisplay);
         } else if (target === 'personagem-em-jogo') {
-            // Se for a tela em jogo, não precisa de scaling de thumbnail, mas pode precisar de outra lógica pós-render
         } else {
-             applyThumbnailScaling(contentDisplay); // Aplica scaling mesmo para telas complexas se tiverem thumbnails
+             applyThumbnailScaling(contentDisplay);
         }
     };
 
     function showView(section, isEditing, setupFunction) {
         section.classList.remove('hidden');
-        document.getElementById('main-content').classList.add('hidden');
-         // Esconde a barra de navegação desktop também
-        const desktopNav = document.getElementById('desktop-sidebar');
-        if (desktopNav) desktopNav.classList.add('hidden');
-        // Esconde a barra de navegação mobile
-        const mobileNav = document.querySelector('nav.md\\:hidden');
-        if (mobileNav) mobileNav.classList.add('hidden');
+        
+        // Bloqueia o scroll do corpo para focar no modal
+        document.body.classList.add('overflow-hidden');
 
         if (setupFunction) setupFunction();
     }
@@ -982,7 +697,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         selectCharacterList.innerHTML = '';
         const allCharacters = await getData('rpgCards');
 
-        if (!allCharacters || allCharacters.length === 0) { // Check if undefined or empty
+        if (!allCharacters || allCharacters.length === 0) {
             selectCharacterList.innerHTML = '<p class="text-gray-400">Nenhum personagem disponível.</p>';
         } else {
             allCharacters.forEach(char => {
@@ -1002,7 +717,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }));
                         selectedChar.inPlay = true;
                         await saveData('rpgCards', selectedChar);
-                        renderContent('personagem-em-jogo', true); // Force rerender
+                        renderContent('personagem-em-jogo', true);
                         selectCharacterModal.classList.add('hidden');
                     }
                 });
@@ -1017,7 +732,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const target = event.currentTarget.dataset.target;
             if (!target) return;
 
-            // Close mobile sidebars on navigation
             const sidebar = document.getElementById('actions-sidebar');
             const sidebar1 = document.getElementById('actions-sidebar-1');
             if (sidebar) sidebar.classList.remove('active');
@@ -1031,12 +745,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // The listener above handles closing for navigation buttons ([data-target]).
-    // This adds the same closing behavior to the other action buttons in the sidebars.
     const actionButtons = document.querySelectorAll('#actions-sidebar button:not([data-target]), #actions-sidebar-1 button:not([data-target])');
 
     actionButtons.forEach(button => {
-        // Exclude toggle buttons which have their own logic in sidebar_manager.js
         if (button.id !== 'sidebar-toggle' && button.id !== 'sidebar-toggle-1') {
             button.addEventListener('click', () => {
                 const sidebar = document.getElementById('actions-sidebar');
@@ -1063,12 +774,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             spellForm.dataset.type = isHabilidade ? 'habilidade' : 'magia';
             spellFormTitle.textContent = isHabilidade ? 'Nova Habilidade' : 'Nova Magia';
             spellSubmitButton.textContent = isHabilidade ? 'Criar Habilidade' : 'Criar Magia';
-            document.getElementById('mana-cost-wrapper').classList.toggle('hidden', isHabilidade); // Esconde círculo e custo
+            document.getElementById('mana-cost-wrapper').classList.toggle('hidden', isHabilidade);
             enhanceWrapper.classList.toggle('hidden', isHabilidade);
             trueWrapper.classList.toggle('hidden', isHabilidade);
-            populateSpellAumentosSelect(); // Garante que aumentos sejam populados
-             document.getElementById('spell-aumentos-list').innerHTML = ''; // Limpa lista de aumentos
-             showImagePreview(document.getElementById('spellImagePreview'), null, true); // Limpa preview
+            populateSpellAumentosSelect();
+             document.getElementById('spell-aumentos-list').innerHTML = '';
+             showImagePreview(document.getElementById('spellImagePreview'), null, true);
             await populateCharacterSelect('spellCharacterOwner');
             await populateCategorySelect('spell-category-select', isHabilidade ? 'habilidade' : 'magia');
         });
@@ -1076,9 +787,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             itemForm.reset();
             itemFormTitle.textContent = 'Novo Item';
             itemSubmitButton.textContent = 'Criar Item';
-            populateItemAumentosSelect(); // Garante que aumentos sejam populados
-            document.getElementById('item-aumentos-list').innerHTML = ''; // Limpa lista de aumentos
-            showImagePreview(document.getElementById('itemImagePreview'), null, true); // Limpa preview
+            populateItemAumentosSelect();
+            document.getElementById('item-aumentos-list').innerHTML = '';
+            showImagePreview(document.getElementById('itemImagePreview'), null, true);
             await populateCharacterSelect('itemCharacterOwner');
             await populateCategorySelect('item-category-select', 'item');
         });
@@ -1086,7 +797,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             attackForm.reset();
             attackFormTitle.textContent = 'Novo Ataque';
             attackSubmitButton.textContent = 'Criar Ataque';
-            showImagePreview(document.getElementById('attackImagePreview'), null, true); // Limpa preview
+            showImagePreview(document.getElementById('attackImagePreview'), null, true);
             await populateCharacterSelect('attackCharacterOwner');
             await populateCategorySelect('attack-category-select', 'ataque');
         });
@@ -1095,26 +806,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const closeForm = (section) => {
         if (section.id === 'creation-section') {
-            resetCharacterFormState(); // Reset specific to character form
+            resetCharacterFormState();
         } else if (section.id === 'spell-creation-section') {
-             // *** MODIFICAÇÃO: Usa a função importada ***
              showImagePreview(document.getElementById('spellImagePreview'), null, true);
              document.getElementById('spell-aumentos-list').innerHTML = '';
         } else if (section.id === 'item-creation-section') {
-             // *** MODIFICAÇÃO: Usa a função importada ***
              showImagePreview(document.getElementById('itemImagePreview'), null, true);
              document.getElementById('item-aumentos-list').innerHTML = '';
         } else if (section.id === 'attack-creation-section') {
-             // *** MODIFICAÇÃO: Usa a função importada ***
              showImagePreview(document.getElementById('attackImagePreview'), null, true);
         }
 
         section.classList.add('hidden');
-        document.getElementById('main-content').classList.remove('hidden');
-         // *** CORREÇÃO: Linha removida para não mostrar a sidebar desktop incondicionalmente ***
-        // Mostra a barra de navegação mobile novamente
-        const mobileNav = document.querySelector('nav.md\\:hidden');
-        if (mobileNav) mobileNav.classList.remove('hidden');
+        
+        // Libera o scroll do corpo
+        document.body.classList.remove('overflow-hidden');
     };
 
 
@@ -1124,7 +830,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     closeAttackFormBtn.addEventListener('click', () => closeForm(attackCreationSection));
 
     selectCharacterCloseBtn.addEventListener('click', () => selectCharacterModal.classList.add('hidden'));
-     // Add listener to close modal on overlay click
     selectCharacterModal.addEventListener('click', (e) => {
         if (e.target === selectCharacterModal) {
             selectCharacterModal.classList.add('hidden');
@@ -1164,7 +869,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('add-magic-to-char-btn').addEventListener('click', () => openSelectionModal('magic'));
     document.getElementById('add-attack-to-char-btn').addEventListener('click', () => openSelectionModal('attack'));
     selectionModalCloseBtn.addEventListener('click', () => selectionModal.classList.add('hidden'));
-    // Add listener to close modal on overlay click
     selectionModal.addEventListener('click', (e) => {
         if (e.target === selectionModal) {
              selectionModal.classList.add('hidden');
@@ -1208,7 +912,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         showProgressModal("Exportando Imagens...");
         try {
             await exportImagesAsPng(updateProgress);
-            // showCustomAlert("Imagens exportadas com sucesso!"); // Removed success alert for less interruption
         } catch (error) {
             console.error("Erro ao exportar imagens:", error);
             showCustomAlert("Ocorreu um erro ao exportar as imagens.");
@@ -1233,9 +936,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 try {
                     await importDatabase(file, updateProgress);
                     showCustomAlert("Banco de dados importado com sucesso!");
-                    Object.keys(viewCache).forEach(key => delete viewCache[key]); // Limpa todo o cache
+                    Object.keys(viewCache).forEach(key => delete viewCache[key]);
                     const activeNav = document.querySelector('.nav-button.active, .desktop-nav-button.active')?.dataset.target || 'personagem-em-jogo';
-                    renderContent(activeNav, true); // Força o recarregamento
+                    renderContent(activeNav, true);
                 } catch (error) {
                     console.error("Erro ao importar banco de dados:", error);
                     showCustomAlert("Erro ao importar. Verifique se o arquivo é válido.");
@@ -1244,7 +947,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     importDbInput.value = '';
                 }
             } else {
-                 importDbInput.value = ''; // Reset input if cancelled
+                 importDbInput.value = '';
             }
         }
     });
@@ -1257,15 +960,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-     // Listener simplificado para dataChanged
      document.addEventListener('dataChanged', (e) => {
-        // Sempre invalida todo o cache quando os dados mudam
         Object.keys(viewCache).forEach(key => invalidateCache(key));
 
-        // Obtém a aba ativa e força o recarregamento dela
         const activeNav = document.querySelector('.nav-button.active, .desktop-nav-button.active')?.dataset.target;
         if (activeNav) {
-            renderContent(activeNav, true); // Force = true
+            renderContent(activeNav, true);
         }
     });
 
@@ -1275,7 +975,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const menuBtn = e.target.closest('.thumb-btn-menu');
         const menuItem = e.target.closest('.thumbnail-menu .menu-item');
 
-        // Click no card (fora do menu) -> Abrir ficha completa
         if (thumbCard && !menuBtn && !menuItem) {
             const cardId = thumbCard.dataset.id;
             const cardType = thumbCard.dataset.type;
@@ -1286,14 +985,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Click no botão de menu (...) -> Abrir/Fechar menu
        if (menuBtn) {
             e.preventDefault();
             e.stopPropagation();
             const menu = menuBtn.nextElementSibling;
             const parentThumbnail = menuBtn.closest('.rpg-thumbnail');
 
-            // Fecha outros menus abertos
             document.querySelectorAll('.rpg-thumbnail.menu-active').forEach(activeThumb => {
                 if (activeThumb !== parentThumbnail) {
                     activeThumb.classList.remove('menu-active');
@@ -1305,50 +1002,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
             
-            // Alterna o menu atual
             const isActive = menu.classList.toggle('active');
             parentThumbnail.classList.toggle('menu-active', isActive);
-
-            // Ajusta z-index e posição (esquerda/direita)
-           /* if (isActive) {
-                parentThumbnail.style.zIndex = '100'; 
-                const parentRect = parentThumbnail.getBoundingClientRect();
-                const viewportMidpoint = window.innerWidth / 2;
-                // Abre para a esquerda se o card estiver mais à direita da metade da tela
-                if ((parentRect.left + parentRect.width / 2) > viewportMidpoint) {
-                    menu.classList.add('menu-left');
-                } else {
-                    menu.classList.remove('menu-left');
-                }
-            } else {
-                 parentThumbnail.style.zIndex = ''; 
-                 menu.classList.remove('menu-left');
-            }*/
 
             return;
         }
 
-        // Click em um item do menu -> Executar ação
         if (menuItem) {
             e.preventDefault();
             e.stopPropagation();
             const action = menuItem.dataset.action;
             const cardId = menuItem.dataset.id;
-            const cardType = menuItem.closest('[data-type]').dataset.type; // Pega o tipo do menu pai
+            const cardType = menuItem.closest('[data-type]').dataset.type;
             const activeNav = document.querySelector('.nav-button.active, .desktop-nav-button.active').dataset.target;
 
-            // Fecha o menu ANTES de executar a ação
             const parentThumbnail = menuItem.closest('.rpg-thumbnail');
             if(parentThumbnail){
                 parentThumbnail.classList.remove('menu-active');
-                 parentThumbnail.style.zIndex = ''; // Reset z-index
+                 parentThumbnail.style.zIndex = '';
             }
             const parentMenu = menuItem.closest('.thumbnail-menu');
             if(parentMenu){
                 parentMenu.classList.remove('active', 'menu-left');
             }
 
-            // --- Executa a ação ---
             if (action === 'edit') {
                 if (cardType === 'character') {
                     showView(creationSection, true);
@@ -1365,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         trueWrapper.classList.toggle('hidden', isHabilidade);
 
                         showView(spellCreationSection, true);
-                        await editSpell(cardId); // editSpell preencherá os campos corretos
+                        await editSpell(cardId);
                     }
                 } else if (cardType === 'item') {
                     itemFormTitle.textContent = 'Editando Item';
@@ -1381,16 +1058,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else if (action === 'remove' || action === 'delete') {
                 if (await showCustomConfirm('Tem certeza que deseja excluir?')) {
                     let storeName;
-                    let eventType = activeNav; // Assume o tipo da navegação atual
+                    let eventType = activeNav;
 
                     if(cardType === 'character') { storeName = 'rpgCards'; eventType = 'personagem'; }
-                    else if (cardType === 'spell') { storeName = 'rpgSpells'; eventType = (await getData('rpgSpells', cardId))?.type === 'habilidade' ? 'habilidades' : 'magias'; } // Determina tipo correto
+                    else if (cardType === 'spell') { storeName = 'rpgSpells'; eventType = (await getData('rpgSpells', cardId))?.type === 'habilidade' ? 'habilidades' : 'magias'; }
                     else if (cardType === 'item') { storeName = 'rpgItems'; eventType = 'itens'; }
                     else if (cardType === 'attack') { storeName = 'rpgAttacks'; eventType = 'ataques'; }
 
                     if(storeName) {
                         await removeData(storeName, cardId);
-                        // Dispara evento para forçar recarregamento da aba atual
                         document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: eventType } }));
                     }
                 }
@@ -1402,38 +1078,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else if (action === 'set-in-play' || action === 'remove-from-play') {
                 const isSettingInPlay = action === 'set-in-play';
                 const allCharacters = await getData('rpgCards');
-                // Desmarca qualquer outro personagem em jogo ao marcar um novo
                 if (isSettingInPlay) {
                     await Promise.all(allCharacters.map(c => {
                         if (c.inPlay) {
                             c.inPlay = false;
-                            c.isInCombat = false; // *** NOVO: Limpa o combate do personagem antigo ***
                             return saveData('rpgCards', c);
                         }
                         return null;
                     }));
                 }
-                // Atualiza o personagem clicado
                 const charToUpdate = allCharacters.find(c => c.id === cardId);
                 if (charToUpdate) {
                     charToUpdate.inPlay = isSettingInPlay;
-                    if (!isSettingInPlay) { // Se estiver removendo de jogo
-                        charToUpdate.isInCombat = false; // *** NOVO: Limpa o combate ***
-                    }
                     await saveData('rpgCards', charToUpdate);
                 }
-                 // Dispara evento para forçar recarregamento da aba atual (Personagens)
                 document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: 'personagem' } }));
             }
 
-            return; // Impede que o clique no item do menu feche outros menus
+            return;
         }
 
-        // Click fora de qualquer menu -> Fechar todos os menus
         if (!e.target.closest('.thumbnail-menu') && !e.target.closest('.thumb-btn-menu')) {
             document.querySelectorAll('.rpg-thumbnail.menu-active').forEach(activeThumb => {
                 activeThumb.classList.remove('menu-active');
-                 activeThumb.style.zIndex = ''; // Reset z-index
+                 activeThumb.style.zIndex = '';
                 const activeMenu = activeThumb.querySelector('.thumbnail-menu');
                 if (activeMenu) {
                     activeMenu.classList.remove('active', 'menu-left');
@@ -1441,10 +1109,4 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
     });
-
-    // Listener para o evento de usar habilidade/item em combate
-    document.addEventListener('useAbilityInCombat', (e) => {
-        useAbilityInCombat(e.detail.sourceItem);
-    });
 });
-

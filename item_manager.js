@@ -3,6 +3,7 @@ import { renderFullItemSheet } from './item_renderer.js';
 import { openSelectionModal } from './navigation_manager.js';
 import { getAumentosData, populateCharacterSelect } from './character_manager.js';
 import { populateCategorySelect } from './category_manager.js';
+import { showImagePreview } from './ui_utils.js';
 
 let currentEditingItemId = null;
 let itemImageFile = null;
@@ -64,15 +65,6 @@ async function calculateColor(imageBuffer, imageMimeType) {
     return predominantColor;
 }
 // --- Fim das Funções de Cálculo de Cor ---
-
-function showImagePreview(element, url) {
-    if (url) {
-        element.src = url;
-        element.classList.remove('hidden');
-    } else {
-        element.classList.add('hidden');
-    }
-}
 
 function readFileAsArrayBuffer(file) {
     return new Promise((resolve, reject) => {

@@ -2,6 +2,9 @@ import { saveData, getData, removeData } from './local_db.js';
 import { renderFullSpellSheet } from './magic_renderer.js';
 import { getAumentosData, populateCharacterSelect } from './character_manager.js';
 import { populateCategorySelect } from './category_manager.js';
+import { showImagePreview } from './ui_utils.js';
+
+export { showImagePreview }; // Re-export para manter compatibilidade com navigation_manager.js
 
 // Variáveis de estado
 let currentEditingSpellId = null;
@@ -64,26 +67,6 @@ async function calculateColor(imageBuffer, imageMimeType) {
     return predominantColor;
 }
 // --- Fim das Funções de Cálculo de Cor ---
-
-// Funções auxiliares para imagens
-/**
- * Shows or hides an image preview element.
- * @param {HTMLImageElement|HTMLElement} element The image or div element for preview.
- * @param {string|null} url The object URL of the image or null to hide.
- * @param {boolean} isImageElement True if the element is an <img>, false if it's a div for background.
- */
-export function showImagePreview(element, url, isImageElement) { // Added export
-    if (url) {
-        if (isImageElement) element.src = url;
-        else element.style.backgroundImage = `url('${url}')`;
-        element.classList.remove('hidden');
-    } else {
-        if (isImageElement) element.src = ''; // Clear src for img tags
-        else element.style.backgroundImage = ''; // Clear background for divs
-        element.classList.add('hidden');
-    }
-}
-
 
 function readFileAsArrayBuffer(file) {
     return new Promise((resolve, reject) => {
