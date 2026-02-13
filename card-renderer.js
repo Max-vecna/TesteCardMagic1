@@ -622,6 +622,19 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     </div>
                 </div>                
 
+                <div style="position: relative;" data-action="edit-stat" data-stat-type="mana" data-stat-max="${permanentMaxMana}">
+                    <i class="fas fa-fire text-blue-500 text-5xl" style="background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto;">
+                        <span data-stat-current="mana">
+                            ${characterData.attributes.manaAtual || 0}
+                        </span>
+                        <hr style="width: 15px;">
+                        <span data-stat-max-display="mana" style="bottom: 12px;">
+                           ${permanentMaxMana}
+                        </span>
+                    </div>
+                </div>  
+
                  <div class="money-container rounded-full p-2 flex items-center justify-center text-sm text-amber-300 font-bold cursor-pointer" data-action="edit-stat" data-stat-type="dinheiro" title="Alterar Dinheiro" style="width: 42px; ${moneyContainerStyle} background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100});">
                     💰$<span data-stat-current="dinheiro">${characterData.dinheiro || 0}</span>
                 </div>
@@ -633,38 +646,23 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             </div>
             
             <div class="absolute top-6 left-4 p-2 rounded-full text-center cursor-pointer" style="display: flex; justify-content: space-between; flex-direction: column; height: calc(100% - 30px);">
-                <div class="mb-2 icon-container mana-icon-container" data-action="edit-stat" data-stat-type="mana" data-stat-max="${permanentMaxMana}" style="${hasMana ? 'display: none' : ''}">
-                    <i class="fas fa-fire text-blue-500 text-5xl" style="background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
-                    <div class="absolute left-0 right-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="top: 20px;">
-                        <span data-stat-current="mana">
-                            ${characterData.attributes.manaAtual || 0}
-                        </span>
-                        <hr style="width: 15px;">
-                        <span data-stat-max-display="mana" style="bottom: 12px;">
-                           ${permanentMaxMana}
-                        </span>
-                    </div>
-                </div>   
-                <div>
-                    <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4 div-Stats" style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); padding: 10px; width: 42px; justify-content: center; ">
-                        <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
-                        ${combatStatsHtml}
-                        <div class="text-center">CD<br>${cdValue}</div>
-                    </div>
+                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); padding: 10px; width: 42px; justify-content: space-evenly; ">
+                    <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
+                    ${combatStatsHtml}
+                    <div class="text-center">CD<br>${cdValue}</div>
+                </div>
 
-                    <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100}); padding: 10px; width: 42px;">
-                        ${mainAttributes.map(key => {
-                        const baseValue = parseInt(characterData.attributes[key]) || 0;
-                        const fixedBonus = totalFixedBonuses[key] || 0;
-                        const fixedBonusHtml = fixedBonus !== 0 ? ` <span class="text-green-400 font-semibold">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
-                        return `                        
-                            <label class="text-center" title="${key}">${key.slice(0, 3).toUpperCase()}<br>${baseValue}${fixedBonusHtml}</label>                                                      
-                        `;
-                        }).join('')}
-                    </div>
+                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs mb-4 div-Stats" style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100}); padding: 10px; width: 42px;">
+                    ${mainAttributes.map(key => {
+                    const baseValue = parseInt(characterData.attributes[key]) || 0;
+                    const fixedBonus = totalFixedBonuses[key] || 0;
+                    const fixedBonusHtml = fixedBonus !== 0 ? ` <span class="text-green-400 font-semibold">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
+                    return `                        
+                        <label class="text-center" title="${key}">${key.slice(0, 3).toUpperCase()}<br>${baseValue}${fixedBonusHtml}</label>                                                      
+                    `;
+                    }).join('')}
                 </div>
             </div>
-           
 
             <div id="lore-modal-${uniqueId}" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 hidden transition-opacity duration-300">
                 <div class="bg-gray-800 p-8 rounded-lg max-w-xl w-full text-white shadow-lg relative">
@@ -681,8 +679,8 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                 </div>
             </div>
             
-            <div class="absolute bottom-0 w-full p-4 div-miniCards">
-                <div class="pb-1 scrollable-content text-sm text-left ml-2" style="display: flex; flex-direction: row; overflow-y: scroll;gap: 12px; scroll-snap-type: x mandatory; margin-left: 65px;">
+            <div class="absolute bottom-0 w-full p-4">
+                <div class="pb-1 scrollable-content text-sm text-left ml-2 div-miniCards" style="display: flex; flex-direction: row; overflow-y: scroll;gap: 12px; scroll-snap-type: x mandatory; margin-left: 65px;">
                     <div class="rounded-3xl w-full" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; border-color: ${palette.borderColor}; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end;">
                         <!-- RELATIONSHIPS_BAR -->
                     </div>
@@ -791,6 +789,38 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     scaleItems('.related-skill-grid-item', 'spell-sheet-');
     scaleItems('.related-attack-grid-item', 'attack-sheet-');
     scaleItems('.related-item-grid-item', 'item-sheet-');
+
+     // --- LÓGICA DE AJUSTE DE ALTURA ---
+    const miniCardsDiv = sheetContainer.querySelector('.div-miniCards');
+    const statsDiv = sheetContainer.querySelector('.div-Stats');
+
+    if (miniCardsDiv && statsDiv) {
+        const adjustStatsHeight = () => {
+            const miniCardsHeight = miniCardsDiv.offsetHeight;
+            // Define a altura mínima do statsDiv igual à do miniCardsDiv.
+            // Se miniCards for maior, statsDiv cresce.
+            // Se miniCards for menor, o min-height será pequeno e o statsDiv manterá seu tamanho natural (comportamento "não fazer nada").
+            statsDiv.style.minHeight = `${miniCardsHeight}px`;
+            // Opcional: Ajustar o alinhamento do conteúdo para ficar centralizado ou distribuído se esticar muito
+            statsDiv.style.display = 'flex';
+            statsDiv.style.flexDirection = 'column';
+            statsDiv.style.justifyContent = 'space-evenly'; 
+        };
+
+        // Executa imediatamente
+        adjustStatsHeight();
+
+        // Cria um observador para ajustar caso o inventário carregue depois e mude o tamanho
+        const resizeObserver = new ResizeObserver(() => {
+            adjustStatsHeight();
+        });
+        resizeObserver.observe(miniCardsDiv);
+        
+        // Salva a referência no container para limpar depois
+        sheetContainer._statsResizeObserver = resizeObserver;
+    }
+    // -----------------------------------
+
 }, 100); 
 
     populateInventory(sheetContainer, characterData, uniqueId);
@@ -805,6 +835,12 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     const closeSheetBtn = sheetContainer.querySelector(`#close-sheet-btn-${uniqueId}`);
 
     const closeSheet = () => {
+         // Limpa o observador se existir
+        if (sheetContainer._statsResizeObserver) {
+            sheetContainer._statsResizeObserver.disconnect();
+            delete sheetContainer._statsResizeObserver;
+        }
+
         sheetContainer.classList.remove('visible');
         const handler = () => {
             sheetContainer.classList.add('hidden');
