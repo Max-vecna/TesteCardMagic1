@@ -90,10 +90,13 @@ async function exportGrimoireToTxt(id) {
 /**
  * Função principal para renderizar a tela de gerenciamento de grimórios.
  */
-export async function renderGrimoireScreen() {
-    const contentDisplay = document.getElementById('content-display');
-    contentDisplay.innerHTML= '';
-    contentDisplay.innerHTML = `
+export async function renderGrimoireScreen(container) {
+    if (!container) {
+        container = document.getElementById('content-display');
+        container.innerHTML = '';
+    }
+    
+    container.innerHTML = `
         <div class="p-6 w-full max-w-6xl mx-auto">
             <h2 class="text-3xl font-bold text-yellow-300 mb-6 border-b-2 border-gray-700 pb-2">Grimórios e Diários</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -789,3 +792,4 @@ async function exportAllVolumesByTitle(title) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
+

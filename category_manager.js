@@ -31,7 +31,7 @@ async function saveCategory(name, type, description, editId = null) {
     };
     
     await saveData('rpgCategories', category);
-    renderCategoryScreen(); // Atualiza a tela
+    document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: 'categorias' } }));
 }
 
 
@@ -77,18 +77,21 @@ async function deleteCategory(id) {
         
         // 3. Dispara um evento para notificar toda a aplicação que os dados mudaram.
         document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: 'categorias' } }));
-
-        // 4. Atualiza a tela de gerenciamento de categorias (a tela atual)
-        renderCategoryScreen(); 
     }
 }
 
 /**
  * Renderiza a tela de gerenciamento de categorias.
  */
-export async function renderCategoryScreen() {
-    const contentDisplay = document.getElementById('content-display');
-    contentDisplay.innerHTML = `
+export async function renderCategoryScreen(container) {
+    // Se o container não for passado (compatibilidade), usa o content-display global e limpa.
+    // Se for passado, assume que é limpo pelo chamador ou é um container novo.
+    if (!container) {
+        container = document.getElementById('content-display');
+        container.innerHTML = '';
+    }
+    
+    container.innerHTML = `
         <div id="category-management-section" class="w-full h-full p-6 flex flex-col items-center overflow-y-auto">
             <div class="w-full max-w-4xl">
                 <h2 class="text-3xl font-bold text-indigo-300 mb-6 border-b-2 border-gray-700 pb-2">Gerenciar Categorias</h2>
@@ -232,4 +235,3 @@ export async function populateCategorySelect(selectId, itemType) {
         selectElement.appendChild(option);
     });
 }
-
