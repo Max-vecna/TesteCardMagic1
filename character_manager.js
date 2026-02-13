@@ -27,6 +27,7 @@ export function resetCharacterFormState() {
     if (cardForm) cardForm.reset();
 
     document.getElementById('selected-magics-container').innerHTML = '';
+    document.getElementById('selected-skills-container').innerHTML = '';
     document.getElementById('selected-attacks-container').innerHTML = '';
     document.getElementById('selected-relationships-container').innerHTML = '';
     document.getElementById('form-inventory-section').classList.add('hidden');
@@ -106,84 +107,66 @@ export async function populateCharacterSelect(selectId, includeNoneOption = true
     }
 }
 
-function createSelectedItemElement(data, type) {
-    const containerId = type === 'item' ? 'selected-items-container' : 'selected-magics-container';
+/**
+ * Cria e renderiza um elemento selecionado (magia, habilidade, ataque ou relacionamento)
+ * em seu respectivo container no formulário.
+ * * @param {object} data - O objeto com os dados do item.
+ * @param {string} type - O tipo do item ('magic', 'skill', 'attack', 'relationship', 'item').
+ */
+function createSelectedElement(data, type) {
+    let containerId;
+    let iconClass;
+    let isImageRound = false;
+
+    // Mapeamento de tipo para Container e Ícone
+    if (type === 'magic') {
+        containerId = 'selected-magics-container';
+        iconClass = 'fa-magic';
+        isImageRound = true;
+    } else if (type === 'skill') {
+        containerId = 'selected-skills-container';
+        iconClass = 'fa-fist-raised';
+        isImageRound = true;
+    } else if (type === 'attack') {
+        containerId = 'selected-attacks-container';
+        iconClass = 'fa-khanda';
+        isImageRound = true;
+    } else if (type === 'relationship') {
+        containerId = 'selected-relationships-container';
+        iconClass = 'fa-user';
+        isImageRound = true;
+    } else if (type === 'item') {
+        // Itens são tratados separadamente no inventário, mas se precisarmos de uma lista visual simples:
+        containerId = 'selected-items-container';
+        iconClass = 'fa-box';
+    } else {
+        return;
+    }
+
     const container = document.getElementById(containerId);
+    
+    // Verifica duplicidade visual
     if (!container || container.querySelector(`[data-id="${data.id}"]`)) return;
 
     const itemElement = document.createElement('div');
-    itemElement.className = 'flex items-center justify-between bg-gray-800 p-2 rounded';
+    itemElement.className = 'flex items-center justify-between bg-gray-800 p-2 rounded mt-1 mb-1';
     itemElement.dataset.id = data.id;
     
     let iconHtml = '';
     if (data.image) {
         const imageUrl = URL.createObjectURL(bufferToBlob(data.image, data.imageMimeType));
-        iconHtml = `<img src="${imageUrl}" class="w-6 h-6 rounded-full mr-2 object-cover" style="image-rendering: pixelated;">`;
+        iconHtml = `<img src="${imageUrl}" class="w-6 h-6 ${isImageRound ? 'rounded-full' : 'rounded'} mr-2 object-cover" style="image-rendering: pixelated;">`;
     } else {
-        const iconClass = type === 'item' ? 'fa-box' : 'fa-magic';
         iconHtml = `<i class="fas ${iconClass} w-6 text-center mr-2"></i>`;
     }
 
-    itemElement.innerHTML = `
-        <div class="flex items-center">
-            ${iconHtml}
-            <span class="text-sm">${data.name}</span>
-        </div>
-        <button type="button" class="text-red-500 hover:text-red-400 remove-selection-btn text-xl leading-none">&times;</button>
-    `;
-
-    itemElement.querySelector('.remove-selection-btn').addEventListener('click', () => itemElement.remove());
-    container.appendChild(itemElement);
-}
-
-function createSelectedAttackElement(data) {
-    const container = document.getElementById('selected-attacks-container');
-    if (!container || container.querySelector(`[data-id="${data.id}"]`)) return;
-
-    const itemElement = document.createElement('div');
-    itemElement.className = 'flex items-center justify-between bg-gray-800 p-2 rounded';
-    itemElement.dataset.id = data.id;
-    
-    let iconHtml = '';
-    if (data.image) {
-        const imageUrl = URL.createObjectURL(bufferToBlob(data.image, data.imageMimeType));
-        iconHtml = `<img src="${imageUrl}" class="w-6 h-6 rounded-full mr-2 object-cover" style="image-rendering: pixelated;">`;
-    } else {
-        iconHtml = `<i class="fas fa-khanda w-6 text-center mr-2"></i>`;
-    }
+    // Usa 'title' para personagens, 'name' para outros
+    const displayText = data.name || data.title;
 
     itemElement.innerHTML = `
         <div class="flex items-center">
             ${iconHtml}
-            <span class="text-sm">${data.name}</span>
-        </div>
-        <button type="button" class="text-red-500 hover:text-red-400 remove-selection-btn text-xl leading-none">&times;</button>
-    `;
-
-    itemElement.querySelector('.remove-selection-btn').addEventListener('click', () => itemElement.remove());
-    container.appendChild(itemElement);
-}
-
-function createSelectedRelationshipElement(data) {
-    const container = document.getElementById('selected-relationships-container');
-    if (!container || container.querySelector(`[data-id="${data.id}"]`)) return;
-
-    const itemElement = document.createElement('div');
-    itemElement.className = 'flex items-center justify-between bg-gray-800 p-2 rounded';
-    itemElement.dataset.id = data.id;
-    
-    let iconHtml = '';
-    if (data.image) {
-        const imageUrl = URL.createObjectURL(bufferToBlob(data.image, data.imageMimeType));
-        iconHtml = `<img src="${imageUrl}" class="w-6 h-6 rounded-full mr-2 object-cover">`;
-    } else {
-        iconHtml = `<i class="fas fa-user w-6 text-center mr-2"></i>`;
-    }
-
-    itemElement.innerHTML = `
-        <div class="flex items-center">
-            ${iconHtml}
-            <span class="text-sm">${data.title}</span>
+            <span class="text-sm truncate max-w-[150px]">${displayText}</span>
         </div>
         <button type="button" class="text-red-500 hover:text-red-400 remove-selection-btn text-xl leading-none">&times;</button>
     `;
@@ -323,7 +306,13 @@ export async function saveCharacterCard(cardForm) {
     const backgroundMimeType = backgroundImageFile ? backgroundImageFile.type : (existingData ? existingData.backgroundMimeType : null);
     
     const itemIds = currentCharacterItems.map(item => item.id);
-    const magicIds = Array.from(document.querySelectorAll('#selected-magics-container [data-id]')).map(el => el.dataset.id);
+    
+    // Coleta IDs tanto de magias quanto de habilidades para salvar no array único 'spells' do DB
+    const magicIds = [
+        ...Array.from(document.querySelectorAll('#selected-magics-container [data-id]')),
+        ...Array.from(document.querySelectorAll('#selected-skills-container [data-id]'))
+    ].map(el => el.dataset.id);
+
     const attackIds = Array.from(document.querySelectorAll('#selected-attacks-container [data-id]')).map(el => el.dataset.id);
     const relationshipIds = Array.from(document.querySelectorAll('#selected-relationships-container [data-id]')).map(el => el.dataset.id);
     
@@ -411,24 +400,29 @@ export async function editCard(cardId) {
 
     populatePericiasCheckboxes(attrs.pericias);
 
+    // Carrega Magias e Habilidades e distribui nos containers corretos
     if (cardData.spells) {
         for (const magicId of cardData.spells) {
             const magicData = await getData('rpgSpells', magicId);
-            if (magicData) createSelectedItemElement(magicData, 'magic');
+            if (magicData) {
+                // Se o tipo for habilidade, renderiza no container de habilidades, senão no de magias
+                const renderType = magicData.type === 'habilidade' ? 'skill' : 'magic';
+                createSelectedElement(magicData, renderType);
+            }
         }
     }
 
     if (cardData.attacks) {
         for (const attackId of cardData.attacks) {
             const attackData = await getData('rpgAttacks', attackId);
-            if (attackData) createSelectedAttackElement(attackData);
+            if (attackData) createSelectedElement(attackData, 'attack');
         }
     }
 
     if (cardData.relationships) {
         for (const charId of cardData.relationships) {
             const relatedCharData = await getData('rpgCards', charId);
-            if (relatedCharData) createSelectedRelationshipElement(relatedCharData);
+            if (relatedCharData) createSelectedElement(relatedCharData, 'relationship');
         }
     }
 
@@ -530,14 +524,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('addItemToCharacter', (e) => {
         const { data, type } = e.detail;
-        if (type === 'magic') createSelectedItemElement(data, type);
-        else if (type === 'item') {
+        
+        // Verifica o tipo de dado para direcionar ao container correto
+        if (type === 'magic') {
+            // Se veio do modal de seleção como 'magic', verifica se o objeto interno é habilidade
+            const finalType = data.type === 'habilidade' ? 'skill' : 'magic';
+            createSelectedElement(data, finalType);
+        } else if (type === 'item') {
             currentCharacterItems.push(data);
             renderInventoryForForm(currentCharacterItems, parseInt(document.getElementById('forca').value) || 0);
-        } else if (type === 'attack') createSelectedAttackElement(data);
+        } else if (type === 'attack') {
+            createSelectedElement(data, 'attack');
+        }
     });
     
-    document.addEventListener('addRelationshipToCharacter', (e) => createSelectedRelationshipElement(e.detail.data));
+    document.addEventListener('addRelationshipToCharacter', (e) => createSelectedElement(e.detail.data, 'relationship'));
 
     document.addEventListener('requestItemRemoval', (e) => {
         const { itemIndex } = e.detail;
@@ -552,6 +553,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     document.getElementById('add-item-to-inventory-btn').addEventListener('click', () => openItemSelectionModal('item'));
+
+    // Botão de adicionar habilidade
+    const addSkillBtn = document.getElementById('add-skill-to-char-btn');
+    if (addSkillBtn) {
+        addSkillBtn.addEventListener('click', () => {
+            // Reutiliza o modal de seleção de magias, já que ele lista ambos (magias e habilidades)
+            // O sistema de filtragem no addItemToCharacter separará visualmente.
+            openItemSelectionModal('magic'); 
+        });
+    }
 
     const showBtn = document.getElementById('show-add-pericia-form-btn');
     const addForm = document.getElementById('add-pericia-form');

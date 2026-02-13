@@ -646,7 +646,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     </div>
                 </div>   
                 <div>
-                    <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4 " style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); padding: 10px; width: 42px; justify-content: center; ">
+                    <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs my-2 mb-4 div-Stats" style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); padding: 10px; width: 42px; justify-content: center; ">
                         <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
                         ${combatStatsHtml}
                         <div class="text-center">CD<br>${cdValue}</div>

@@ -165,7 +165,7 @@
                              </label>
                              <div class="relative group cursor-pointer">
                                  <input type="file" id="backgroundImageUpload" accept="image/*" class="hidden">
-                                 <div id="backgroundImagePreview" class="mx-auto w-full h-16 rounded border-2 border-dashed border-gray-600 bg-cover bg-center group-hover:border-indigo-500 transition-colors" onclick="document.getElementById('backgroundImageUpload').click()"></div>
+                                 <div id="backgroundImagePreview" class="mx-auto w-full h-64 rounded border-2 border-dashed border-gray-600 bg-cover bg-center group-hover:border-indigo-500 transition-colors" onclick="document.getElementById('backgroundImageUpload').click()"></div>
                              </div>
                          </div>
                     </div>
@@ -230,15 +230,15 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                         <label for="historia" class="block text-xs font-semibold text-gray-400 mb-1">História</label>
-                        <textarea id="historia" rows="3" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none"></textarea>
+                        <textarea id="historia" rows="3" class="h-64 w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none"></textarea>
                     </div>
                     <div>
                         <label for="personalidade" class="block text-xs font-semibold text-gray-400 mb-1">Personalidade</label>
-                        <textarea id="personalidade" rows="3" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none"></textarea>
+                        <textarea id="personalidade" rows="3" class="h-64 w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none"></textarea>
                     </div>
                     <div>
                         <label for="motivacao" class="block text-xs font-semibold text-gray-400 mb-1">Motivação</label>
-                        <textarea id="motivacao" rows="3" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none"></textarea>
+                        <textarea id="motivacao" rows="3" class="h-64 w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none"></textarea>
                     </div>
                 </div>
 
@@ -263,7 +263,7 @@
                              </div>
                              <input type="text" id="new-pericia-description" placeholder="Desc." class="w-full mt-1 px-2 py-1 bg-gray-800 text-xs rounded border border-gray-600">
                         </div>
-                        <div id="pericias-checkboxes-container" class="space-y-1 max-h-32 overflow-y-auto"></div>
+                        <div id="pericias-checkboxes-container" class="space-y-1 overflow-y-auto"></div>
                         <div id="pericia-description-display" class="mt-2 p-2 rounded bg-gray-700 hidden text-xs">
                             <h4 id="periciaDescriptionTitle" class="font-bold text-indigo-200"></h4>
                             <p id="periciaDescriptionText" class="text-gray-300"></p>
@@ -277,7 +277,7 @@
                             <button type="button" id="add-item-to-inventory-btn" class="text-amber-400 hover:text-amber-200 text-xs font-bold flex items-center gap-1"><i class="fas fa-plus"></i> Item</button>
                         </div>
                         <p id="slots-info" class="text-[10px] text-gray-400 text-center mb-1">Força: 0 | Carga: 0/5</p>
-                        <div class="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+                        <div class="space-y-2 overflow-y-auto custom-scrollbar">
                              <div>
                                 <h4 class="text-[10px] font-semibold text-gray-500 uppercase">Equip. (Slots)</h4>
                                 <div id="special-equipment-container" class="grid grid-cols-6 gap-1"></div>
@@ -294,28 +294,42 @@
                     </div>
                 </div>
 
-                <!-- Listas Vinculadas -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                <!-- Listas Vinculadas (Magias, Habilidades, Ataques, Relações) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+                    <!-- Magias -->
                     <div>
                          <div class="flex justify-between items-center mb-1">
-                            <h3 class="text-xs font-bold text-teal-300 uppercase">Magias/Hab.</h3>
+                            <h3 class="text-xs font-bold text-teal-300 uppercase">Magias</h3>
                             <button type="button" id="add-magic-to-char-btn" class="text-teal-400 hover:text-teal-200 text-xs font-bold"><i class="fas fa-plus"></i></button>
                         </div>
-                        <div id="selected-magics-container" class="bg-gray-800/50 p-2 rounded min-h-[40px] max-h-[100px] overflow-y-auto"></div>
+                        <div id="selected-magics-container" class="bg-gray-800/50 p-2 rounded min-h-[40px] max-h-[500px] overflow-y-auto"></div>
                     </div>
+                    
+                    <!-- Habilidades -->
+                    <div>
+                         <div class="flex justify-between items-center mb-1">
+                            <h3 class="text-xs font-bold text-cyan-300 uppercase">Habilidades</h3>
+                            <button type="button" id="add-skill-to-char-btn" class="text-cyan-400 hover:text-cyan-200 text-xs font-bold"><i class="fas fa-plus"></i></button>
+                        </div>
+                        <div id="selected-skills-container" class="bg-gray-800/50 p-2 rounded min-h-[40px] max-h-[500px] overflow-y-auto"></div>
+                    </div>
+
+                    <!-- Ataques -->
                     <div>
                          <div class="flex justify-between items-center mb-1">
                             <h3 class="text-xs font-bold text-red-400 uppercase">Ataques</h3>
                             <button type="button" id="add-attack-to-char-btn" class="text-red-400 hover:text-red-200 text-xs font-bold"><i class="fas fa-plus"></i></button>
                         </div>
-                        <div id="selected-attacks-container" class="bg-gray-800/50 p-2 rounded min-h-[40px] max-h-[100px] overflow-y-auto"></div>
+                        <div id="selected-attacks-container" class="bg-gray-800/50 p-2 rounded min-h-[40px] max-h-[500px] overflow-y-auto"></div>
                     </div>
+
+                    <!-- Relações -->
                     <div>
                          <div class="flex justify-between items-center mb-1">
                             <h3 class="text-xs font-bold text-purple-400 uppercase">Relações</h3>
                             <button type="button" id="add-relationship-btn" class="text-purple-400 hover:text-purple-200 text-xs font-bold"><i class="fas fa-plus"></i></button>
                         </div>
-                        <div id="selected-relationships-container" class="bg-gray-800/50 p-2 rounded min-h-[40px] max-h-[100px] overflow-y-auto"></div>
+                        <div id="selected-relationships-container" class="bg-gray-800/50 p-2 rounded min-h-[40px] max-h-[500px] overflow-y-auto"></div>
                     </div>
                 </div>
 
@@ -407,15 +421,15 @@
                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div class="md:col-span-2">
                         <label for="spellDescription" class="block text-xs font-semibold text-gray-400 mb-1">Descrição</label>
-                        <textarea id="spellDescription" rows="3" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
+                        <textarea id="spellDescription" rows="3" class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
                     </div>
                     <div id="enhance-wrapper">
                         <label for="spellEnhance" class="block text-xs font-semibold text-gray-400 mb-1">Aprimoramento</label>
-                        <textarea id="spellEnhance" rows="2" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
+                        <textarea id="spellEnhance" rows="2" class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
                     </div>
                     <div id="true-wrapper">
                         <label for="spellTrue" class="block text-xs font-semibold text-gray-400 mb-1">Verdadeiro</label>
-                        <textarea id="spellTrue" rows="2" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
+                        <textarea id="spellTrue" rows="2" class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
                     </div>
                  </div>
 
@@ -504,7 +518,7 @@
                             </div>
                         </div>
 
-                        <div><label for="itemDescription" class="block text-xs font-semibold mb-1 text-gray-400">Descrição</label><textarea id="itemDescription" rows="3" placeholder="Descrição do item..." class="w-full px-3 py-1.5 bg-gray-700 text-white rounded border border-gray-600 text-sm focus:border-amber-500 focus:outline-none"></textarea></div>
+                        <div><label for="itemDescription" class="block text-xs font-semibold mb-1 text-gray-400">Descrição</label><textarea id="itemDescription" rows="3" placeholder="Descrição do item..." class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white rounded border border-gray-600 text-sm focus:border-amber-500 focus:outline-none"></textarea></div>
                      </div>
                  </div>
 
@@ -576,7 +590,7 @@
                         </div>
                         <div>
                             <label for="attackDescription" class="block text-xs font-semibold text-gray-400 mb-1">Descrição</label>
-                            <textarea id="attackDescription" rows="4" placeholder="Descrição do ataque..." class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-red-500 focus:outline-none"></textarea>
+                            <textarea id="attackDescription" rows="4" placeholder="Descrição do ataque..." class="w-full  h-64 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-red-500 focus:outline-none"></textarea>
                         </div>
                     </div>
                 </div>
