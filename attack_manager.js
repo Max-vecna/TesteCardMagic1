@@ -102,6 +102,9 @@ export async function saveAttackCard(attackForm) {
     const attackDescriptionInput = document.getElementById('attackDescription');
     const attackCharacterOwnerInput = document.getElementById('attackCharacterOwner');
     const attackCategorySelect = document.getElementById('attack-category-select');
+    // Novos campos
+    const attackAcertoInput = document.getElementById('attackAcerto');
+    const attackDamageInput = document.getElementById('attackDamage');
 
     let existingData = null;
     if (currentEditingAttackId) {
@@ -112,25 +115,24 @@ export async function saveAttackCard(attackForm) {
     const imageMimeType = attackImageFile ? attackImageFile.type : (existingData ? existingData.imageMimeType : null);
     
     let attackData;
+    const baseData = {
+        name: attackNameInput.value,
+        description: attackDescriptionInput.value,
+        characterId: attackCharacterOwnerInput.value,
+        categoryId: attackCategorySelect.value,
+        acerto: attackAcertoInput.value,
+        dano: attackDamageInput.value,
+        image: imageBuffer,
+        imageMimeType: imageMimeType,
+    };
+
     if (currentEditingAttackId) {
         attackData = existingData;
-        Object.assign(attackData, {
-            name: attackNameInput.value,
-            description: attackDescriptionInput.value,
-            characterId: attackCharacterOwnerInput.value,
-            categoryId: attackCategorySelect.value,
-            image: imageBuffer,
-            imageMimeType: imageMimeType,
-        });
+        Object.assign(attackData, baseData);
     } else {
         attackData = {
             id: Date.now().toString(),
-            name: attackNameInput.value,
-            description: attackDescriptionInput.value,
-            characterId: attackCharacterOwnerInput.value,
-            categoryId: attackCategorySelect.value,
-            image: imageBuffer,
-            imageMimeType: imageMimeType,
+            ...baseData
         };
     }
 
@@ -153,6 +155,10 @@ export async function editAttack(attackId) {
     currentEditingAttackId = attackId;
     document.getElementById('attackName').value = attackData.name;
     document.getElementById('attackDescription').value = attackData.description;
+    
+    // Novos campos
+    document.getElementById('attackAcerto').value = attackData.acerto || '';
+    document.getElementById('attackDamage').value = attackData.dano || '';
     
     await populateCharacterSelect('attackCharacterOwner');
     document.getElementById('attackCharacterOwner').value = attackData.characterId || '';

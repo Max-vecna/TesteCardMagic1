@@ -678,6 +678,13 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     cursor: pointer;
 }
 
+#view-personagem-em-jogo
+{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .related-character-grid-item,
 .related-spell-grid-item,
 .related-attack-grid-item,
@@ -689,7 +696,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     position: relative;
     cursor: pointer;
     transition: margin 0.4s ease-in-out, transform 0.4s ease-in-out;
-    margin-left: -30px;
+    margin-left: -40px;
 }
 
 .related-character-grid-item:first-child,
@@ -1013,4 +1020,77 @@ body:not(.dark) .text-white { color: var(--text-color) !important; }
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+/* === PROGRESS SLIDER STYLES === */
+.progress-slider-container {
+    width: 100%;
+    height: 80px;
+    background-color: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 10px;
+    border: 1px solid var(--menu-border);
+}
+
+.progress-slider-track {
+    display: flex;
+    gap: 10px;
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    animation: slide-track 10s linear infinite;
+    width: max-content;
+}
+
+.progress-mini-card {
+    width: 48px;
+    height: 68px;
+    border-radius: 4px;
+    border: 2px solid #6366f1; /* Indigo-500 */
+    background-size: cover;
+    background-position: center;
+    background-color: #1e293b;
+    flex-shrink: 0;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+
+/* Para ícones padrão se não houver imagem */
+.progress-mini-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #94a3b8;
+}
+
+@keyframes slide-track {
+    0% {
+        transform: translate(0, -50%);
+    }
+    100% {
+        transform: translate(-50%, -50%);
+    }
+}
+
+.dados
+{
+     border: 2px solid var(--color-dados); 
+     padding: 4px; 
+     border-radius: 0 50px 6px 0; 
+     border-left: none;
+     background-color: var(--color-dadosBk);
+     padding-right: 20px;
+     padding-left: 10px;
+}
+
+.dados:nth-child(2)
+{
+    border-radius: 50px 0 0 6px;
+    border-right: none;
+    border-left: 2px solid var(--color-dados);
+    padding-left: 20px;
+    padding-right: 10px;
 }

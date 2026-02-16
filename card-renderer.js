@@ -1,4 +1,4 @@
-import { getData } from './local_db.js';
+import { getData, saveData } from './local_db.js';
 import { renderFullItemSheet } from './item_renderer.js';
 import { renderFullSpellSheet } from './magic_renderer.js';
 import { renderFullAttackSheet } from './attack_renderer.js';
@@ -79,24 +79,52 @@ export async function updateStatDisplay(sheetContainer, characterData) {
     const dinheiroEl = sheetContainer.querySelector('[data-stat-current="dinheiro"]');
     if (dinheiroEl) dinheiroEl.textContent = characterData.dinheiro || 0;
     
-    const combatStats = { armadura: 'CA', esquiva: 'ES', bloqueio: 'BL', deslocamento: 'DL' };
-    const combatStatsContainer = sheetContainer.querySelector('.grid.grid-cols-6.gap-x-4.gap-y-1.text-xs');
+    // --- ATUALIZADO: Separação de Stats ---
+    // Definição das duas listas de stats para busca
+    const attackStats = { acerto: 'ATK', dano: 'DMG' };
+    const defenseStats = { armadura: 'CA', esquiva: 'ES', bloqueio: 'BL', deslocamento: 'DL' };
     
-    if (combatStatsContainer) {
-        Object.entries(combatStats).forEach(([stat, label]) => {
-            const el = Array.from(combatStatsContainer.querySelectorAll('.text-center')).find(e => e.textContent.includes(label));
+    // Busca elementos em AMBOS os containers (novo div-attack-stats e div-combat-stats existente)
+    const statElements = sheetContainer.querySelectorAll('.div-combat-stats .text-center, .div-attack-stats .text-center');
+
+    if (statElements.length > 0) {
+        // Combina as listas para iterar e atualizar tudo de uma vez
+        const allStats = { ...attackStats, ...defenseStats };
+
+        Object.entries(allStats).forEach(([stat, label]) => {
+            const el = Array.from(statElements).find(e => e.textContent.includes(label));
             if (el) {
-                const baseValue = characterData.attributes[stat] || 0;
-                const fixedBonus = totalFixedBonuses[stat] || 0;
-                const fixedBonusHtml = fixedBonus !== 0 ? `<span class="text-green-400 font-bold ml-1">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
-                const suffix = stat === 'deslocamento' ? 'm' : '';
-                el.innerHTML = `${label}<br>${baseValue}${suffix}${fixedBonusHtml}`;
+                let baseValue = characterData.attributes[stat] || 0;
+                
+                let content = baseValue;
+                let fixedBonusHtml = '';
+
+                // Bonus fixos apenas para stats numéricos de defesa/movimento
+                if (['armadura', 'esquiva', 'bloqueio', 'deslocamento'].includes(stat)) {
+                    const numVal = parseInt(baseValue) || 0;
+                    const fixedBonus = totalFixedBonuses[stat] || 0;
+                    fixedBonusHtml = fixedBonus !== 0 ? `<span class="text-green-400 font-bold ml-1">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
+                    const suffix = stat === 'deslocamento' ? 'm' : '';
+                    content = `${numVal}${suffix}`;
+                } else {
+                    // Para Acerto e Dano, exibimos como está (string)
+                    content = baseValue || '-';
+                }
+
+                // Preserva a cor específica para ATK e DMG
+                const colorStyle = stat === 'acerto' ? 'color: #facc15;' : (stat === 'dano' ? 'color: #f87171;' : '');
+
+                // Se houver estilo de cor, aplicamos no span do label, senão herda
+                const labelHtml = colorStyle ? `<span style="${colorStyle}">${label}</span>` : label;
+
+                el.innerHTML = `${labelHtml}<br>${content}${fixedBonusHtml}`;
             }
         });
         
+        // Atualiza CD (Classe de Dificuldade)
         const sabTotal = (parseInt(characterData.attributes.sabedoria) || 0) + (totalFixedBonuses.sabedoria || 0);
         const cdValue = 10 + (parseInt(characterData.level) || 0) + sabTotal;
-        const cdEl = Array.from(combatStatsContainer.querySelectorAll('.text-center')).find(e => e.textContent.includes('CD'));
+        const cdEl = Array.from(statElements).find(e => e.textContent.includes('CD'));
         if(cdEl) cdEl.innerHTML = `CD<br>${cdValue}`;
     }
 
@@ -127,19 +155,21 @@ export async function updateStatDisplay(sheetContainer, characterData) {
     });
 }
 
+// Substitua a função setupStatEditor inteira por esta:
+// Substitua a função setupStatEditor inteira por esta versão robusta:
+
 function setupStatEditor(characterData, container) {
     const sheetContainer = container || document.querySelector('#nested-sheet-container.visible') || document.querySelector('#character-sheet-container.visible');
     const modal = document.getElementById('stat-editor-modal');
     if (!sheetContainer || !modal) return;
 
+    // Elementos do DOM do Modal Global
     const modalContent = modal.querySelector('#stat-editor-content');
     const titleTextEl = modal.querySelector('#stat-editor-title-text');
     const iconEl = modal.querySelector('#stat-editor-icon');
     const inputEl = modal.querySelector('#stat-editor-value');
-    const addBtn = modal.querySelector('#stat-editor-add-btn');
-    const subtractBtn = modal.querySelector('#stat-editor-subtract-btn');
-    const closeBtn = modal.querySelector('#stat-editor-close-btn');
-
+    
+    // Variáveis de estado locais para esta instância da ficha
     let currentStat = null;
     let statMax = Infinity;
 
@@ -149,10 +179,72 @@ function setupStatEditor(characterData, container) {
         dinheiro: { title: 'Dinheiro', icon: 'fa-coins', color: 'text-amber-400', border: 'border-amber-500' }
     };
 
+    const closeModal = () => {
+        modal.classList.remove('visible');
+        setTimeout(() => modal.classList.add('hidden'), 300);
+    };
+
+    // Função que configura os botões do modal para ESTE personagem especificamente
+    // Ela é chamada toda vez que abrimos o modal, para garantir que o modal "pertença" a esta ficha
+    const configureModalButtons = () => {
+        const addBtn = modal.querySelector('#stat-editor-add-btn');
+        const subtractBtn = modal.querySelector('#stat-editor-subtract-btn');
+        const closeBtn = modal.querySelector('#stat-editor-close-btn');
+
+        // Clona para remover listeners antigos (de outros personagens ou instancias anteriores)
+        const newAddBtn = addBtn.cloneNode(true);
+        const newSubtractBtn = subtractBtn.cloneNode(true);
+        const newCloseBtn = closeBtn.cloneNode(true);
+
+        addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+        subtractBtn.parentNode.replaceChild(newSubtractBtn, subtractBtn);
+        closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+
+        // Lógica de Atualização (Closure capturando o characterData correto)
+        const updateStat = (amount) => {
+            if (!currentStat || isNaN(amount) || amount === 0) {
+                if (amount === 0) closeModal();
+                return;
+            }
+
+            if (currentStat === 'vida' || currentStat === 'mana') {
+                let statCurrent = currentStat === 'vida' ? 'vidaAtual' : 'manaAtual';
+                let currentValue = characterData.attributes[statCurrent];
+
+                if (amount < 0) {
+                    let remainingDamage = Math.abs(amount);
+                    currentValue = Math.max(0, currentValue - remainingDamage);
+                    characterData.attributes[statCurrent] = currentValue;
+                } else {
+                    let newValue = Math.min(statMax, currentValue + amount);
+                    characterData.attributes[statCurrent] = newValue;
+                }
+
+            } else if (currentStat === 'dinheiro') {
+                let currentValue = characterData.dinheiro || 0;
+                characterData.dinheiro = Math.max(0, currentValue + amount);
+            }
+
+            saveData('rpgCards', characterData).then(async () => {
+                await updateStatDisplay(sheetContainer, characterData);
+                closeModal();
+            }).catch(err => {
+                console.error("Failed to save character data:", err);
+                closeModal();
+            });
+        };
+
+        // Adiciona os eventos nos botões recém-limpos
+        newAddBtn.addEventListener('click', () => updateStat(Math.abs(parseInt(inputEl.value, 10) || 0)));
+        newSubtractBtn.addEventListener('click', () => updateStat(-Math.abs(parseInt(inputEl.value, 10) || 0)));
+        newCloseBtn.addEventListener('click', closeModal);
+    };
+
     const openModal = async (type, max) => {
         currentStat = type;
         statMax = max;
         
+        // Garante dados frescos
         const freshCharacterData = await getData('rpgCards', characterData.id);
         if (freshCharacterData) Object.assign(characterData, freshCharacterData);
 
@@ -174,71 +266,35 @@ function setupStatEditor(characterData, container) {
         setTimeout(() => modal.classList.add('visible'), 10);
     };
 
-    const closeModal = () => {
-        modal.classList.remove('visible');
-        setTimeout(() => modal.classList.add('hidden'), 300);
-    };
-
-    const updateStat = (amount) => {
-        if (!currentStat || isNaN(amount) || amount === 0) {
-            if (amount === 0) closeModal();
-            return;
-        }
-
-        if (currentStat === 'vida' || currentStat === 'mana') {
-            let statCurrent = currentStat === 'vida' ? 'vidaAtual' : 'manaAtual';
-            let currentValue = characterData.attributes[statCurrent];
-
-            if (amount < 0) {
-                let remainingDamage = Math.abs(amount);
-                currentValue = Math.max(0, currentValue - remainingDamage);
-                characterData.attributes[statCurrent] = currentValue;
-            } else {
-                let newValue = Math.min(statMax, currentValue + amount);
-                characterData.attributes[statCurrent] = newValue;
-            }
-
-        } else if (currentStat === 'dinheiro') {
-            let currentValue = characterData.dinheiro || 0;
-            characterData.dinheiro = Math.max(0, currentValue + amount);
-        }
-
-        saveData('rpgCards', characterData).then(async () => {
-             await updateStatDisplay(sheetContainer, characterData);
-             closeModal();
-        }).catch(err => {
-            console.error("Failed to save character data:", err);
-            closeModal();
-        });
-    };
-
-    const newAddBtn = addBtn.cloneNode(true);
-    addBtn.parentNode.replaceChild(newAddBtn, addBtn);
-    const newSubtractBtn = subtractBtn.cloneNode(true);
-    subtractBtn.parentNode.replaceChild(newSubtractBtn, subtractBtn);
-    const newCloseBtn = closeBtn.cloneNode(true);
-    closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
-
-    newAddBtn.addEventListener('click', () => updateStat(Math.abs(parseInt(inputEl.value, 10) || 0)));
-    newSubtractBtn.addEventListener('click', () => updateStat(-Math.abs(parseInt(inputEl.value, 10) || 0)));
-    newCloseBtn.addEventListener('click', closeModal);
-
-     modal.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeModal();
-    });
-     modal.addEventListener('click', (e) => {
-         if (e.target === modal) closeModal();
-     });
-
+    // Configuração dos gatilhos na ficha (Ícones de Vida/Mana/Dinheiro)
     sheetContainer.querySelectorAll('[data-action="edit-stat"]').forEach(el => {
+        // Limpa listeners antigos do ícone
         const newEl = el.cloneNode(true);
         el.parentNode.replaceChild(newEl, el);
-        newEl.addEventListener('click', async () => {
+        
+        newEl.addEventListener('click', async (e) => {
+            e.stopPropagation();
             const type = newEl.dataset.statType;
             const max = newEl.dataset.statMax ? parseInt(newEl.dataset.statMax, 10) : Infinity;
+            
+            // --- PASSO CRÍTICO: Reconfigura os botões do modal AGORA ---
+            // Isso garante que os botões "Add/Subtract" obedeçam a ESTA ficha, 
+            // não importa quantos minicards foram abertos antes.
+            configureModalButtons(); 
+            // -----------------------------------------------------------
+
             await openModal(type, max);
         });
     });
+
+    // Listeners globais do modal (Fundo e ESC)
+    // Apenas definimos o onclick direto para evitar acúmulo de listeners globais
+    modal.onclick = (e) => {
+        if (e.target === modal) closeModal();
+    };
+    modal.onkeydown = (e) => {
+        if (e.key === 'Escape') closeModal();
+    };
 }
 
 // Renderiza o inventário na ficha
@@ -471,13 +527,40 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         }).join('');
     }
 
-    const combatStats = { armadura: 'CA', esquiva: 'ES', bloqueio: 'BL', deslocamento: 'DL' };
-    const combatStatsHtml = Object.entries(combatStats).map(([stat, label]) => {
+    // --- SEPARAÇÃO DOS STATS EM DOIS GRUPOS ---
+    const attackStats = { acerto: 'ATK', dano: 'DMG' };
+    const defenseStats = { armadura: 'CA', esquiva: 'ES', bloqueio: 'BL', deslocamento: 'DL' };
+
+    const hasAcerto = characterData.attributes.acerto && String(characterData.attributes.acerto).trim() !== '';
+    const hasDano = characterData.attributes.dano && String(characterData.attributes.dano).trim() !== '';
+    const showAttackStats = hasAcerto || hasDano;
+
+   
+
+    // Gera HTML para Acerto e Dano (Novo Card)
+    const attackStatsHtml = Object.entries(attackStats).map(([stat, label]) => {
         const baseValue = characterData.attributes[stat] || 0;
-        const fixedBonus = totalFixedBonuses[stat] || 0;
-        const fixedBonusHtml = fixedBonus !== 0 ? `<span class="text-green-400 font-bold ml-1">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
-        const suffix = stat === 'deslocamento' ? 'm' : '';
-        return `<div class="text-center">${label}<br>${baseValue}${suffix}${fixedBonusHtml}</div>`;
+        const content = baseValue || '-';
+        const colorStyle = stat === 'acerto' ? 'color: #facc15;' : (stat === 'dano' ? 'color: #f87171;' : '');
+        return `<div class="text-center font-bold text-sm" style="${stat === 'acerto' ? 'margin-bottom: 20px;' : ''}"><span style="${colorStyle}; writing-mode: vertical-rl; text-orientation: upright;">${content}</div>`;
+    }).join('');
+
+    // Gera HTML para Defesa (Card Existente)
+    const defenseStatsHtml = Object.entries(defenseStats).map(([stat, label]) => {
+        const baseValue = characterData.attributes[stat] || 0;
+        let content = baseValue;
+        let fixedBonusHtml = '';
+
+        if (['armadura', 'esquiva', 'bloqueio', 'deslocamento'].includes(stat)) {
+             const fixedBonus = totalFixedBonuses[stat] || 0;
+             fixedBonusHtml = fixedBonus !== 0 ? `<span class="text-green-400 font-bold ml-1">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
+             const suffix = stat === 'deslocamento' ? 'm' : '';
+             content = `${baseValue}${suffix}`;
+        } else {
+             content = baseValue || '-';
+        }
+        
+        return `<div class="text-center"><span>${label}</span><br>${content}${fixedBonusHtml}</div>`;
     }).join('');
 
     let relationshipsHtml = '';
@@ -604,39 +687,45 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                  <button id="close-sheet-btn-${uniqueId}" class="bg-red-600 hover:text-white thumb-btn" style="display: ${isModal ? 'flex' : 'none'}"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div id="character-sheet-${uniqueId}" class="w-full h-full rounded-lg shadow-2xl overflow-hidden relative text-white" style="${origin}; background-image: url('${imageUrl}'); background-size: cover; background-position: center; box-shadow: 0 0 20px ${predominantColor.colorLight}; width: ${finalWidth}px; height: ${finalHeight}px; ${transformProp} margin: 0 auto;">
-            <div class="w-full h-full" style="background: linear-gradient(-180deg, #000000a4, transparent, transparent, #0000008f, #0000008f, #000000a4); display: flex; align-items: center; justify-content: center;">
+            <div class="w-full h-full" style="background: linear-gradient(to bottom, #000000a4, transparent, transparent, #0000008f, #0000008f, #000000a4); display: flex; align-items: center; justify-content: center;">
                 <div class="rounded-lg" style="width: 96%; height: 96%; border: 3px solid ${predominantColor.colorLight};"></div>
             </div>
             
-            <div class="absolute top-6 right-4 p-2 rounded-full text-center cursor-pointer flex flex-col items-center justify-center" >
-                <div style="position: relative;" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}">
-                    <i class="fa-solid fa-heart text-5xl" style="background:  linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto;">
-                        <span data-stat-current="vida">
-                            ${characterData.attributes.vidaAtual || 0}
-                        </span>
-                        <hr style="width: 15px;">
-                        <span data-stat-max-display="vida" style="bottom: 12px;">
-                            ${permanentMaxVida}
-                        </span>
-                    </div>
-                </div>                
+            <div class="absolute top-6 right-4 p-2 rounded-full text-center cursor-pointer flex flex-col items-center justify-center" style="display: flex; justify-content: space-between; flex-direction: column; height: calc(100% - 40px);">
+                <div>    
+                    <div style="position: relative;" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}" class="mb-2">
+                        <i class="fa-solid fa-heart text-5xl" style="background:  linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto;">
+                            <span data-stat-current="vida">
+                                ${characterData.attributes.vidaAtual || 0}
+                            </span>
+                            <hr style="width: 15px;">
+                            <span data-stat-max-display="vida" style="bottom: 12px;">
+                                ${permanentMaxVida}
+                            </span>
+                        </div>
+                    </div>                
 
-                <div style="position: relative;" data-action="edit-stat" data-stat-type="mana" data-stat-max="${permanentMaxMana}">
-                    <i class="fas fa-fire text-blue-500 text-5xl" style="background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto;">
-                        <span data-stat-current="mana">
-                            ${characterData.attributes.manaAtual || 0}
-                        </span>
-                        <hr style="width: 15px;">
-                        <span data-stat-max-display="mana" style="bottom: 12px;">
-                           ${permanentMaxMana}
-                        </span>
-                    </div>
-                </div>  
+                    <div style="position: relative;" data-action="edit-stat" data-stat-type="mana" data-stat-max="${permanentMaxMana}" class="mb-2">
+                        <i class="fas fa-fire text-blue-500 text-5xl" style="background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto;">
+                            <span data-stat-current="mana">
+                                ${characterData.attributes.manaAtual || 0}
+                            </span>
+                            <hr style="width: 15px;">
+                            <span data-stat-max-display="mana" style="bottom: 12px;">
+                            ${permanentMaxMana}
+                            </span>
+                        </div>
+                    </div>  
 
-                 <div class="money-container rounded-full p-2 flex items-center justify-center text-sm text-amber-300 font-bold cursor-pointer" data-action="edit-stat" data-stat-type="dinheiro" title="Alterar Dinheiro" style="width: 42px; ${moneyContainerStyle} background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100});">
-                    💰$<span data-stat-current="dinheiro">${characterData.dinheiro || 0}</span>
+                    <div class="money-container rounded-full p-2 flex mb-2 items-center justify-center text-sm text-amber-300 font-bold cursor-pointer" data-action="edit-stat" data-stat-type="dinheiro" title="Alterar Dinheiro" style="width: 42px; ${moneyContainerStyle} background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100});">
+                        💰$<span data-stat-current="dinheiro">${characterData.dinheiro || 0}</span>
+                    </div>
+                </div>
+                <!-- 1. Attack Stats (New Separated Block) -->
+                <div class="div-attack-stats grid grid-row-2 gap-y-2 text-xs mb-2" style="display: ${showAttackStats ? 'block' : 'none'}; border-radius: 18px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100}); padding: 8px; width: 42px; justify-content: center; align-content: space-around;">
+                    ${attackStatsHtml}
                 </div>
             </div>
 
@@ -646,12 +735,14 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             </div>
             
             <div class="absolute top-6 left-4 p-2 rounded-full text-center cursor-pointer" style="display: flex; justify-content: space-between; flex-direction: column; height: calc(100% - 30px);">
-                <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs mb-4" style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.colorLight}); padding: 10px; width: 42px; justify-content: space-evenly; ">
+                <!-- 2. Defense/Combat Stats (Renamed, Removed ATK/DMG) -->
+                <div class="div-combat-stats grid grid-row-6 gap-x-4 gap-y-2 text-xs mb-2" style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100}); padding: 10px; width: 42px; justify-content: space-evenly; ">
                     <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
-                    ${combatStatsHtml}
+                    ${defenseStatsHtml}
                     <div class="text-center">CD<br>${cdValue}</div>
                 </div>
 
+                <!-- 3. Attributes Stats (Existing) -->
                 <div class="grid grid-row-6 gap-x-4 gap-y-2 text-xs mb-4 div-Stats" style="border-radius: 28px; background: linear-gradient(to bottom, ${predominantColor.color30}, ${predominantColor.color100}); padding: 10px; width: 42px;">
                     ${mainAttributes.map(key => {
                     const baseValue = parseInt(characterData.attributes[key]) || 0;
@@ -679,9 +770,9 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                 </div>
             </div>
             
-            <div class="absolute bottom-0 w-full p-4">
+            <div class="absolute bottom-0 w-full p-4" style="display: ${(isModal || isInPlay) ? 'flex' : 'none'}">
                 <div class="pb-1 scrollable-content text-sm text-left ml-2 div-miniCards" style="display: flex; flex-direction: row; overflow-y: scroll;gap: 12px; scroll-snap-type: x mandatory; margin-left: 65px;">
-                    <div class="rounded-3xl w-full" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; border-color: ${palette.borderColor}; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end;">
+                    <div class="rounded-3xl w-full" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; border-color: ${palette.borderColor}; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end; opacity: 0.6;">
                         <!-- RELATIONSHIPS_BAR -->
                     </div>
                     <div class="pb-4 rounded-3xl w-full" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; border-color: ${palette.borderColor}; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end;">
@@ -800,7 +891,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             // Define a altura mínima do statsDiv igual à do miniCardsDiv.
             // Se miniCards for maior, statsDiv cresce.
             // Se miniCards for menor, o min-height será pequeno e o statsDiv manterá seu tamanho natural (comportamento "não fazer nada").
-            statsDiv.style.minHeight = `${miniCardsHeight}px`;
+            statsDiv.style.minHeight = `${miniCardsHeight - 10}px`;
             // Opcional: Ajustar o alinhamento do conteúdo para ficar centralizado ou distribuído se esticar muito
             statsDiv.style.display = 'flex';
             statsDiv.style.flexDirection = 'column';

@@ -45,8 +45,16 @@ export async function renderFullAttackSheet(attackData, isModal) {
     const transformProp = isModal ? 'transform: scale(0.9);' : '';
     const uniqueId = `attack-${attackData.id}-${Date.now()}`;
 
-    // A lógica para o botão de buff seria adicionada aqui, se ataques tivessem aumentos temporários.
-    // Por enquanto, vamos omitir, já que o formulário de ataque não os inclui.
+    // Exibição de Acerto e Dano
+    let statsHtml = '';
+    if (attackData.acerto || attackData.dano) {
+        statsHtml = `
+           <div class="flex gap-4 mt-2 mb-2 text-sm text-center absolute w-full" style="top: -45px; justify-content: space-between; margin: 0px 11px; width: calc(100% - 22px);">
+                ${attackData.acerto ? `<div class="dados" style="--color-dados: ${predominantColor.color100}; --color-dadosBk: ${predominantColor.color30};"><span class="font-bold text-teal-300">${attackData.acerto}</span> </div>` : ''}
+                ${attackData.dano ? `<div class="dados" style="--color-dados: ${predominantColor.color100}; --color-dadosBk: ${predominantColor.color30};"><span class="font-bold text-red-300">${attackData.dano}</span> </div>` : ''}
+            </div>
+        `;
+    }
 
     const sheetHtml = `
         <button id="close-attack-sheet-btn-${uniqueId}" class="absolute top-4 right-4 bg-red-600 hover:text-white z-20 thumb-btn" style="display:${isModal? "block": "none"};"><i class="fa-solid fa-xmark"></i></button>
@@ -58,18 +66,16 @@ export async function renderFullAttackSheet(attackData, isModal) {
             <div class="w-full text-left absolute top-0 line-top" style="background-color: ${predominantColor.color30}; padding-top: 20px; padding-bottom: 10px; text-align: center; --minha-cor: ${predominantColor.color100};">
                 <h3 class="font-bold tracking-tight text-white" style="font-size: 1.3rem">${attackData.name}</h3>
             </div>
-           <div class="circle-container"><div class="circle"><div class="icon">🎯</div></div></div>
             
-            <div class="mt-auto p-6 pt-3 md:p-6 w-full text-left absolute bottom-0 line-bottom" style="background-color: ${predominantColor.color30}; --minha-cor: ${predominantColor.color100};">                
-                <div class="sheet-card-text-panel">                      
-                  <div class="space-y-3 max-h-40 overflow-y-auto pr-2">
-                        ${attackData.description ? `
-                            <div class="pt-2">
-                                <h3 class="text-sm font-semibold flex items-center gap-2">Descrição</h3>
-                                <p class="text-gray-300 text-xs leading-relaxed mt-1 pl-6" style="white-space:pre-line;">${attackData.description}</p>
-                            </div>
-                        ` : ''}
-                    </div>
+             <div class="mt-auto  w-full text-left absolute bottom-0 z-20">  
+                ${statsHtml}           
+                <div class="p-6 pt-3 md:p-6 sheet-card-text-panel line-bottom" style="background-color: ${predominantColor.color30}; --minha-cor: ${predominantColor.color100};">
+                    ${attackData.description ? `
+                        <div class="pt-2">
+                            <h3 class="text-sm font-semibold flex items-center gap-2">Descrição</h3>
+                            <p class="text-gray-300 text-xs leading-relaxed mt-1 pl-6" style="white-space:pre-line;">${attackData.description}</p>
+                        </div>
+                    ` : ''}
                 </div>
             </div>            
         </div>       

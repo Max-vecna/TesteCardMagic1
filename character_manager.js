@@ -259,6 +259,10 @@ export async function saveCharacterCard(cardForm) {
     const historiaInput = document.getElementById('historia');
     const personalidadeInput = document.getElementById('personalidade');
     const motivacaoInput = document.getElementById('motivacao');
+    
+    // NOVOS INPUTS
+    const acertoInput = document.getElementById('acerto');
+    const danoInput = document.getElementById('dano');
 
     const selectedPericias = [];
     document.querySelectorAll('#pericias-checkboxes-container input[type="checkbox"]:checked').forEach(cb => {
@@ -286,7 +290,10 @@ export async function saveCharacterCard(cardForm) {
         inteligencia: parseInt(inteligenciaInput.value) || 0,
         sabedoria: parseInt(sabedoriaInput.value) || 0,
         vigor: parseInt(vigorInput.value) || 0,
-        pericias: selectedPericias
+        pericias: selectedPericias,
+        // Salvando Acerto e Dano (String para permitir "+5" ou "1d8")
+        acerto: acertoInput.value,
+        dano: danoInput.value
     };
     const lore = {
         historia: historiaInput.value,
@@ -393,6 +400,10 @@ export async function editCard(cardId) {
     document.getElementById('inteligencia').value = attrs.inteligencia;
     document.getElementById('sabedoria').value = attrs.sabedoria;
     document.getElementById('vigor').value = attrs.vigor;
+
+    // PREENCHE ACERTO E DANO
+    document.getElementById('acerto').value = attrs.acerto || '';
+    document.getElementById('dano').value = attrs.dano || '';
     
     document.getElementById('historia').value = cardData.lore?.historia || '';
     document.getElementById('personalidade').value = cardData.lore?.personalidade || '';

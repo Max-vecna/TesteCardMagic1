@@ -4,11 +4,13 @@ import { getAumentosData, populateCharacterSelect } from './character_manager.js
 import { populateCategorySelect } from './category_manager.js';
 import { showImagePreview } from './ui_utils.js';
 
-export { showImagePreview }; // Re-export para manter compatibilidade com navigation_manager.js
+export { showImagePreview }; 
 
 // Variáveis de estado
 let currentEditingSpellId = null;
 let spellImageFile = null;
+let spellEnhanceImageFile = null; // Nova variável para imagem de aprimoramento
+let spellTrueImageFile = null;    // Nova variável para imagem de verdadeiro
 
 // --- Funções de Cálculo de Cor ---
 function getPredominantColor(imageUrl) {
@@ -105,17 +107,13 @@ function base64ToArrayBuffer(base64) {
     return bytes.buffer;
 }
 
-/**
- * Popula o select de aumentos no formulário de magia/habilidade.
- */
 export function populateSpellAumentosSelect() {
     const select = document.getElementById('spell-aumento-select');
     if (!select) return;
-    select.innerHTML = ''; // Limpa opções existentes
+    select.innerHTML = ''; 
 
     const AUMENTOS_DATA = getAumentosData();
 
-    // Adiciona Status
     const statusGroup = document.createElement('optgroup');
     statusGroup.label = 'Status';
     AUMENTOS_DATA.Status.forEach(stat => {
@@ -126,7 +124,6 @@ export function populateSpellAumentosSelect() {
     });
     select.appendChild(statusGroup);
 
-    // Adiciona Atributos
     const atributosGroup = document.createElement('optgroup');
     atributosGroup.label = 'Atributos';
     AUMENTOS_DATA.Atributos.forEach(attr => {
@@ -137,7 +134,6 @@ export function populateSpellAumentosSelect() {
     });
     select.appendChild(atributosGroup);
 
-    // Adiciona Perícias
     for (const attr in AUMENTOS_DATA.Perícias) {
         const periciasGroup = document.createElement('optgroup');
         periciasGroup.label = `Perícias (${attr})`;
@@ -151,11 +147,6 @@ export function populateSpellAumentosSelect() {
     }
 }
 
-
-/**
- * Adiciona um elemento visual de aumento à lista no formulário.
- * @param {object} aumento - O objeto de aumento a ser renderizado.
- */
 function renderAumentoNaLista(aumento) {
     const list = document.getElementById('spell-aumentos-list');
     if (!list) return;
@@ -182,12 +173,23 @@ function renderAumentoNaLista(aumento) {
     list.appendChild(div);
 }
 
-/**
- * Salva ou atualiza uma magia/habilidade no IndexedDB.
- * @param {HTMLFormElement} spellForm - O formulário com os dados da magia.
- * @param {string} type - O tipo de item a ser salvo ('magia' ou 'habilidade').
- * @returns {Promise<void>}
- */
+// Helper para resetar previews de imagem extra
+function resetExtraImagePreviews() {
+    const enhancePreview = document.getElementById('spellEnhanceImagePreview');
+    const enhanceContainer = document.getElementById('spellEnhanceImagePreviewContainer');
+    const truePreview = document.getElementById('spellTrueImagePreview');
+    const trueContainer = document.getElementById('spellTrueImagePreviewContainer');
+
+    if(enhancePreview) enhancePreview.src = '';
+    if(enhanceContainer) enhanceContainer.classList.add('hidden');
+    if(truePreview) truePreview.src = '';
+    if(trueContainer) trueContainer.classList.add('hidden');
+    
+    // Limpa inputs file
+    document.getElementById('spellEnhanceImageUpload').value = '';
+    document.getElementById('spellTrueImageUpload').value = '';
+}
+
 export async function saveSpellCard(spellForm, type) {
     const spellNameInput = document.getElementById('spellName');
     const spellCircleInput = document.getElementById('spellCircle');
@@ -202,6 +204,10 @@ export async function saveSpellCard(spellForm, type) {
     const spellTrueInput = document.getElementById('spellTrue');
     const spellCharacterOwnerInput = document.getElementById('spellCharacterOwner');
     const spellCategorySelect = document.getElementById('spell-category-select');
+    
+    // Novos campos
+    const spellAcertoInput = document.getElementById('spellAcerto');
+    const spellDamageInput = document.getElementById('spellDamage');
 
     const aumentosList = document.getElementById('spell-aumentos-list');
     const aumentos = [];
@@ -221,49 +227,50 @@ export async function saveSpellCard(spellForm, type) {
     const imageBuffer = spellImageFile ? await readFileAsArrayBuffer(spellImageFile) : (existingData ? existingData.image : null);
     const imageMimeType = spellImageFile ? spellImageFile.type : (existingData ? existingData.imageMimeType : null);
 
+    // Processamento das novas imagens (Enhance e True)
+    const enhanceImageBuffer = spellEnhanceImageFile ? await readFileAsArrayBuffer(spellEnhanceImageFile) : (existingData ? existingData.enhanceImage : null);
+    const enhanceImageMimeType = spellEnhanceImageFile ? spellEnhanceImageFile.type : (existingData ? existingData.enhanceImageMimeType : null);
+
+    const trueImageBuffer = spellTrueImageFile ? await readFileAsArrayBuffer(spellTrueImageFile) : (existingData ? existingData.trueImage : null);
+    const trueImageMimeType = spellTrueImageFile ? spellTrueImageFile.type : (existingData ? existingData.trueImageMimeType : null);
+
+
     let spellData;
+    const baseData = {
+        name: spellNameInput.value,
+        circle: parseInt(spellCircleInput.value) || 0,
+        execution: spellExecutionInput.value,
+        manaCost: parseInt(spellManaCostInput.value) || 0,
+        range: spellRangeInput.value,
+        target: spellTargetInput.value,
+        duration: spellDurationInput.value,
+        resistencia: spellResistenciaInput.value,
+        description: spellDescriptionInput.value,
+        enhance: spellEnhanceInput.value,
+        true: spellTrueInput.value,
+        aumentos: aumentos,
+        type: type,
+        characterId: spellCharacterOwnerInput.value,
+        categoryId: spellCategorySelect.value,
+        image: imageBuffer,
+        imageMimeType: imageMimeType,
+        // Novos campos
+        acerto: spellAcertoInput.value,
+        dano: spellDamageInput.value,
+        
+        enhanceImage: enhanceImageBuffer,
+        enhanceImageMimeType: enhanceImageMimeType,
+        trueImage: trueImageBuffer,
+        trueImageMimeType: trueImageMimeType
+    };
+
     if (currentEditingSpellId) {
         spellData = existingData;
-        if (!spellData) return;
-        Object.assign(spellData, {
-            name: spellNameInput.value,
-            circle: parseInt(spellCircleInput.value) || 0,
-            execution: spellExecutionInput.value,
-            manaCost: parseInt(spellManaCostInput.value) || 0,
-            range: spellRangeInput.value,
-            target: spellTargetInput.value,
-            duration: spellDurationInput.value,
-            resistencia: spellResistenciaInput.value,
-            description: spellDescriptionInput.value,
-            enhance: spellEnhanceInput.value,
-            true: spellTrueInput.value,
-            aumentos: aumentos,
-            type: type,
-            characterId: spellCharacterOwnerInput.value,
-            categoryId: spellCategorySelect.value,
-            image: imageBuffer,
-            imageMimeType: imageMimeType,
-        });
+        Object.assign(spellData, baseData);
     } else {
         spellData = {
             id: Date.now().toString(),
-            name: spellNameInput.value,
-            circle: parseInt(spellCircleInput.value) || 0,
-            execution: spellExecutionInput.value,
-            manaCost: parseInt(spellManaCostInput.value) || 0,
-            range: spellRangeInput.value,
-            target: spellTargetInput.value,
-            duration: spellDurationInput.value,
-            resistencia: spellResistenciaInput.value,
-            description: spellDescriptionInput.value,
-            enhance: spellEnhanceInput.value,
-            true: spellTrueInput.value,
-            aumentos: aumentos,
-            type: type,
-            characterId: spellCharacterOwnerInput.value,
-            categoryId: spellCategorySelect.value,
-            image: imageBuffer,
-            imageMimeType: imageMimeType,
+            ...baseData
         };
     }
 
@@ -276,15 +283,15 @@ export async function saveSpellCard(spellForm, type) {
 
     spellForm.reset();
     spellImageFile = null;
+    spellEnhanceImageFile = null;
+    spellTrueImageFile = null;
+    
     document.getElementById('spell-aumentos-list').innerHTML = '';
     showImagePreview(document.getElementById('spellImagePreview'), null, true);
+    resetExtraImagePreviews();
     currentEditingSpellId = null;
 }
 
-/**
- * Carrega os dados de uma magia/habilidade existente no formulário para edição.
- * @param {string} spellId - O ID da magia a ser editada.
- */
 export async function editSpell(spellId) {
     const spellData = await getData('rpgSpells', spellId);
     if (!spellData) return;
@@ -302,6 +309,10 @@ export async function editSpell(spellId) {
     document.getElementById('spellDescription').value = spellData.description;
     document.getElementById('spellEnhance').value = spellData.enhance;
     document.getElementById('spellTrue').value = spellData.true;
+    
+    // Novos campos
+    document.getElementById('spellAcerto').value = spellData.acerto || '';
+    document.getElementById('spellDamage').value = spellData.dano || '';
 
     await populateCharacterSelect('spellCharacterOwner');
     document.getElementById('spellCharacterOwner').value = spellData.characterId || '';
@@ -322,27 +333,40 @@ export async function editSpell(spellId) {
     } else {
         showImagePreview(spellImagePreview, null, true);
     }
+
+    // Carregar previews das imagens extras
+    if (spellData.enhanceImage) {
+        const blob = bufferToBlob(spellData.enhanceImage, spellData.enhanceImageMimeType);
+        document.getElementById('spellEnhanceImagePreview').src = URL.createObjectURL(blob);
+        document.getElementById('spellEnhanceImagePreviewContainer').classList.remove('hidden');
+    } else {
+        document.getElementById('spellEnhanceImagePreviewContainer').classList.add('hidden');
+    }
+
+    if (spellData.trueImage) {
+        const blob = bufferToBlob(spellData.trueImage, spellData.trueImageMimeType);
+        document.getElementById('spellTrueImagePreview').src = URL.createObjectURL(blob);
+        document.getElementById('spellTrueImagePreviewContainer').classList.remove('hidden');
+    } else {
+        document.getElementById('spellTrueImagePreviewContainer').classList.add('hidden');
+    }
 }
 
-/**
- * Remove uma magia/habilidade do IndexedDB.
- * @param {string} spellId - O ID da magia a ser removida.
- */
 export async function removeSpell(spellId) {
     if (window.confirm('Tem certeza que deseja excluir este item?')) {
         await removeData('rpgSpells', spellId);
     }
 }
 
-/**
- * Exporta uma única magia/habilidade para um arquivo JSON.
- * @param {string} spellId - O ID da magia a ser exportada.
- */
 export async function exportSpell(spellId) {
     const spellData = await getData('rpgSpells', spellId);
     if (spellData) {
         const dataToExport = { ...spellData };
         if (dataToExport.image) dataToExport.image = arrayBufferToBase64(dataToExport.image);
+        // Exportar imagens extras
+        if (dataToExport.enhanceImage) dataToExport.enhanceImage = arrayBufferToBase64(dataToExport.enhanceImage);
+        if (dataToExport.trueImage) dataToExport.trueImage = arrayBufferToBase64(dataToExport.trueImage);
+
         const jsonString = JSON.stringify(dataToExport, null, 2);
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -357,11 +381,6 @@ export async function exportSpell(spellId) {
     }
 }
 
-/**
- * Importa uma única magia/habilidade a partir de um arquivo JSON.
- * @param {File} file - O arquivo JSON a ser importado.
- * @param {string} type - 'magias' ou 'habilidades' para definir o tipo do item importado.
- */
 export async function importSpell(file, type) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -377,6 +396,13 @@ export async function importSpell(file, type) {
 
                 if (importedSpell.image) {
                     importedSpell.image = base64ToArrayBuffer(importedSpell.image);
+                }
+                // Importar imagens extras
+                if (importedSpell.enhanceImage) {
+                    importedSpell.enhanceImage = base64ToArrayBuffer(importedSpell.enhanceImage);
+                }
+                if (importedSpell.trueImage) {
+                    importedSpell.trueImage = base64ToArrayBuffer(importedSpell.trueImage);
                 }
 
                 importedSpell.predominantColor = await calculateColor(importedSpell.image, importedSpell.imageMimeType);
@@ -418,6 +444,52 @@ document.addEventListener('DOMContentLoaded', () => {
             valueInput.value = '0';
         });
     }
+
+    // Listeners para imagens extras de Magia/Habilidade
+    const setupExtraImageListener = (inputId, previewId, containerId, removeBtnId, fileVarSetter) => {
+        const input = document.getElementById(inputId);
+        const preview = document.getElementById(previewId);
+        const container = document.getElementById(containerId);
+        const removeBtn = document.getElementById(removeBtnId);
+
+        if (input && preview && container && removeBtn) {
+            input.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    fileVarSetter(file);
+                    preview.src = URL.createObjectURL(file);
+                    container.classList.remove('hidden');
+                }
+            });
+
+            removeBtn.addEventListener('click', () => {
+                input.value = '';
+                preview.src = '';
+                container.classList.add('hidden');
+                fileVarSetter(null);
+                
+                // Se estivermos editando, precisamos limpar os dados existentes também no objeto em memória durante o save
+                // Isso é tratado na função saveSpellCard ao checar se o input está vazio e o preview oculto, 
+                // mas para simplicidade, se o usuário clica em remover, assumimos null.
+            });
+        }
+    };
+
+    setupExtraImageListener(
+        'spellEnhanceImageUpload', 
+        'spellEnhanceImagePreview', 
+        'spellEnhanceImagePreviewContainer', 
+        'removeEnhanceImageBtn',
+        (file) => { spellEnhanceImageFile = file; }
+    );
+
+    setupExtraImageListener(
+        'spellTrueImageUpload', 
+        'spellTrueImagePreview', 
+        'spellTrueImagePreviewContainer', 
+        'removeTrueImageBtn',
+        (file) => { spellTrueImageFile = file; }
+    );
 });
 
 

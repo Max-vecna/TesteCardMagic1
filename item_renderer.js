@@ -36,8 +36,10 @@ export async function renderFullItemSheet(itemData, isModal) {
     const transformProp = isModal ? 'transform: scale(.9);' : '';
     const uniqueId = `item-${itemData.id}-${Date.now()}`;
 
+    // Incluindo Acerto
     const details = [
         { label: 'Tipo', value: itemData.type },
+        { label: 'Acerto', value: itemData.acerto },
         { label: 'Dano', value: itemData.damage },
         { label: 'Carga', value: itemData.charge },
         { label: 'Pré-requisito', value: itemData.prerequisite }
@@ -89,7 +91,6 @@ export async function renderFullItemSheet(itemData, isModal) {
             <div class="w-full text-left absolute top-0 line-top" style="background-color: ${predominantColor.color30}; padding-top: 20px; padding-bottom: 10px; text-align: center; --minha-cor: ${predominantColor.color100};">
                 <h3 class="font-bold tracking-tight text-white" style="font-size: 1.3rem">${itemData.name}</h3>
             </div>
-           <div class="circle-container"><div class="circle"><div class="icon">🎯</div></div></div>
             
             <div class="mt-auto p-6 pt-3 md:p-6 w-full text-left absolute bottom-0 line-bottom" style="background-color: ${predominantColor.color30}; --minha-cor: ${predominantColor.color100};">                
                 <div class="sheet-card-text-panel">                      

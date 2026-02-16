@@ -207,3 +207,5 @@ export async function calculateColor(imageBuffer, imageMimeType, defaultColor = 
         if (createdObjectUrl) URL.revokeObjectURL(createdObjectUrl);
     }
 }
+
+//AIzaSyCYcqir8zIlJFtnOctoZoJJCpAh2Bd0aC8

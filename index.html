@@ -7,8 +7,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <!-- BIBLIOTECAS GOOGLE (Essenciais para o Drive funcionar) -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+
     <link rel="stylesheet" href="./style.css">
-    <!-- Removido o bloco <style> que forçava full screen -->
 </head>
 <body class="overflow-hidden dark"> <!-- Inicia com o tema escuro por padrão -->
     <!-- Splash Screen -->
@@ -30,7 +34,7 @@
             <i class="fas fa-dice-d20 text-indigo-400"></i>
             <span>Farland 1.0</span>
         </div>
-        <div class="flex flex-col gap-2 p-4 flex-grow">
+        <div class="flex flex-col gap-2 p-4 flex-grow custom-scrollbar overflow-y-auto">
             <button class="desktop-nav-button" data-target="personagem-em-jogo" title="Personagem em Jogo">
                 <i class="fas fa-theater-masks"></i><span>Em Jogo</span>
             </button>
@@ -56,11 +60,39 @@
                 <i class="fas fa-book-open"></i><span>Grimório</span>
             </button>
         </div>
-        <div class="p-2 border-t border-gray-700/50 flex justify-around items-center">
-            <button id="export-db-btn" class="desktop-action-button" title="Exportar Banco de Dados">
+        
+        <!-- Área de Login do Google Drive (Desktop - Melhorada) -->
+        <div class="px-4 pb-4 pt-2 border-t border-gray-700/30">
+            <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 pl-1">Nuvem</div>
+            <div class="space-y-3">
+                <button id="google-login-btn" class="w-full flex items-center justify-center gap-2 py-2 px-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-lg text-sm text-gray-300 transition-all duration-300 group">
+                    <i class="fab fa-google-drive text-lg group-hover:text-white transition-colors"></i>
+                    <span id="google-login-text">Conectar</span>
+                </button>
+                
+                <!-- Botões Manuais do Drive (Layout Melhorado) -->
+                <div id="drive-manual-controls" class="hidden flex-col gap-2 animate-fade-in">
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="drive-upload-btn" class="relative group overflow-hidden flex flex-col items-center justify-center gap-1 py-3 bg-gradient-to-br from-blue-900/40 to-blue-800/40 hover:from-blue-800/60 hover:to-blue-700/60 border border-blue-500/30 rounded-lg transition-all duration-300 shadow-sm hover:shadow-blue-900/20" title="Enviar dados locais para a nuvem">
+                            <div class="absolute inset-0 bg-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <i class="fas fa-cloud-upload-alt text-xl text-blue-300 group-hover:text-blue-200 group-hover:scale-110 transition-transform mb-0.5"></i>
+                            <span class="text-[10px] font-bold text-blue-200/80 uppercase tracking-wide group-hover:text-blue-100">Salvar</span>
+                        </button>
+                        <button id="drive-download-btn" class="relative group overflow-hidden flex flex-col items-center justify-center gap-1 py-3 bg-gradient-to-br from-emerald-900/40 to-emerald-800/40 hover:from-emerald-800/60 hover:to-emerald-700/60 border border-emerald-500/30 rounded-lg transition-all duration-300 shadow-sm hover:shadow-emerald-900/20" title="Baixar dados da nuvem para local">
+                            <div class="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <i class="fas fa-cloud-download-alt text-xl text-emerald-300 group-hover:text-emerald-200 group-hover:scale-110 transition-transform mb-0.5"></i>
+                            <span class="text-[10px] font-bold text-emerald-200/80 uppercase tracking-wide group-hover:text-emerald-100">Baixar</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-2 border-t border-gray-700/50 flex justify-around items-center bg-gray-900/30">
+            <button id="export-db-btn" class="desktop-action-button" title="Exportar Backup Local">
                 <i class="fas fa-file-download"></i>
             </button>
-            <button id="import-db-btn" class="desktop-action-button" title="Importar Banco de Dados">
+            <button id="import-db-btn" class="desktop-action-button" title="Importar Banco de Dados (Local)">
                 <i class="fas fa-file-upload"></i>
             </button>
             <button id="export-images-btn" class="desktop-action-button" title="Baixar Imagens">
@@ -78,10 +110,25 @@
             <i class="fas fa-chevron-left"></i>
         </button>
         <div id="sidebar-buttons" class="flex flex-col gap-3 p-2 rounded-l-lg shadow-lg">
-            <button id="export-db-btn-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Exportar Banco de Dados">
+            <!-- Botão Google Mobile -->
+            <button id="google-login-btn-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform border border-gray-600" title="Conectar Google Drive">
+                <i class="fab fa-google-drive"></i>
+            </button>
+            
+            <!-- Botões Mobile Nuvem (Hidden por padrão) -->
+            <button id="drive-upload-btn-mobile" class="hidden sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform bg-gradient-to-br from-blue-900 to-blue-700 text-blue-100 border border-blue-500/30" title="Salvar na Nuvem">
+                <i class="fas fa-cloud-upload-alt"></i>
+            </button>
+            <button id="drive-download-btn-mobile" class="hidden sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform bg-gradient-to-br from-emerald-900 to-emerald-700 text-emerald-100 border border-emerald-500/30" title="Carregar da Nuvem">
+                <i class="fas fa-cloud-download-alt"></i>
+            </button>
+
+            <hr class="border-gray-600">
+
+            <button id="export-db-btn-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Exportar Backup Local">
                 <i class="fas fa-file-download"></i>
             </button>
-            <button id="import-db-btn-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Importar Banco de Dados">
+            <button id="import-db-btn-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Importar Backup Local">
                 <i class="fas fa-file-upload"></i>
             </button>
              <button id="export-images-btn-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Baixar Imagens">
@@ -91,16 +138,13 @@
 
     </div>
 
-     <!-- Sliding Actions Sidebar for Mobile -->
+     <!-- Sliding Actions Sidebar for Mobile (Right) -->
     <div id="actions-sidebar-1" class="fixed top-1/2 -translate-y-1/2 z-50 flex items-center md:hidden">
         <div id="sidebar-buttons" class="flex flex-col gap-3 p-2 rounded-r-lg shadow-lg">
             <button id="aspect-ratio-btn-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Ajustar Tamanho dos Cards">
                 <i class="fas fa-expand-alt"></i>
             </button>
 
-            <!-- <button id="theme-switcher-mobile" class="sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Alterar Tema">
-                <i class="fas fa-moon"></i>
-            </button> -->
             <hr>
             <button  class=" sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Exportar Banco de Dados"  data-target="grimorio" title="Grimório">
                <i class="fas fa-book-open"></i>
@@ -123,29 +167,23 @@
         </main>
     </div>
 
-    <!-- Container da Ficha de Personagem -->
+    <!-- Resto do HTML (Modais, Containers de Fichas, etc.) permanece inalterado -->
     <div id="character-sheet-container" class="hidden"></div>
-    <!-- Container da Ficha de Magia/Habilidade -->
     <div id="spell-sheet-container" class="hidden"></div>
-    <!-- Container da Ficha de Item -->
     <div id="item-sheet-container" class="hidden"></div>
-    <!-- Container da Ficha de Ataque -->
     <div id="attack-sheet-container" class="hidden"></div>
-    <!-- Contêiner para fichas aninhadas (ex: relacionamentos) -->
     <div id="nested-sheet-container" class="hidden"></div>
-    <!-- Container do Editor de Grimório -->
     <div id="grimoire-editor-container" class="hidden"></div>
 
-    <!-- Formulário de Criação de Personagem -->
     <div id="creation-section" class="hidden">
+        <!-- ... Conteúdo do formulário de personagem ... -->
         <div class="form-container" style="max-width: 1000px;">
             <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
                 <h2 id="form-title" class="text-2xl font-bold text-indigo-300">Novo Personagem</h2>
                 <button id="close-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
             </div>
             <form id="cardForm" class="space-y-3">
-                <div class="flex flex-col md:flex-row gap-4">
-                    <!-- Coluna Esquerda: Imagens -->
+                 <div class="flex flex-col md:flex-row gap-4">
                     <div class="w-full md:w-1/5 flex flex-col gap-3">
                          <div class="text-center bg-gray-900/50 p-3 rounded-lg border border-gray-700">
                              <label for="characterImageUpload" class="block text-xs font-bold text-indigo-300 uppercase mb-2 cursor-pointer hover:text-white transition-colors">
@@ -169,10 +207,7 @@
                              </div>
                          </div>
                     </div>
-
-                    <!-- Coluna Direita: Dados -->
                     <div class="w-full md:w-4/5 space-y-3">
-                        <!-- Linha 1: Info Básica -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                                 <label for="cardTitle" class="block text-xs font-semibold text-gray-400 mb-1">Nome</label>
@@ -183,8 +218,6 @@
                                 <input type="text" id="cardSubTitle" placeholder="Ex: Humano Mago" required class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none">
                             </div>
                         </div>
-                        
-                        <!-- Linha 2: Nível e $ -->
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div>
                                 <label for="cardLevel" class="block text-xs font-semibold text-gray-400 mb-1">Nível</label>
@@ -195,8 +228,6 @@
                                 <input type="number" id="dinheiro" placeholder="0" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none">
                             </div>
                         </div>
-
-                         <!-- Atributos -->
                         <div class="bg-gray-800/50 p-2 rounded border border-gray-700/50">
                             <h3 class="text-xs font-bold text-indigo-400 uppercase mb-2">Atributos</h3>
                             <div class="grid grid-cols-3 md:grid-cols-6 gap-2">
@@ -208,25 +239,29 @@
                                 <div><label class="block text-[10px] text-gray-500 text-center uppercase">VIG</label><input type="number" id="vigor" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                             </div>
                         </div>
-
-                        <!-- Combate -->
                         <div class="bg-gray-800/50 p-2 rounded border border-gray-700/50">
                             <h3 class="text-xs font-bold text-red-400 uppercase mb-2">Combate</h3>
-                            <div class="grid grid-cols-4 md:grid-cols-8 gap-2">
+                            <!-- GRID ALTERADO PARA 5 COLUNAS PARA CABER ACERTO E DANO -->
+                            <div class="grid grid-cols-5 gap-2">
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">PV Máx</label><input type="number" id="vida" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">PV Atual</label><input type="number" id="vidaAtual" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">PM Máx</label><input type="number" id="mana" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">PM Atual</label><input type="number" id="manaAtual" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                
+                                <!-- NOVOS CAMPOS INSERIDOS -->
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-yellow-400">Acerto</label><input type="text" id="acerto" placeholder="+0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">Armadura</label><input type="number" id="armadura" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">Esquiva</label><input type="number" id="esquiva" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">Bloqueio</label><input type="number" id="bloqueio" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">Desloc.</label><input type="number" id="deslocamento" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                
+                                <!-- NOVOS CAMPOS INSERIDOS -->
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano</label><input type="text" id="dano" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Textareas (Compact) -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                         <label for="historia" class="block text-xs font-semibold text-gray-400 mb-1">História</label>
@@ -241,17 +276,13 @@
                         <textarea id="motivacao" rows="3" class="h-64 w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none"></textarea>
                     </div>
                 </div>
-
-                <!-- Seções Expansíveis/Listas -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Perícias -->
                     <div class="bg-gray-800/30 p-2 rounded">
                          <div class="flex justify-between items-center mb-1">
                             <h3 class="text-xs font-bold text-indigo-300 uppercase">Perícias</h3>
                             <button type="button" id="show-add-pericia-form-btn" class="text-indigo-400 hover:text-indigo-200 text-xs font-bold">+ Nova</button>
                         </div>
                         <div id="add-pericia-form" class="hidden bg-gray-900 p-2 rounded mb-2 border border-gray-700">
-                             <!-- Form Pericia Compacto -->
                              <input type="text" id="new-pericia-name" placeholder="Nome" class="w-full mb-1 px-2 py-1 bg-gray-800 text-xs rounded border border-gray-600">
                              <div class="flex gap-1">
                                 <select id="new-pericia-attribute" class="flex-1 px-2 py-1 bg-gray-800 text-xs rounded border border-gray-600">
@@ -269,8 +300,6 @@
                             <p id="periciaDescriptionText" class="text-gray-300"></p>
                         </div>
                     </div>
-
-                    <!-- Inventário -->
                     <div id="form-inventory-section" class="bg-gray-800/30 p-2 rounded hidden">
                          <div class="flex justify-between items-center mb-1">
                             <h3 class="text-xs font-bold text-amber-300 uppercase">Inventário</h3>
@@ -293,10 +322,7 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Listas Vinculadas (Magias, Habilidades, Ataques, Relações) -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-                    <!-- Magias -->
                     <div>
                          <div class="flex justify-between items-center mb-1">
                             <h3 class="text-xs font-bold text-teal-300 uppercase">Magias</h3>
@@ -304,8 +330,6 @@
                         </div>
                         <div id="selected-magics-container" class="bg-gray-800/50 p-2 rounded min-h-[40px] max-h-[500px] overflow-y-auto"></div>
                     </div>
-                    
-                    <!-- Habilidades -->
                     <div>
                          <div class="flex justify-between items-center mb-1">
                             <h3 class="text-xs font-bold text-cyan-300 uppercase">Habilidades</h3>
@@ -313,8 +337,6 @@
                         </div>
                         <div id="selected-skills-container" class="bg-gray-800/50 p-2 rounded min-h-[40px] max-h-[500px] overflow-y-auto"></div>
                     </div>
-
-                    <!-- Ataques -->
                     <div>
                          <div class="flex justify-between items-center mb-1">
                             <h3 class="text-xs font-bold text-red-400 uppercase">Ataques</h3>
@@ -322,8 +344,6 @@
                         </div>
                         <div id="selected-attacks-container" class="bg-gray-800/50 p-2 rounded min-h-[40px] max-h-[500px] overflow-y-auto"></div>
                     </div>
-
-                    <!-- Relações -->
                     <div>
                          <div class="flex justify-between items-center mb-1">
                             <h3 class="text-xs font-bold text-purple-400 uppercase">Relações</h3>
@@ -332,7 +352,6 @@
                         <div id="selected-relationships-container" class="bg-gray-800/50 p-2 rounded min-h-[40px] max-h-[500px] overflow-y-auto"></div>
                     </div>
                 </div>
-
                 <div class="pt-2">
                     <button type="submit" id="submitButton" class="w-full py-2 px-4 rounded-full text-base font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg btn-gradient-pulse">
                         Criar Cartão
@@ -342,8 +361,9 @@
         </div>
     </div>
 
-    <!-- Formulário de Criação de Magia/Habilidade -->
+    <!-- Modais adicionais (Spell, Item, Attack, etc) também se mantêm os mesmos -->
     <div id="spell-creation-section" class="hidden">
+        <!-- Conteúdo do form de magia... -->
         <div class="form-container" style="max-width: 1000px;">
             <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
                 <h2 id="spell-form-title" class="text-2xl font-bold text-teal-300">Nova Magia</h2>
@@ -351,7 +371,6 @@
             </div>
             <form id="spellForm" class="space-y-3">
                  <div class="flex flex-col md:flex-row gap-4">
-                    <!-- Coluna Esq: Imagem -->
                     <div class="w-full md:w-1/5 flex flex-col items-center gap-2 bg-gray-900/50 p-3 rounded-lg border border-gray-700 h-fit">
                         <label for="spellImageUpload" class="block text-xs font-bold text-teal-300 uppercase cursor-pointer hover:text-white">Ícone</label>
                         <div class="relative group cursor-pointer w-24 h-24">
@@ -362,8 +381,6 @@
                              </div>
                         </div>
                     </div>
-
-                    <!-- Coluna Dir: Dados -->
                     <div class="w-full md:w-4/5 space-y-3">
                          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div class="md:col-span-2">
@@ -375,13 +392,10 @@
                                 <select id="spell-category-select" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></select>
                             </div>
                         </div>
-
                         <div>
                             <label for="spellCharacterOwner" class="block text-xs font-semibold text-gray-400 mb-1">Dono (Opcional)</label>
                             <select id="spellCharacterOwner" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></select>
                         </div>
-
-                        <!-- Stats Grid Compacto -->
                         <div class="bg-gray-800/50 p-2 rounded border border-gray-700/50 grid grid-cols-2 md:grid-cols-4 gap-3">
                              <div id="mana-cost-wrapper" class="contents">
                                  <div>
@@ -413,30 +427,57 @@
                                 <label for="spellResistencia" class="block text-[10px] text-gray-500 uppercase mb-1">Resistência</label>
                                 <input type="text" id="spellResistencia" placeholder="nenhuma" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
                             </div>
+                            <!-- NOVOS CAMPOS: Acerto e Dano -->
+                            <div>
+                                <label for="spellAcerto" class="block text-[10px] text-gray-500 uppercase mb-1">Acerto</label>
+                                <input type="text" id="spellAcerto" placeholder="Ex: +5" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                            </div>
+                            <div>
+                                <label for="spellDamage" class="block text-[10px] text-gray-500 uppercase mb-1">Dano</label>
+                                <input type="text" id="spellDamage" placeholder="Ex: 2d6" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                            </div>
                         </div>
                     </div>
                  </div>
-
-                 <!-- Textareas Grid -->
-                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div class="md:col-span-2">
                         <label for="spellDescription" class="block text-xs font-semibold text-gray-400 mb-1">Descrição</label>
                         <textarea id="spellDescription" rows="3" class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
                     </div>
                     <div id="enhance-wrapper">
-                        <label for="spellEnhance" class="block text-xs font-semibold text-gray-400 mb-1">Aprimoramento</label>
+                        <div class="flex justify-between items-center mb-1">
+                            <label for="spellEnhance" class="block text-xs font-semibold text-gray-400">Aprimoramento</label>
+                             <div class="relative group">
+                                <label for="spellEnhanceImageUpload" class="cursor-pointer text-xs text-teal-400 hover:text-teal-200"><i class="fas fa-image"></i> Add Img</label>
+                                <input type="file" id="spellEnhanceImageUpload" accept="image/*" class="hidden">
+                            </div>
+                        </div>
+                        <div id="spellEnhanceImagePreviewContainer" class="hidden mb-2 relative w-full h-64 bg-gray-800 rounded border border-gray-600 overflow-hidden group">
+                             <img id="spellEnhanceImagePreview" class="w-full h-full object-cover opacity-50">
+                             <button type="button" id="removeEnhanceImageBtn" class="absolute top-1 right-1 text-red-500 hover:text-white bg-black/50 hover:bg-red-600 rounded-full w-5 h-5 flex items-center justify-center text-xs">&times;</button>
+                             <span class="absolute bottom-1 left-2 text-[10px] text-white font-bold drop-shadow-md">Imagem selecionada</span>
+                        </div>
                         <textarea id="spellEnhance" rows="2" class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
                     </div>
                     <div id="true-wrapper">
-                        <label for="spellTrue" class="block text-xs font-semibold text-gray-400 mb-1">Verdadeiro</label>
+                        <div class="flex justify-between items-center mb-1">
+                            <label for="spellTrue" class="block text-xs font-semibold text-gray-400">Verdadeiro</label>
+                            <div class="relative group">
+                                <label for="spellTrueImageUpload" class="cursor-pointer text-xs text-teal-400 hover:text-teal-200"><i class="fas fa-image"></i> Add Img</label>
+                                <input type="file" id="spellTrueImageUpload" accept="image/*" class="hidden">
+                            </div>
+                        </div>
+                        <div id="spellTrueImagePreviewContainer" class="hidden mb-2 relative w-full h-64 bg-gray-800 rounded border border-gray-600 overflow-hidden group">
+                             <img id="spellTrueImagePreview" class="w-full h-full object-cover opacity-50">
+                             <button type="button" id="removeTrueImageBtn" class="absolute top-1 right-1 text-red-500 hover:text-white bg-black/50 hover:bg-red-600 rounded-full w-5 h-5 flex items-center justify-center text-xs">&times;</button>
+                             <span class="absolute bottom-1 left-2 text-[10px] text-white font-bold drop-shadow-md">Imagem selecionada</span>
+                        </div>
                         <textarea id="spellTrue" rows="2" class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
                     </div>
                  </div>
-
-                 <!-- Aumentos Compacto -->
                 <div class="bg-gray-800/30 p-2 rounded border border-gray-700/50">
                     <h3 class="text-xs font-bold text-teal-300 uppercase mb-2">Aumentos de Atributo</h3>
-                    <div class="flex flex-wrap gap-2 items-end mb-2">
+                    <div class="flex flex-wrap gap-2 items-end mb-2" style="justify-content: space-between;">
                          <div class="flex-grow min-w-[120px]">
                              <select id="spell-aumento-select" class="w-full px-2 py-1 bg-gray-800 text-white text-sm rounded border border-gray-600"></select>
                          </div>
@@ -451,7 +492,6 @@
                     </div>
                     <div id="spell-aumentos-list" class="flex flex-wrap gap-2"></div>
                 </div>
-
                 <div class="pt-2">
                     <button type="submit" id="spellSubmitButton" class="w-full py-2 px-4 rounded-full text-base font-bold text-white bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 shadow-lg">
                         Salvar
@@ -460,17 +500,15 @@
             </form>
         </div>
     </div>
-
-    <!-- Formulário de Criação de Item -->
     <div id="item-creation-section" class="hidden">
-        <div class="form-container" style="max-width: 1000px;">
+        <!-- Conteúdo do form de item -->
+         <div class="form-container" style="max-width: 1000px;">
             <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
                 <h2 id="item-form-title" class="text-2xl font-bold text-amber-300">Novo Item</h2>
                 <button id="close-item-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
             </div>
             <form id="itemForm" class="space-y-3">
                  <div class="flex flex-col md:flex-row gap-4">
-                     <!-- Coluna Esq: Imagem -->
                     <div class="w-full md:w-1/5 flex flex-col items-center gap-2 bg-gray-900/50 p-3 rounded-lg border border-gray-700 h-fit">
                         <label for="itemImageUpload" class="block text-xs font-bold text-amber-300 uppercase cursor-pointer hover:text-white">Ícone</label>
                         <div class="relative group cursor-pointer w-24 h-24">
@@ -481,8 +519,6 @@
                              </div>
                         </div>
                     </div>
-
-                    <!-- Coluna Dir: Dados -->
                      <div class="w-full md:w-4/5 space-y-3">
                          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div class="md:col-span-2">
@@ -498,7 +534,6 @@
                             <label for="itemCharacterOwner" class="block text-xs font-semibold text-gray-400 mb-1">Dono (Opcional)</label>
                             <select id="itemCharacterOwner" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-amber-500 focus:outline-none"></select>
                         </div>
-                        
                         <div class="bg-gray-800/50 p-2 rounded border border-gray-700/50 grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div>
                                 <label for="itemType" class="block text-[10px] text-gray-500 uppercase mb-1">Tipo</label>
@@ -507,6 +542,11 @@
                             <div>
                                 <label for="itemDamage" class="block text-[10px] text-gray-500 uppercase mb-1">Dano</label>
                                 <input type="text" id="itemDamage" placeholder="1d8" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                            </div>
+                             <!-- NOVO CAMPO: Acerto (Dano já existia) -->
+                             <div>
+                                <label for="itemAcerto" class="block text-[10px] text-gray-500 uppercase mb-1">Acerto</label>
+                                <input type="text" id="itemAcerto" placeholder="+2" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
                             </div>
                              <div>
                                 <label for="itemCharge" class="block text-[10px] text-gray-500 uppercase mb-1">Carga</label>
@@ -517,15 +557,12 @@
                                 <input type="text" id="itemPrerequisite" placeholder="FOR 1" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
                             </div>
                         </div>
-
                         <div><label for="itemDescription" class="block text-xs font-semibold mb-1 text-gray-400">Descrição</label><textarea id="itemDescription" rows="3" placeholder="Descrição do item..." class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white rounded border border-gray-600 text-sm focus:border-amber-500 focus:outline-none"></textarea></div>
                      </div>
                  </div>
-
-                  <!-- Aumentos Compacto -->
                 <div class="bg-gray-800/30 p-2 rounded border border-gray-700/50">
                     <h3 class="text-xs font-bold text-amber-300 uppercase mb-2">Aumentos de Atributo</h3>
-                    <div class="flex flex-wrap gap-2 items-end mb-2">
+                    <div class="flex flex-wrap gap-2 items-end mb-2" style="justify-content: space-between;">
                          <div class="flex-grow min-w-[120px]">
                              <select id="item-aumento-select" class="w-full px-2 py-1 bg-gray-800 text-white text-sm rounded border border-gray-600"></select>
                          </div>
@@ -540,7 +577,6 @@
                     </div>
                     <div id="item-aumentos-list" class="flex flex-wrap gap-2"></div>
                 </div>
-
                 <div class="pt-2">
                     <button type="submit" id="itemSubmitButton" class="w-full py-2 px-4 rounded-full text-base font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-lg">
                         Salvar Item
@@ -549,9 +585,8 @@
             </form>
         </div>
     </div>
-
-    <!-- Formulário de Criação de Ataque -->
     <div id="attack-creation-section" class="hidden">
+         <!-- Conteúdo do form de ataque -->
         <div class="form-container" style="max-width: 1000px;">
             <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
                 <h2 id="attack-form-title" class="text-2xl font-bold text-red-400">Novo Ataque</h2>
@@ -559,7 +594,6 @@
             </div>
             <form id="attackForm" class="space-y-3">
                  <div class="flex flex-col md:flex-row gap-4">
-                    <!-- Coluna Esq: Imagem -->
                     <div class="w-full md:w-1/5 flex flex-col items-center gap-2 bg-gray-900/50 p-3 rounded-lg border border-gray-700 h-fit">
                         <label for="attackImageUpload" class="block text-xs font-bold text-red-400 uppercase cursor-pointer hover:text-white">Ícone</label>
                         <div class="relative group cursor-pointer w-24 h-24">
@@ -570,8 +604,6 @@
                              </div>
                         </div>
                     </div>
-
-                    <!-- Coluna Dir: Dados -->
                     <div class="w-full md:w-4/5 space-y-3">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div class="md:col-span-2">
@@ -583,10 +615,20 @@
                                 <select id="attack-category-select" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-red-500 focus:outline-none"></select>
                             </div>
                         </div>
-
                         <div>
                             <label for="attackCharacterOwner" class="block text-xs font-semibold text-gray-400 mb-1">Personagem</label>
                             <select id="attackCharacterOwner" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-red-500 focus:outline-none"></select>
+                        </div>
+                        <!-- NOVOS CAMPOS: Acerto e Dano -->
+                        <div class="grid grid-cols-2 gap-3">
+                             <div>
+                                <label for="attackAcerto" class="block text-[10px] text-gray-500 uppercase mb-1">Acerto</label>
+                                <input type="text" id="attackAcerto" placeholder="+4" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                            </div>
+                            <div>
+                                <label for="attackDamage" class="block text-[10px] text-gray-500 uppercase mb-1">Dano</label>
+                                <input type="text" id="attackDamage" placeholder="1d10+2" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                            </div>
                         </div>
                         <div>
                             <label for="attackDescription" class="block text-xs font-semibold text-gray-400 mb-1">Descrição</label>
@@ -594,7 +636,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="pt-2">
                     <button type="submit" id="attackSubmitButton" class="w-full py-2 px-4 rounded-full text-base font-bold text-white bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 shadow-lg">
                         Salvar Ataque
@@ -605,7 +646,6 @@
     </div>
 
 
-    <!-- Modal de Seleção de Personagem -->
     <div id="select-character-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4" style="z-index: 1000000000000000000;">
         <div class="bg-gray-800 text-white rounded-lg shadow-2xl p-6 w-full max-w-sm border border-gray-700">
             <div class="flex justify-between items-center mb-4">
@@ -616,7 +656,6 @@
         </div>
     </div>
 
-    <!-- Generic Selection Modal -->
     <div id="selection-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-[11000000000000000000000000000] p-4">
         <div class="bg-gray-800 text-white rounded-lg shadow-2xl p-6 w-full max-w-lg border border-gray-700 flex flex-col max-h-[90vh]">
             <div class="flex justify-between items-center mb-4">
@@ -627,7 +666,6 @@
         </div>
     </div>
 
-    <!-- Stat Editor Modal -->
     <div id="stat-editor-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center hidden z-[1200000000000000000000] p-4 transition-opacity duration-300">
         <div id="stat-editor-content" class="bg-gray-900/70 border-2 border-gray-700 text-white rounded-2xl shadow-2xl p-6 w-full max-w-sm transform transition-all duration-300 scale-95 opacity-0">
             <div class="flex justify-between items-center mb-6">
@@ -646,7 +684,6 @@
                     <label for="stat-editor-value" class="block text-sm font-semibold mb-2 text-gray-300">Valor a Adicionar ou Subtrair</label>
                     <input type="number" id="stat-editor-value" placeholder="0" class="w-full text-center text-2xl px-4 py-3 bg-gray-800 text-white rounded-lg border-2 border-gray-600 focus:border-indigo-500 focus:ring focus:ring-indigo-500/50 transition-all duration-300">
                 </div>
-                <!-- MODIFICAÇÃO: Adicionado botão de relógio -->
                 <div class="flex justify-center gap-4">
                     <button id="stat-editor-subtract-btn" class="w-16 h-16 rounded-full bg-gradient-to-br from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 text-white font-bold text-3xl flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Subtrair Permanente">
                         <i class="fas fa-minus"></i>
@@ -662,7 +699,6 @@
         </div>
     </div>
 
-    <!-- Aspect Ratio Modal -->
     <div id="aspect-ratio-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-[120000000000000000000] p-4">
         <div class="bg-gray-800 text-white rounded-lg shadow-2xl p-6 w-full max-w-sm border border-gray-700">
             <div class="flex justify-between items-center mb-4">
@@ -712,6 +748,8 @@
     </nav>
 
     <script src="./splash_screen.js"></script>
+        <script type="module" src="./drive_adapter.js"></script> <!-- NOVO -->
+
     <script type="module" src="./local_db.js"></script>
     <script type="module" src="./settings_manager.js"></script>
     <script type="module" src="./ui_utils.js"></script>

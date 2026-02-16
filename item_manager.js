@@ -175,6 +175,8 @@ export async function saveItemCard(itemForm) {
     const itemPrerequisiteInput = document.getElementById('itemPrerequisite');
     const itemCharacterOwnerInput = document.getElementById('itemCharacterOwner');
     const itemCategorySelect = document.getElementById('item-category-select');
+    // Novo campo
+    const itemAcertoInput = document.getElementById('itemAcerto');
     
     const aumentosList = document.getElementById('item-aumentos-list');
     const aumentos = [];
@@ -195,35 +197,28 @@ export async function saveItemCard(itemForm) {
     const imageMimeType = itemImageFile ? itemImageFile.type : (existingData ? existingData.imageMimeType : null);
     
     let itemData;
+    const baseData = {
+        name: itemNameInput.value,
+        effect: itemDescriptionInput.value,
+        type: itemTypeInput.value,
+        damage: itemDamageInput.value,
+        charge: itemChargeInput.value,
+        prerequisite: itemPrerequisiteInput.value,
+        characterId: itemCharacterOwnerInput.value,
+        categoryId: itemCategorySelect.value,
+        acerto: itemAcertoInput.value, // Salvando acerto
+        aumentos,
+        image: imageBuffer,
+        imageMimeType: imageMimeType,
+    };
+
     if (currentEditingItemId) {
         itemData = existingData;
-        Object.assign(itemData, {
-            name: itemNameInput.value,
-            effect: itemDescriptionInput.value,
-            type: itemTypeInput.value,
-            damage: itemDamageInput.value,
-            charge: itemChargeInput.value,
-            prerequisite: itemPrerequisiteInput.value,
-            characterId: itemCharacterOwnerInput.value,
-            categoryId: itemCategorySelect.value,
-            aumentos,
-            image: imageBuffer,
-            imageMimeType: imageMimeType,
-        });
+        Object.assign(itemData, baseData);
     } else {
         itemData = {
             id: Date.now().toString(),
-            name: itemNameInput.value,
-            effect: itemDescriptionInput.value,
-            type: itemTypeInput.value,
-            damage: itemDamageInput.value,
-            charge: itemChargeInput.value,
-            prerequisite: itemPrerequisiteInput.value,
-            characterId: itemCharacterOwnerInput.value,
-            categoryId: itemCategorySelect.value,
-            aumentos,
-            image: imageBuffer,
-            imageMimeType: imageMimeType,
+            ...baseData
         };
     }
 
@@ -251,6 +246,8 @@ export async function editItem(itemId) {
     document.getElementById('itemDamage').value = itemData.damage || '';
     document.getElementById('itemCharge').value = itemData.charge || '';
     document.getElementById('itemPrerequisite').value = itemData.prerequisite || '';
+    // Carregar acerto
+    document.getElementById('itemAcerto').value = itemData.acerto || '';
     
     await populateCharacterSelect('itemCharacterOwner');
     document.getElementById('itemCharacterOwner').value = itemData.characterId || '';
