@@ -54,7 +54,7 @@ function getPredominantColor(imageUrl) {
             try {
                 const data = ctx.getImageData(0, 0, img.width, img.height).data;
                 let r = 0, g = 0, b = 0, count = 0;
-                for (let i = 0; i < data.length; i += 20) { // amostragem de pixels
+                for (let i = 0; i < data.length; i += 20) {
                     r += data[i];
                     g += data[i + 1];
                     b += data[i + 2];
@@ -73,13 +73,13 @@ function getPredominantColor(imageUrl) {
 async function calculateColor(imageBuffer, imageMimeType) {
     let imageUrl;
     let createdObjectUrl = null;
-    const defaultColor = { color30: 'rgba(185, 28, 28, 0.3)', color100: 'rgb(185, 28, 28)' }; // red-700
+    const defaultColor = { color30: 'rgba(185, 28, 28, 0.3)', color100: 'rgb(185, 28, 28)' };
 
     if (imageBuffer) {
         createdObjectUrl = URL.createObjectURL(bufferToBlob(imageBuffer, imageMimeType));
         imageUrl = createdObjectUrl;
     } else {
-        imageUrl = './icons/back.png'; // Imagem padrão
+        imageUrl = './icons/back.png';
     }
 
     let predominantColor;
@@ -95,16 +95,18 @@ async function calculateColor(imageBuffer, imageMimeType) {
     }
     return predominantColor;
 }
-// --- Fim das Funções de Cálculo de Cor ---
 
 export async function saveAttackCard(attackForm) {
     const attackNameInput = document.getElementById('attackName');
     const attackDescriptionInput = document.getElementById('attackDescription');
     const attackCharacterOwnerInput = document.getElementById('attackCharacterOwner');
     const attackCategorySelect = document.getElementById('attack-category-select');
-    // Novos campos
+    
     const attackAcertoInput = document.getElementById('attackAcerto');
     const attackDamageInput = document.getElementById('attackDamage');
+    // Novos campos
+    const attackcriticoInput = document.getElementById('attackcritico');
+    const attackDanoSemManaInput = document.getElementById('attackDanoSemMana');
 
     let existingData = null;
     if (currentEditingAttackId) {
@@ -122,6 +124,9 @@ export async function saveAttackCard(attackForm) {
         categoryId: attackCategorySelect.value,
         acerto: attackAcertoInput.value,
         dano: attackDamageInput.value,
+        // Novos campos salvos
+        critico: attackcriticoInput ? attackcriticoInput.value : '',
+        danoSemMana: attackDanoSemManaInput ? attackDanoSemManaInput.value : '',
         image: imageBuffer,
         imageMimeType: imageMimeType,
     };
@@ -137,7 +142,6 @@ export async function saveAttackCard(attackForm) {
     }
 
     attackData.predominantColor = await calculateColor(attackData.image, attackData.imageMimeType);
-
     await saveData('rpgAttacks', attackData);
     
     document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: 'ataques' } }));
@@ -156,9 +160,14 @@ export async function editAttack(attackId) {
     document.getElementById('attackName').value = attackData.name;
     document.getElementById('attackDescription').value = attackData.description;
     
-    // Novos campos
     document.getElementById('attackAcerto').value = attackData.acerto || '';
     document.getElementById('attackDamage').value = attackData.dano || '';
+    
+    // Novos campos preenchidos na edição
+    const semManaAcerto = document.getElementById('attackcritico');
+    const semManaDano = document.getElementById('attackDanoSemMana');
+    if (semManaAcerto) semManaAcerto.value = attackData.critico || '';
+    if (semManaDano) semManaDano.value = attackData.danoSemMana || '';
     
     await populateCharacterSelect('attackCharacterOwner');
     document.getElementById('attackCharacterOwner').value = attackData.characterId || '';
@@ -202,9 +211,7 @@ export async function importAttack(file) {
             try {
                 const importedAttack = JSON.parse(e.target.result);
                 importedAttack.id = Date.now().toString(); 
-                if (importedAttack.image) {
-                    importedAttack.image = base64ToArrayBuffer(importedAttack.image);
-                }
+                if (importedAttack.image) importedAttack.image = base64ToArrayBuffer(importedAttack.image);
                 importedAttack.predominantColor = await calculateColor(importedAttack.image, importedAttack.imageMimeType);
                 await saveData('rpgAttacks', importedAttack);
                 resolve(importedAttack);
@@ -217,10 +224,15 @@ export async function importAttack(file) {
     });
 }
 
-document.getElementById('attackImageUpload').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        attackImageFile = file;
-        showImagePreview(document.getElementById('attackImagePreview'), URL.createObjectURL(file));
+document.addEventListener('DOMContentLoaded', () => {
+    const uploadInput = document.getElementById('attackImageUpload');
+    if (uploadInput) {
+        uploadInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                attackImageFile = file;
+                showImagePreview(document.getElementById('attackImagePreview'), URL.createObjectURL(file));
+            }
+        });
     }
 });

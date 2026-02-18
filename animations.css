@@ -1,57 +1,43 @@
-/* Animações para os Modais e Fichas */
+/* === AUTO SLIDE MINI CARDS === */
 
-/* O contêiner do modal (fundo escuro) terá uma transição de fade e desfoque */
-#character-sheet-container, 
-#spell-sheet-container, 
-#item-sheet-container,
-#nested-sheet-container {
-    opacity: 0;
-    pointer-events: none;
-    -webkit-backdrop-filter: blur(0px);
-    backdrop-filter: blur(0px);
-    transition: opacity 0.3s ease, -webkit-backdrop-filter 0.3s ease, backdrop-filter 0.3s ease;
+.relationships-grid-slide {
+    overflow: hidden;
+    position: relative;
 }
 
-/* Estado visível do contêiner do modal */
-#character-sheet-container.visible, 
-#spell-sheet-container.visible, 
-#item-sheet-container.visible,
-#nested-sheet-container.visible {
-    opacity: 1;
-    pointer-events: auto;
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
+.relationships-grid-slide.expanded {
+    animation: auto-slide-cards 50s linear infinite;
+    width: max-content;
 }
 
-/* A ficha em si terá uma animação de escala e fade */
-#character-sheet-container > #character-sheet,
-#spell-sheet-container > #spell-sheet,
-#item-sheet-container > #item-sheet,
-#nested-sheet-container > #character-sheet {
-    opacity: 0;
-    transform: scale(0.95);
-    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.2s ease-in-out;
+/* Pausa ao passar o mouse (opcional, mas recomendado) */
+.relationships-grid-slide.expanded:hover {
+    animation-play-state: paused;
 }
 
-/* Estado visível da ficha */
-#character-sheet-container.visible > #character-sheet,
-#spell-sheet-container.visible > #spell-sheet,
-#item-sheet-container.visible > #item-sheet,
-#nested-sheet-container.visible > #character-sheet {
-    opacity: 1;
-    transform: scale(1);
-}
-
-/* Animação de fade-in para a ficha "Em Jogo" */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
+@keyframes auto-slide-cards {
+    0% {
+        transform: translateX(0);
     }
-    to {
-        opacity: 1;
+    50% {
+        transform: translateX(-50%);
+    }
+    100%
+    { 
+        transform: translateX(0);
     }
 }
 
-.in-play-animation > div { /* O alvo é a ficha dentro do contêiner */
-    animation: fadeIn 0.6s ease-out forwards;
+#splash-floating-cards {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.splash-float-card {
+  position: absolute;
+  transform-origin: center;
+  will-change: transform;
+  animation: splashFloat var(--dur, 10s) ease-in-out infinite alternate;
 }

@@ -32,7 +32,6 @@ export async function renderFullSpellSheet(spellData, isModal) {
         mainImageUrl = 'https://placehold.co/400x400/00796B/B2DFDB?text=Magia';
     }
 
-    // Preparar URLs das imagens extras (Enhance e True)
     let enhanceImageUrl = null;
     let createdEnhanceObjectUrl = null;
     if (spellData.enhanceImage) {
@@ -65,7 +64,7 @@ export async function renderFullSpellSheet(spellData, isModal) {
         aumentosHtml = `
             <div class="pt-2 scroll-section" data-bg-type="main">
                 <h3 class="text-sm font-semibold flex items-center gap-2">Aumentos</h3>
-                <div class="text-gray-300 text-xs leading-relaxed mt-1 pl-6 space-y-1">
+                <div class="text-gray-300 text-xs leading-relaxed mt-1 space-y-1">
                     ${createList(aumentosFixos, 'Bônus Fixos', 'text-green-300')}
                     ${createList(aumentosTemporarios, 'Bônus Temporários (Informativo)', 'text-blue-300')}
                 </div>
@@ -94,53 +93,82 @@ export async function renderFullSpellSheet(spellData, isModal) {
         ? `<p style="font-size: 10px;">${spellData.circle > 0 ? `${spellData.circle}º Círculo` : ''}${spellData.circle > 0 && spellData.manaCost > 0 ? ' - ' : ''}${spellData.manaCost > 0 ? `${spellData.manaCost} PM` : ''}</p>`
         : '';
 
-    // Lógica para definir atributos de dados para troca de imagem
     const enhanceDataAttr = enhanceImageUrl ? `data-bg-image="${enhanceImageUrl}"` : '';
     const trueDataAttr = trueImageUrl ? `data-bg-image="${trueImageUrl}"` : '';
 
-    // Novas informações de Acerto e Dano
-    let extraStatsHtml = '';
-    if (spellData.acerto || spellData.dano) {
-        extraStatsHtml = `
-            <div class="flex gap-4 mt-2 mb-2 text-sm text-center absolute w-full" style="top: -45px; justify-content: space-between; margin: 0px 11px; width: calc(100% - 22px);">
-                ${spellData.acerto ? `<div class="dados" style="--color-dados: ${predominantColor.color100}; --color-dadosBk: ${predominantColor.color30};"><span class="font-bold text-teal-300">${spellData.acerto}</span> </div>` : ''}
-                ${spellData.dano ? `<div class="dados" style="--color-dados: ${predominantColor.color100}; --color-dadosBk: ${predominantColor.color30};"><span class="font-bold text-red-300">${spellData.dano}</span> </div>` : ''}
-            </div>
-        `;
-    }
+    // Modificado para suportar Acerto/Dano Sem Mana
+    const attackStats = { acerto: 'ATK', critico: 'ATK s/Mana', dano: 'DMG', danoSemMana: 'DMG s/Mana'};
+    // Gera HTML para Acerto e Dano (Novo Card)
+    const attackStatsHtml = Object.entries(attackStats).map(([stat, label]) => 
+    {
+        const baseValue = spellData[stat] || 0;
+        const content = baseValue || '-';
+
+        const icon = stat === 'acerto' ? 'fa-dice-d20' : //dado
+                     stat === 'dano' ? 'fas fa-fire' :  //dano em criatura com mana
+                     stat === 'critico' ? 'fa-crosshairs' : //critico
+                     stat === 'danoSemMana' ? 'fa-skull' : ""; //dano em criatura sem mana
+
+        return `
+            <div style="position: relative; transform: scale(.8); display: ${content === "-" ? 'none' : 'block'}" class="flex flex-col items-center flex">
+                <i class="fas ${icon} text-5xl" style="background: ${predominantColor.color100}; -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+                <div class="absolute inset-0 flex flex-col items-center justify-center text-white text-xs pointer-events-none" style="margin: auto;">
+                    <div class="text-center text-sm">
+                        <span class="font-bold">
+                            ${content.split("+")[0] || ""}
+                        </span>
+                        <hr style="width: 100%;">
+                        <span style="bottom: 12px;" class="font-bold">
+                            +${content.split("+")[1] || ""}
+                        </span>
+                    </div>
+                </div>
+            </div> `;
+    }).join('');
+
+    const textLabel = { description: 'Descrição', enhance: 'Aprimorar', true: 'Verdadeiro'};
+    const textLabelHtml = Object.entries(textLabel).map(([stat, label]) => 
+    {
+        const baseValue = spellData[stat] || 0;
+        const content = baseValue || '-';
+
+        return `
+            <div class="scroll-section" data-bg-type="main" style="${content === '-' ? 'display: none;' : ''}"}>
+                <h3 class="text-sm font-semibold flex items-center gap-2">${label}</h3>
+                <p class="text-gray-300 text-xs leading-relaxed mt-1" style="white-space: break-spaces;text-align: justify;">${content}</p>
+            </div>`;
+    }).join('');
 
     const sheetHtml = `
-        <button id="close-spell-sheet-btn-${uniqueId}" class="absolute top-4 right-4 bg-red-600 hover:text-white z-50 thumb-btn" style="display:${isModal? "block": "none"};"><i class="fa-solid fa-xmark"></i></button>
+        <button id="close-spell-sheet-btn-${uniqueId}" class="absolute top-4 right-4 bg-red-600 hover:text-white z-50 thumb-btn" style="display:${isModal? "block": "none"};">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
         <div id="spell-sheet-${uniqueId}" class="w-full h-full rounded-lg shadow-2xl overflow-hidden relative text-white transition-all duration-500" style="${origin}; width: ${finalWidth}px; height: ${finalHeight}px; ${transformProp} margin: 0 auto; box-shadow: 0 0 20px ${predominantColor.color100}; background-color: #1a1a1a;">        
             
-            <!-- Camadas de Fundo para Cross-fade -->
             <div id="spell-bg-1-${uniqueId}" class="absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-700 ease-in-out" style="background-image: url('${mainImageUrl}'); z-index: 0; opacity: 1;"></div>
             <div id="spell-bg-2-${uniqueId}" class="absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-700 ease-in-out" style="background-image: url('${mainImageUrl}'); z-index: 0; opacity: 0;"></div>
 
-            <!-- Overlay de Gradiente -->
-            <div class="absolute inset-0 w-full h-full z-10" style="background: linear-gradient(-180deg, #000000a4, transparent, transparent, #0000008f, #0000008f, #000000a4); display: flex; align-items: center; justify-content: center; pointer-events: none;">
-                <div class="rounded-lg" style="width: 100%; height: calc(100% - 20px); border: 3px solid ${predominantColor.color100}; margin: 10px;"></div>
+            <div class="absolute inset-0 w-full h-full z-10" style="background: linear-gradient(-180deg, #000000a4, transparent, transparent, #0000008f, #0000008f, #000000a4); display: flex; align-items: center; justify-content: center; pointer-events: none;box-shadow: inset 0px 0px 5px black; ">
+                <div class="rounded-lg" style="width: 100%; height: calc(100% - 20px); border: 3px solid ${predominantColor.color100}; margin: 10px;box-shadow: inset 0px 0px 5px black, 0px 0px 5px black;"></div>
             </div>
             
-            <div class="w-full text-left absolute top-0 line-top z-20" style="background-color: ${predominantColor.color30}; padding-top: 20px; padding-bottom: 10px; text-align: center; --minha-cor: ${predominantColor.color100};">
+            <div class="w-full text-left absolute top-0 line-top z-20 pt-[20px] pb-[10px]" style="background-color: ${predominantColor.color30}; text-align: center; --minha-cor: ${predominantColor.color100};">
                 <h3 class="font-bold tracking-tight text-white" style="font-size: 1.3rem">${spellData.name}</h3>
                 ${topBarHtml}
             </div>
              
-            <div class="mt-auto  w-full text-left absolute bottom-0 z-20">  
-                   ${extraStatsHtml}           
+            <div class="mt-auto  w-full text-left absolute bottom-0 z-20">                              
                 <div class="p-6 pt-3 md:p-6 sheet-card-text-panel line-bottom" style="background-color: ${predominantColor.color30}; --minha-cor: ${predominantColor.color100};">                      
-                    <div id="spell-scroll-container-${uniqueId}" class="space-y-3 overflow-y-auto pr-2 custom-scrollbar" style="max-height: 12rem; height: 12rem">
-                       
-                        ${spellData.description ? `<div class="scroll-section" data-bg-type="main"><h3 class="text-sm font-semibold flex items-center gap-2">Descrição</h3><p class="text-gray-300 text-xs leading-relaxed mt-1 pl-6" style="white-space: break-spaces;">${spellData.description}</p></div>` : ''}
-                        
-                        ${(spellData.enhance && spellData.type !== 'habilidade') ? `<div class="pt-2 scroll-section" data-bg-type="enhance" ${enhanceDataAttr}><h3 class="text-sm font-semibold flex items-center gap-2">Aprimorar</h3><p class="text-gray-300 text-xs leading-relaxed mt-1 pl-6" style="white-space: break-spaces;">${spellData.enhance}</p></div>` : ''}
-                        
-                        ${(spellData.true && spellData.type !== 'habilidade') ? `<div class="pt-2 scroll-section" data-bg-type="true" ${trueDataAttr}><h3 class="text-sm font-semibold flex items-center gap-2">Verdadeiro</h3><p class="text-gray-300 text-xs leading-relaxed mt-1 pl-6" style="white-space: break-spaces;">${spellData.true}</p></div>` : ''}
+                    <div id="spell-scroll-container-${uniqueId}" class="space-y-3 overflow-y-auto custom-scrollbar" style="max-height: 12rem; height: 12rem">                       
+                        ${textLabelHtml}
                         
                         ${aumentosHtml}
                     </div>
+                    <div class="flex row mt-2 pt-2" style="justify-content: space-around;  border-top: 1px solid ${predominantColor.color100};">
+                        ${attackStatsHtml}  
+                    </div>
                     ${statsHtml}
+                    
                 </div>
             </div>            
         </div>
@@ -149,15 +177,12 @@ export async function renderFullSpellSheet(spellData, isModal) {
     if (!isModal) return sheetHtml;
 
     sheetContainer.innerHTML = sheetHtml;
-    // Removemos a imagem de fundo do container principal pois agora o card tem camadas internas
     sheetContainer.style.backgroundImage = `url(icons/fundo.png)`;
     sheetContainer.style.backgroundSize = 'cover';
     sheetContainer.style.backgroundPosition = 'center';
     
-    // Animação de entrada do Modal (Fade) - Mantida conforme pedido anterior
     sheetContainer.style.transition = 'opacity 0.4s ease-out';
     sheetContainer.style.opacity = '0';
-
     sheetContainer.classList.remove('hidden');
     
     setTimeout(() => {
@@ -165,14 +190,13 @@ export async function renderFullSpellSheet(spellData, isModal) {
         sheetContainer.style.opacity = '1';
     }, 10);
 
-    // --- LÓGICA DE SCROLL PARA TROCA DE IMAGEM COM FADE ---
     setTimeout(() => {
         const scrollContainer = document.getElementById(`spell-scroll-container-${uniqueId}`);
         const bg1 = document.getElementById(`spell-bg-1-${uniqueId}`);
         const bg2 = document.getElementById(`spell-bg-2-${uniqueId}`);
         
-        let currentBgUrl = mainImageUrl; // Estado inicial
-        let activeLayer = 1; // 1 ou 2
+        let currentBgUrl = mainImageUrl;
+        let activeLayer = 1;
 
         if (scrollContainer && bg1 && bg2) {
             scrollContainer.addEventListener('scroll', () => {
@@ -181,7 +205,6 @@ export async function renderFullSpellSheet(spellData, isModal) {
                 const triggerPoint = containerRect.top + (containerRect.height / 3);
 
                 let activeSection = null;
-
                 sections.forEach(section => {
                     const rect = section.getBoundingClientRect();
                     if (rect.top <= triggerPoint && rect.bottom >= triggerPoint) {
@@ -198,18 +221,14 @@ export async function renderFullSpellSheet(spellData, isModal) {
                         targetImage = sectionImage;
                     }
 
-                    // Se a imagem alvo for diferente da atual, faz o cross-fade
                     if (targetImage !== currentBgUrl) {
                         currentBgUrl = targetImage;
-                        
                         if (activeLayer === 1) {
-                            // Transição para camada 2
                             bg2.style.backgroundImage = `url('${targetImage}')`;
                             bg2.style.opacity = '1';
                             bg1.style.opacity = '0';
                             activeLayer = 2;
                         } else {
-                            // Transição para camada 1
                             bg1.style.backgroundImage = `url('${targetImage}')`;
                             bg1.style.opacity = '1';
                             bg2.style.opacity = '0';
@@ -220,7 +239,6 @@ export async function renderFullSpellSheet(spellData, isModal) {
             });
         }
     }, 200);
-    // ---------------------------------------------
 
     const closeSheet = () => {
         sheetContainer.classList.remove('visible');

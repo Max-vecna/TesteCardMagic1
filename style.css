@@ -689,7 +689,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
 .related-spell-grid-item,
 .related-attack-grid-item,
 .related-item-grid-item,
-.related-skill-grid-item {
+.related-skill-grid-item{
     flex-shrink: 0;
     width: 60px;
     height: 92px;
@@ -714,7 +714,9 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
 .relationships-grid.expanded .related-item-grid-item,
 .relationships-grid.expanded .related-skill-grid-item {
     margin-left: 4px;
-    margin-right: 2px;
+    margin-right: 2px;    
+    position: sticky;
+    left: 0;
 }
 
 .relationships-grid.expanded .related-character-grid-item:first-child,
@@ -1093,4 +1095,11 @@ body:not(.dark) .text-white { color: var(--text-color) !important; }
     border-left: 2px solid var(--color-dados);
     padding-left: 20px;
     padding-right: 10px;
+}
+
+.glass-element {
+  
+  /* 2. Apply the backdrop blur */
+  backdrop-filter: blur(10px); 
+  -webkit-backdrop-filter: blur(10px); /* For Safari support */
 }

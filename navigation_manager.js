@@ -11,6 +11,7 @@ import { renderFullSpellSheet } from './magic_renderer.js';
 import { renderFullItemSheet } from './item_renderer.js';
 import { showCustomAlert, showCustomConfirm } from './ui_utils.js';
 import { bufferToBlob } from './ui_utils.js';
+import { createMiniCardsFloat } from './splash_screen.js';
 
 let renderContent;
 const viewCache = {};
@@ -953,6 +954,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await openDatabase();
 
+   
     const emJogoButtons = document.querySelectorAll('[data-target="personagem-em-jogo"]');
     emJogoButtons.forEach(btn => btn.classList.add('active'));
     renderContent('personagem-em-jogo');

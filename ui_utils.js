@@ -31,7 +31,7 @@ export function showCustomAlert(message) {
     const modalId = `custom-alert-modal-${Date.now()}`;
     const modalHtml = `
         <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style="z-index: 9999;">
-            <div class="bg-gray-800 text-white rounded-lg shadow-2xl p-6 w-full max-w-sm border border-gray-700">
+            <div class="bg-gray-800 text-white rounded-lg shadow-2xl p-6 w-full max-w-sm border border-gray-700 w-72">
                 <p class="text-center text-lg mb-4">${message}</p>
                 <button class="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 font-bold">OK</button>
             </div>

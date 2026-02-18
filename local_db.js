@@ -1,7 +1,7 @@
 // local_db.js
 import { initDrive, loadFromDrive, saveToDrive } from './drive_adapter.js';
 import { showCustomAlert, showTopAlert, showCustomConfirm } from './ui_utils.js';
-
+import { createMiniCards } from './splash_screen.js';
 let db;
 let isDriveLoaded = false;
 
@@ -41,27 +41,26 @@ function base64ToArrayBuffer(base64) {
     return bytes.buffer;
 }
 
+
+
 // --- Modais de Progresso (Com Barra) ---
 let progressModal = null;
-function createProgressModal() {
+async function createProgressModal() {
+
+   let grid = await createMiniCards();
+
     if (document.getElementById('progress-modal')) return;
     const modal = document.createElement('div');
     modal.id = 'progress-modal';
     modal.className = 'hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[999]';
     modal.innerHTML = `
-        <div class="bg-gray-900 border-2 border-indigo-800/50 text-white rounded-2xl shadow-2xl w-64 max-w-sm text-center p-6 relative">
+        <div class="bg-gray-900 border-2 border-indigo-800/50 text-white rounded-2xl shadow-2xl w-72 max-w-sm text-center p-6 relative" style="overflow: hidden;">
             <div class="loading-dice text-4xl mb-3 text-indigo-400"><i class="fas fa-dice-d20 fa-spin"></i></div>
-            <h3 id="progress-title" class="text-lg font-bold text-indigo-300 mb-1">Processando...</h3>
-            <p id="progress-message" class="text-gray-400 text-sm mb-4">Aguarde...</p>
-            
-            <!-- Barra de Progresso Visual -->
-            <div class="w-full bg-gray-700 rounded-full h-3 mb-1 overflow-hidden">
-                <div id="progress-bar-fill" class="bg-indigo-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+            <h3 id="progress-title" class="text-lg font-bold text-indigo-300" style="margin-bottom: 25px;">Processando...</h3>
+            <div class="rounded-3xl w-full" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end; opacity: 0.6;">
+                ${grid}
             </div>
-            <div class="flex justify-between text-xs text-gray-500">
-                <span id="progress-percent">0%</span>
-                <span id="progress-status-text">Iniciando</span>
-            </div>
+            <p id="progress-message" class="text-gray-400 text-sm mb-4">Aguarde...</p>            
 
             <!-- Botão de Abortar -->
             <button id="abort-progress-btn" class="mt-4 text-xs text-red-400 hover:text-red-300 hidden">Cancelar Operação</button>
@@ -77,7 +76,7 @@ export function showProgressModal(title = "Processando...", initialPercent = 0) 
     modal.querySelector('#progress-title').textContent = title;
     modal.querySelector('#progress-message').textContent = 'Iniciando...';
     modal.querySelector('#abort-progress-btn').classList.add('hidden'); // Reset do botão
-    updateProgressBar(initialPercent);
+    
     modal.classList.remove('hidden');
 }
 
@@ -86,28 +85,9 @@ export function updateProgress(message, percent = null) {
     const modal = document.getElementById('progress-modal');
     if (message) {
         modal.querySelector('#progress-message').textContent = message;
-        modal.querySelector('#progress-status-text').textContent = message;
     }
-    if (percent !== null) updateProgressBar(percent);
 }
 
-function updateProgressBar(percent) {
-    if (!progressModal) return;
-    const bar = document.getElementById('progress-bar-fill');
-    const text = document.getElementById('progress-percent');
-    
-    if (percent === -1) {
-        // Indeterminado
-        bar.style.width = '100%';
-        bar.classList.add('animate-pulse');
-        text.textContent = '--%';
-    } else {
-        bar.classList.remove('animate-pulse');
-        const p = Math.max(0, Math.min(100, percent));
-        bar.style.width = `${p}%`;
-        text.textContent = `${Math.floor(p)}%`;
-    }
-}
 
 export function hideProgressModal() {
     if (!progressModal) return;

@@ -13,11 +13,13 @@
     <script src="https://accounts.google.com/gsi/client"></script>
 
     <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="./animations.css">
 </head>
 <body class="overflow-hidden dark"> <!-- Inicia com o tema escuro por padrão -->
     <!-- Splash Screen -->
     <div id="splash-screen" class="splash-screen fixed inset-0 flex items-center justify-center">
-        <div class="flex flex-col items-center justify-center">
+        <div id="splash-floating-cards" class="splash-floating-cards" style="position: absolute; filter: blur(1px);"></div>
+        <div class="splash-content flex flex-col items-center justify-center absolute">
             <i class="fas fa-dice-d20 text-8xl text-white animate-spin"></i>
             <p class="mt-4 text-xl font-bold text-white tracking-widest animate-pulse">CARREGANDO...</p>
         </div>
@@ -241,23 +243,29 @@
                         </div>
                         <div class="bg-gray-800/50 p-2 rounded border border-gray-700/50">
                             <h3 class="text-xs font-bold text-red-400 uppercase mb-2">Combate</h3>
-                            <!-- GRID ALTERADO PARA 5 COLUNAS PARA CABER ACERTO E DANO -->
                             <div class="grid grid-cols-5 gap-2">
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">PV Máx</label><input type="number" id="vida" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">PV Atual</label><input type="number" id="vidaAtual" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">PM Máx</label><input type="number" id="mana" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">PM Atual</label><input type="number" id="manaAtual" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
-                                
-                                <!-- NOVOS CAMPOS INSERIDOS -->
-                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-yellow-400">Acerto</label><input type="text" id="acerto" placeholder="+0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
-                                
+                                 
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">Armadura</label><input type="number" id="armadura" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">Esquiva</label><input type="number" id="esquiva" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">Bloqueio</label><input type="number" id="bloqueio" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">Desloc.</label><input type="number" id="deslocamento" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                              </div>
+                        </div>
+                        <div class="bg-gray-800/50 p-2 rounded border border-gray-700/50">
+                            <h3 class="text-xs font-bold text-red-400 uppercase mb-2">Combate</h3>
+                            <!-- GRID ALTERADO PARA 5 COLUNAS PARA CABER ACERTO E DANO -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <!-- NOVOS CAMPOS INSERIDOS -->
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-yellow-400">Acerto</label><input type="text" id="acerto" placeholder="+0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-yellow-400">Crítico</label><input type="text" id="critico" placeholder="+0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 
                                 <!-- NOVOS CAMPOS INSERIDOS -->
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano</label><input type="text" id="dano" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano Sem Mana</label><input type="text" id="danoSemMana" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                             </div>
                         </div>
                     </div>
@@ -427,14 +435,18 @@
                                 <label for="spellResistencia" class="block text-[10px] text-gray-500 uppercase mb-1">Resistência</label>
                                 <input type="text" id="spellResistencia" placeholder="nenhuma" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
                             </div>
-                            <!-- NOVOS CAMPOS: Acerto e Dano -->
-                            <div>
-                                <label for="spellAcerto" class="block text-[10px] text-gray-500 uppercase mb-1">Acerto</label>
-                                <input type="text" id="spellAcerto" placeholder="Ex: +5" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
-                            </div>
-                            <div>
-                                <label for="spellDamage" class="block text-[10px] text-gray-500 uppercase mb-1">Dano</label>
-                                <input type="text" id="spellDamage" placeholder="Ex: 2d6" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                        </div>
+                        <div class="bg-gray-800/50 p-2 rounded border border-gray-700/50">
+                            <h3 class="text-xs font-bold text-red-400 uppercase mb-2">Combate</h3>
+                            <!-- GRID ALTERADO PARA 5 COLUNAS PARA CABER ACERTO E DANO -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <!-- NOVOS CAMPOS INSERIDOS -->
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-yellow-400">Acerto</label><input type="text" id="spellAcerto" placeholder="+0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-yellow-400">Crítico</label><input type="text" id="spellcritico" placeholder="+0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                
+                                <!-- NOVOS CAMPOS INSERIDOS -->
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano</label><input type="text" id="spellDamage" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano Sem Mana</label><input type="text" id="spellDanoSemMana" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                             </div>
                         </div>
                     </div>
@@ -539,15 +551,6 @@
                                 <label for="itemType" class="block text-[10px] text-gray-500 uppercase mb-1">Tipo</label>
                                 <input type="text" id="itemType" placeholder="Ex: Arma" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
                             </div>
-                            <div>
-                                <label for="itemDamage" class="block text-[10px] text-gray-500 uppercase mb-1">Dano</label>
-                                <input type="text" id="itemDamage" placeholder="1d8" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
-                            </div>
-                             <!-- NOVO CAMPO: Acerto (Dano já existia) -->
-                             <div>
-                                <label for="itemAcerto" class="block text-[10px] text-gray-500 uppercase mb-1">Acerto</label>
-                                <input type="text" id="itemAcerto" placeholder="+2" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
-                            </div>
                              <div>
                                 <label for="itemCharge" class="block text-[10px] text-gray-500 uppercase mb-1">Carga</label>
                                 <input type="number" id="itemCharge" placeholder="1" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
@@ -557,6 +560,21 @@
                                 <input type="text" id="itemPrerequisite" placeholder="FOR 1" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
                             </div>
                         </div>
+
+                        <div class="bg-gray-800/50 p-2 rounded border border-gray-700/50">
+                            <h3 class="text-xs font-bold text-red-400 uppercase mb-2">Combate</h3>
+                            <!-- GRID ALTERADO PARA 5 COLUNAS PARA CABER ACERTO E DANO -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <!-- NOVOS CAMPOS INSERIDOS -->
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-yellow-400">Acerto</label><input type="text" id="itemAcerto" placeholder="+0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-yellow-400">Crítico</label><input type="text" id="itemcritico" placeholder="+0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                
+                                <!-- NOVOS CAMPOS INSERIDOS -->
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano</label><input type="text" id="itemDamage" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano Sem Mana</label><input type="text" id="itemDanoSemMana" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                            </div>
+                        </div>
+
                         <div><label for="itemDescription" class="block text-xs font-semibold mb-1 text-gray-400">Descrição</label><textarea id="itemDescription" rows="3" placeholder="Descrição do item..." class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white rounded border border-gray-600 text-sm focus:border-amber-500 focus:outline-none"></textarea></div>
                      </div>
                  </div>
@@ -619,15 +637,17 @@
                             <label for="attackCharacterOwner" class="block text-xs font-semibold text-gray-400 mb-1">Personagem</label>
                             <select id="attackCharacterOwner" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-red-500 focus:outline-none"></select>
                         </div>
-                        <!-- NOVOS CAMPOS: Acerto e Dano -->
-                        <div class="grid grid-cols-2 gap-3">
-                             <div>
-                                <label for="attackAcerto" class="block text-[10px] text-gray-500 uppercase mb-1">Acerto</label>
-                                <input type="text" id="attackAcerto" placeholder="+4" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
-                            </div>
-                            <div>
-                                <label for="attackDamage" class="block text-[10px] text-gray-500 uppercase mb-1">Dano</label>
-                                <input type="text" id="attackDamage" placeholder="1d10+2" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                         <div class="bg-gray-800/50 p-2 rounded border border-gray-700/50">
+                            <h3 class="text-xs font-bold text-red-400 uppercase mb-2">Combate</h3>
+                            <!-- GRID ALTERADO PARA 5 COLUNAS PARA CABER ACERTO E DANO -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <!-- NOVOS CAMPOS INSERIDOS -->
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-yellow-400">Acerto</label><input type="text" id="attackAcerto" placeholder="+0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-yellow-400">Crítico</label><input type="text" id="attackcritico" placeholder="+0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                
+                                <!-- NOVOS CAMPOS INSERIDOS -->
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano</label><input type="text" id="attackDamage" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano Sem Mana</label><input type="text" id="attackDanoSemMana" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                             </div>
                         </div>
                         <div>
@@ -747,10 +767,10 @@
         </button>
     </nav>
 
-    <script src="./splash_screen.js"></script>
-        <script type="module" src="./drive_adapter.js"></script> <!-- NOVO -->
-
+   
+    <script type="module" src="./drive_adapter.js"></script> <!-- NOVO -->
     <script type="module" src="./local_db.js"></script>
+    <script type="module" src="./splash_screen.js"></script>
     <script type="module" src="./settings_manager.js"></script>
     <script type="module" src="./ui_utils.js"></script>
     <script type="module" src="./category_manager.js"></script>

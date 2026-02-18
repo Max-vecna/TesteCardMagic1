@@ -6,11 +6,10 @@ import { showImagePreview } from './ui_utils.js';
 
 export { showImagePreview }; 
 
-// Variáveis de estado
 let currentEditingSpellId = null;
 let spellImageFile = null;
-let spellEnhanceImageFile = null; // Nova variável para imagem de aprimoramento
-let spellTrueImageFile = null;    // Nova variável para imagem de verdadeiro
+let spellEnhanceImageFile = null; 
+let spellTrueImageFile = null;    
 
 // --- Funções de Cálculo de Cor ---
 function getPredominantColor(imageUrl) {
@@ -27,7 +26,7 @@ function getPredominantColor(imageUrl) {
             try {
                 const data = ctx.getImageData(0, 0, img.width, img.height).data;
                 let r = 0, g = 0, b = 0, count = 0;
-                for (let i = 0; i < data.length; i += 20) { // amostragem de pixels
+                for (let i = 0; i < data.length; i += 20) {
                     r += data[i];
                     g += data[i + 1];
                     b += data[i + 2];
@@ -46,13 +45,13 @@ function getPredominantColor(imageUrl) {
 async function calculateColor(imageBuffer, imageMimeType) {
     let imageUrl;
     let createdObjectUrl = null;
-    const defaultColor = { color30: 'rgba(13, 148, 136, 0.3)', color100: 'rgb(13, 148, 136)' }; // teal-600
+    const defaultColor = { color30: 'rgba(13, 148, 136, 0.3)', color100: 'rgb(13, 148, 136)' };
 
     if (imageBuffer) {
         createdObjectUrl = URL.createObjectURL(bufferToBlob(imageBuffer, imageMimeType));
         imageUrl = createdObjectUrl;
     } else {
-        imageUrl = './icons/back.png'; // Imagem padrão
+        imageUrl = './icons/back.png';
     }
 
     let predominantColor;
@@ -68,7 +67,6 @@ async function calculateColor(imageBuffer, imageMimeType) {
     }
     return predominantColor;
 }
-// --- Fim das Funções de Cálculo de Cor ---
 
 function readFileAsArrayBuffer(file) {
     return new Promise((resolve, reject) => {
@@ -173,7 +171,6 @@ function renderAumentoNaLista(aumento) {
     list.appendChild(div);
 }
 
-// Helper para resetar previews de imagem extra
 function resetExtraImagePreviews() {
     const enhancePreview = document.getElementById('spellEnhanceImagePreview');
     const enhanceContainer = document.getElementById('spellEnhanceImagePreviewContainer');
@@ -185,7 +182,6 @@ function resetExtraImagePreviews() {
     if(truePreview) truePreview.src = '';
     if(trueContainer) trueContainer.classList.add('hidden');
     
-    // Limpa inputs file
     document.getElementById('spellEnhanceImageUpload').value = '';
     document.getElementById('spellTrueImageUpload').value = '';
 }
@@ -205,9 +201,11 @@ export async function saveSpellCard(spellForm, type) {
     const spellCharacterOwnerInput = document.getElementById('spellCharacterOwner');
     const spellCategorySelect = document.getElementById('spell-category-select');
     
-    // Novos campos
     const spellAcertoInput = document.getElementById('spellAcerto');
     const spellDamageInput = document.getElementById('spellDamage');
+    // Novos campos
+    const spellcriticoInput = document.getElementById('spellcritico');
+    const spellDanoSemManaInput = document.getElementById('spellDanoSemMana');
 
     const aumentosList = document.getElementById('spell-aumentos-list');
     const aumentos = [];
@@ -227,13 +225,11 @@ export async function saveSpellCard(spellForm, type) {
     const imageBuffer = spellImageFile ? await readFileAsArrayBuffer(spellImageFile) : (existingData ? existingData.image : null);
     const imageMimeType = spellImageFile ? spellImageFile.type : (existingData ? existingData.imageMimeType : null);
 
-    // Processamento das novas imagens (Enhance e True)
     const enhanceImageBuffer = spellEnhanceImageFile ? await readFileAsArrayBuffer(spellEnhanceImageFile) : (existingData ? existingData.enhanceImage : null);
     const enhanceImageMimeType = spellEnhanceImageFile ? spellEnhanceImageFile.type : (existingData ? existingData.enhanceImageMimeType : null);
 
     const trueImageBuffer = spellTrueImageFile ? await readFileAsArrayBuffer(spellTrueImageFile) : (existingData ? existingData.trueImage : null);
     const trueImageMimeType = spellTrueImageFile ? spellTrueImageFile.type : (existingData ? existingData.trueImageMimeType : null);
-
 
     let spellData;
     const baseData = {
@@ -254,9 +250,11 @@ export async function saveSpellCard(spellForm, type) {
         categoryId: spellCategorySelect.value,
         image: imageBuffer,
         imageMimeType: imageMimeType,
-        // Novos campos
         acerto: spellAcertoInput.value,
-        dano: spellDamageInput.value,
+        dano: spellDamageInput.value,  
+        // Novos campos salvos
+        critico: spellcriticoInput ? spellcriticoInput.value : '',
+        danoSemMana: spellDanoSemManaInput ? spellDanoSemManaInput.value : '',
         
         enhanceImage: enhanceImageBuffer,
         enhanceImageMimeType: enhanceImageMimeType,
@@ -275,7 +273,6 @@ export async function saveSpellCard(spellForm, type) {
     }
 
     spellData.predominantColor = await calculateColor(spellData.image, spellData.imageMimeType);
-
     await saveData('rpgSpells', spellData);
 
     const eventType = type === 'habilidade' ? 'habilidades' : 'magias';
@@ -310,9 +307,14 @@ export async function editSpell(spellId) {
     document.getElementById('spellEnhance').value = spellData.enhance;
     document.getElementById('spellTrue').value = spellData.true;
     
-    // Novos campos
     document.getElementById('spellAcerto').value = spellData.acerto || '';
     document.getElementById('spellDamage').value = spellData.dano || '';
+    
+    // Novos campos preenchidos na edição
+    const semManaAcerto = document.getElementById('spellcritico');
+    const semManaDano = document.getElementById('spellDanoSemMana');
+    if (semManaAcerto) semManaAcerto.value = spellData.critico || '';
+    if (semManaDano) semManaDano.value = spellData.danoSemMana || '';
 
     await populateCharacterSelect('spellCharacterOwner');
     document.getElementById('spellCharacterOwner').value = spellData.characterId || '';
@@ -334,7 +336,6 @@ export async function editSpell(spellId) {
         showImagePreview(spellImagePreview, null, true);
     }
 
-    // Carregar previews das imagens extras
     if (spellData.enhanceImage) {
         const blob = bufferToBlob(spellData.enhanceImage, spellData.enhanceImageMimeType);
         document.getElementById('spellEnhanceImagePreview').src = URL.createObjectURL(blob);
@@ -363,7 +364,6 @@ export async function exportSpell(spellId) {
     if (spellData) {
         const dataToExport = { ...spellData };
         if (dataToExport.image) dataToExport.image = arrayBufferToBase64(dataToExport.image);
-        // Exportar imagens extras
         if (dataToExport.enhanceImage) dataToExport.enhanceImage = arrayBufferToBase64(dataToExport.enhanceImage);
         if (dataToExport.trueImage) dataToExport.trueImage = arrayBufferToBase64(dataToExport.trueImage);
 
@@ -388,25 +388,17 @@ export async function importSpell(file, type) {
             try {
                 const importedSpell = JSON.parse(e.target.result);
                 if (!importedSpell || importedSpell.id === undefined) {
-                    throw new Error("Formato de arquivo inválido. Esperado um único objeto com um ID.");
+                    throw new Error("Formato de arquivo inválido.");
                 }
 
                 importedSpell.id = Date.now().toString();
                 importedSpell.type = type === 'habilidades' ? 'habilidade' : 'magia';
 
-                if (importedSpell.image) {
-                    importedSpell.image = base64ToArrayBuffer(importedSpell.image);
-                }
-                // Importar imagens extras
-                if (importedSpell.enhanceImage) {
-                    importedSpell.enhanceImage = base64ToArrayBuffer(importedSpell.enhanceImage);
-                }
-                if (importedSpell.trueImage) {
-                    importedSpell.trueImage = base64ToArrayBuffer(importedSpell.trueImage);
-                }
+                if (importedSpell.image) importedSpell.image = base64ToArrayBuffer(importedSpell.image);
+                if (importedSpell.enhanceImage) importedSpell.enhanceImage = base64ToArrayBuffer(importedSpell.enhanceImage);
+                if (importedSpell.trueImage) importedSpell.trueImage = base64ToArrayBuffer(importedSpell.trueImage);
 
                 importedSpell.predominantColor = await calculateColor(importedSpell.image, importedSpell.imageMimeType);
-
                 await saveData('rpgSpells', importedSpell);
                 resolve(importedSpell);
             } catch (error) {
@@ -421,7 +413,6 @@ export async function importSpell(file, type) {
 
 document.addEventListener('DOMContentLoaded', () => {
     populateSpellAumentosSelect();
-
     document.addEventListener('periciasUpdated', populateSpellAumentosSelect);
 
     const addBtn = document.getElementById('add-spell-aumento-btn');
@@ -445,7 +436,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Listeners para imagens extras de Magia/Habilidade
     const setupExtraImageListener = (inputId, previewId, containerId, removeBtnId, fileVarSetter) => {
         const input = document.getElementById(inputId);
         const preview = document.getElementById(previewId);
@@ -467,36 +457,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 preview.src = '';
                 container.classList.add('hidden');
                 fileVarSetter(null);
-                
-                // Se estivermos editando, precisamos limpar os dados existentes também no objeto em memória durante o save
-                // Isso é tratado na função saveSpellCard ao checar se o input está vazio e o preview oculto, 
-                // mas para simplicidade, se o usuário clica em remover, assumimos null.
             });
         }
     };
 
-    setupExtraImageListener(
-        'spellEnhanceImageUpload', 
-        'spellEnhanceImagePreview', 
-        'spellEnhanceImagePreviewContainer', 
-        'removeEnhanceImageBtn',
-        (file) => { spellEnhanceImageFile = file; }
-    );
+    setupExtraImageListener('spellEnhanceImageUpload', 'spellEnhanceImagePreview', 'spellEnhanceImagePreviewContainer', 'removeEnhanceImageBtn', (file) => { spellEnhanceImageFile = file; });
+    setupExtraImageListener('spellTrueImageUpload', 'spellTrueImagePreview', 'spellTrueImagePreviewContainer', 'removeTrueImageBtn', (file) => { spellTrueImageFile = file; });
 
-    setupExtraImageListener(
-        'spellTrueImageUpload', 
-        'spellTrueImagePreview', 
-        'spellTrueImagePreviewContainer', 
-        'removeTrueImageBtn',
-        (file) => { spellTrueImageFile = file; }
-    );
-});
-
-
-document.getElementById('spellImageUpload').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        spellImageFile = file;
-        showImagePreview(document.getElementById('spellImagePreview'), URL.createObjectURL(file), true);
+    const mainUpload = document.getElementById('spellImageUpload');
+    if (mainUpload) {
+        mainUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                spellImageFile = file;
+                showImagePreview(document.getElementById('spellImagePreview'), URL.createObjectURL(file), true);
+            }
+        });
     }
 });
