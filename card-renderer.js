@@ -789,6 +789,15 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
 
     const sheetHtml = `
         <div class="absolute top-6 right-6 z-20 flex flex-col gap-2">
+            <button
+                id="open-lore-modal-btn-${uniqueId}"
+                class="bg-slate-900/80 hover:text-white thumb-btn"
+                style="display: ${hasLore ? 'flex' : 'none'}"
+                type="button"
+                title="Abrir lore"
+                aria-label="Abrir lore do personagem">
+                <i class="fa-solid fa-book-open"></i>
+            </button>
             <button id="close-sheet-btn-${uniqueId}" class="bg-red-600 hover:text-white thumb-btn" style="display: ${isModal ? 'flex' : 'none'}"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div id="character-sheet-${uniqueId}" class="w-full h-full rounded-lg shadow-2xl overflow-hidden relative text-white" style="${origin}; background-image: url('${imageUrl}'); background-size: cover; background-position: center; box-shadow: 0 0 20px ${predominantColor.colorLight}; width: ${finalWidth}px; height: ${finalHeight}px; ${transformProp} margin: 0 auto;">
@@ -840,9 +849,14 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                                 </div>
                             </div> 
 
-                            <div class="money-container rounded-full w-12 pb-2 pt-2 flex mt-4 items-center justify-center text-sm text-amber-300 font-bold cursor-pointer" data-action="edit-stat" data-stat-type="dinheiro" title="Alterar Dinheiro" style="width: 42px; ${moneyContainerStyle} background: ${predominantColor.colorLight}; box-shadow: 0 0 10px black;">
-                                💰$<span data-stat-current="dinheiro">${characterData.dinheiro || 0}</span>
-                            </div>
+                            <div style="position: relative;" data-action="edit-stat" data-stat-type="dinheiro" data-stat-max="${characterData.dinheiro || 0}" class="mt-4 flex flex-col items-center">
+                                <i class="fas fa-coins text-4xl" style="background: rgb(255 185 0); -webkit-background-clip: text; -webkit-text-fill-color: transparent;filter: drop-shadow(2px 4px 6px black);"></i>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none pt-2" style="margin: auto;">
+                                    <span data-stat-current="dinheiro" style="bottom: 12px;">
+                                        ${characterData.dinheiro || 0}
+                                    </span>
+                                </div>
+                            </div> 
                         </div>  
                         <div class="mb-2 flex flex-col items-center">
                             ${attackStatsHtml}
@@ -1126,6 +1140,8 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
      // --- LÓGICA DE AJUSTE DE ALTURA ---
     const miniCardsDiv = sheetContainer.querySelector('.div-miniCards');
     const statsDiv = sheetContainer.querySelector('.div-Stats');
+    const collectionDock = sheetContainer.querySelector('.character-collection-dock');
+    const collectionGrid = sheetContainer.querySelector('.character-collection-grid');
 
     if (miniCardsDiv && statsDiv) {
         const adjustStatsHeight = () => {
@@ -1138,6 +1154,16 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             statsDiv.style.display = 'flex';
             statsDiv.style.flexDirection = 'column';
             statsDiv.style.justifyContent = 'space-evenly'; 
+
+            if (collectionDock && collectionGrid) {
+                const statsHeight = statsDiv.offsetHeight;
+                collectionDock.style.height = `${statsHeight}px`;
+                collectionDock.style.top = '50%';
+                collectionDock.style.bottom = 'auto';
+                collectionDock.style.transform = 'translateY(-50%)';
+                collectionGrid.style.height = '100%';
+                collectionGrid.style.justifyContent = 'center';
+            }
         };
 
         // Executa imediatamente
@@ -1163,6 +1189,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     }
 
     const loreIcon = sheetContainer.querySelector(`#lore-icon-${uniqueId}`);
+    const openLoreModalBtn = sheetContainer.querySelector(`#open-lore-modal-btn-${uniqueId}`);
     const loreModal = sheetContainer.querySelector(`#lore-modal-${uniqueId}`);
     const closeLoreModalBtn = sheetContainer.querySelector(`#close-lore-modal-btn-${uniqueId}`);
     const closeSheetBtn = sheetContainer.querySelector(`#close-sheet-btn-${uniqueId}`);
@@ -1192,12 +1219,23 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         sheetContainer.addEventListener('transitionend', handler);
     };
 
-    if (loreIcon && loreModal && closeLoreModalBtn) {
+    if (loreModal && closeLoreModalBtn) {
         if (hasLore) {
-            loreIcon.addEventListener('click', () => {
-                loreModal.classList.remove('hidden');
-                loreModal.focus();
-            });
+            if (openLoreModalBtn) {
+                openLoreModalBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    loreModal.classList.remove('hidden');
+                    loreModal.focus();
+                });
+            }
+
+            if (loreIcon) {
+                loreIcon.addEventListener('click', () => {
+                    loreModal.classList.remove('hidden');
+                    loreModal.focus();
+                });
+            }
         }
         
         closeLoreModalBtn.addEventListener('click', () => loreModal.classList.add('hidden'));
