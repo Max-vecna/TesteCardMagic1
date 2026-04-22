@@ -1168,7 +1168,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     const statsCenterY = (statsRect.top - wrapperRect.top) + (statsRect.height / 2);
 
                     collectionDock.style.height = `${statsHeight}px`;
-                    //collectionDock.style.top = `${statsCenterY}px`;
+                    collectionDock.style.top = `${statsCenterY}px`;
                     collectionDock.style.bottom = 'auto';
                     collectionDock.style.transform = 'translateY(-50%)';
                     collectionGrid.style.height = '100%';
@@ -1231,7 +1231,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     const statsCenterY = (statsRect.top - wrapperRect.top) + (statsRect.height / 2);
 
                     enhancedCollectionDock.style.height = `${statsHeight}px`;
-                   // enhancedCollectionDock.style.top = `${statsCenterY}px`;
+                    enhancedCollectionDock.style.top = `${statsCenterY}px`;
                     enhancedCollectionDock.style.bottom = 'auto';
                     enhancedCollectionDock.style.transform = 'translateY(-50%)';
                     enhancedCollectionGrid.style.height = '100%';
