@@ -1,7 +1,6 @@
 import { getData, saveData } from './local_db.js';
 import { renderFullItemSheet } from './item_renderer.js';
 import { renderFullSpellSheet } from './magic_renderer.js';
-import { renderFullAttackSheet } from './attack_renderer.js';
 import { bufferToBlob, showCustomAlert } from './ui_utils.js'; // Importando de ui_utils
 
 const PERICIAS_DATA = {
@@ -20,43 +19,6 @@ for (const attribute in PERICIAS_DATA) {
     });
 }
 
-function normalizeKey(name) {
-    return (name || '').toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-// Converte valores como "4+1" em número (5) e sinaliza que havia bônus.
-// Se não for um formato simples, retorna null.
-function parseAdditiveString(value) {
-    if (value === null || value === undefined) return { total: null, hasBonus: false };
-    const s = String(value).replace(/\s+/g, '');
-    const m = s.match(/^(-?\d+)(?:\+(-?\d+))$/);
-    if (!m) return { total: null, hasBonus: false };
-    const a = parseInt(m[1], 10);
-    const b = parseInt(m[2], 10);
-    if (!Number.isFinite(a) || !Number.isFinite(b)) return { total: null, hasBonus: false };
-    return { total: a + b, hasBonus: b !== 0 };
-}
-
-// Formata um número total e aplica cor quando houve bônus.
-function formatTotal(total, hasBonus, suffix = '') {
-    if (total === null || total === undefined) return '-';
-    const txt = `${total}${suffix}`;
-    return hasBonus ? `<span class="text-yellow-400 font-bold">${txt}</span>` : txt;
-}
-
-function escapeHtml(value) {
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
-function getCollectionItemLabel(item) {
-    return item?.title || item?.name || 'Sem nome';
-}
-
 function calculateBonuses(characterData, inventoryItems, magicItems) {
     const totalFixedBonuses = {
         vida: 0, mana: 0, armadura: 0, esquiva: 0, bloqueio: 0, deslocamento: 0,
@@ -69,7 +31,7 @@ function calculateBonuses(characterData, inventoryItems, magicItems) {
         if (Array.isArray(source.aumentos)) {
             source.aumentos.forEach(aumento => {
                 if (aumento.tipo === 'fixo') {
-                    const statName = normalizeKey(aumento.nome);
+                    const statName = (aumento.nome || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                     if (totalFixedBonuses.hasOwnProperty(statName)) {
                         totalFixedBonuses[statName] += (aumento.valor || 0);
                     } else {
@@ -142,13 +104,12 @@ export async function updateStatDisplay(sheetContainer, characterData) {
                 if (['armadura', 'esquiva', 'bloqueio', 'deslocamento'].includes(stat)) {
                     const numVal = parseInt(baseValue) || 0;
                     const fixedBonus = totalFixedBonuses[stat] || 0;
+                    fixedBonusHtml = fixedBonus !== 0 ? `<span class="text-green-400 font-bold ml-1">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
                     const suffix = stat === 'deslocamento' ? 'm' : '';
-                    const total = numVal + fixedBonus;
-                    content = formatTotal(total, fixedBonus !== 0, suffix);
+                    content = `${numVal}${suffix}`;
                 } else {
-                    // Para Acerto e Dano (strings), se vier no formato "4+1" somamos e destacamos.
-                    const { total, hasBonus } = parseAdditiveString(baseValue);
-                    content = (total !== null) ? formatTotal(total, hasBonus) : (baseValue || '-');
+                    // Para Acerto e Dano, exibimos como está (string)
+                    content = baseValue || '-';
                 }
 
                 // Preserva a cor específica para ATK e DMG
@@ -164,10 +125,10 @@ export async function updateStatDisplay(sheetContainer, characterData) {
         // Atualiza CD (Classe de Dificuldade)
         const sabTotal = (parseInt(characterData.attributes.sabedoria) || 0) + (totalFixedBonuses.sabedoria || 0);
         const cdFixed = (totalFixedBonuses.cd || 0);
-        const cdValue = 10 + (parseInt(characterData.level) || 0) + sabTotal + cdFixed;
-        const cdBonusHtml = cdFixed !== 0 ? ` <span class="text-green-400 font-semibold">${cdFixed > 0 ? '+' : ''}${cdFixed}</span>` : '';
+    const cdValue = 10 + (parseInt(characterData.level) || 0) + sabTotal + cdFixed;
+    const cdBonusHtml = cdFixed !== 0 ? ` <span class="text-green-400 font-semibold">${cdFixed > 0 ? '+' : ''}${cdFixed}</span>` : '';
         const cdEl = Array.from(statElements).find(e => e.textContent.includes('CD'));
-        if(cdEl) cdEl.innerHTML = `CD<br>${formatTotal(cdValue, cdFixed !== 0)}`;
+        if(cdEl) cdEl.innerHTML = `CD<br>${cdValue}`;
     }
 
     const mainAttributes = ['agilidade', 'carisma', 'forca', 'inteligencia', 'sabedoria', 'vigor'];
@@ -193,7 +154,7 @@ export async function updateStatDisplay(sheetContainer, characterData) {
         if (barEl) barEl.style.width = `${percentage}%`;
         
         const valueEl = attrContainer.querySelector('.text-xs.font-bold.ml-auto');
-        if(valueEl) valueEl.innerHTML = formatTotal(totalValue, fixedBonus !== 0);
+        if(valueEl) valueEl.innerHTML = `${baseValue}${fixedBonusHtml}`;
     });
 }
 
@@ -488,10 +449,9 @@ async function populateInventory(container, characterData, uniqueId) {
 }
 
 
-export async function renderFullCharacterSheet(characterData, isModal, isInPlay, targetContainer, renderOptions = {}) {
-    const { staticHtmlOnly = false } = renderOptions;
-    const sheetContainer = staticHtmlOnly ? targetContainer : (targetContainer || document.getElementById('character-sheet-container'));
-    if (!sheetContainer && !staticHtmlOnly && (isModal || isInPlay)) return '';
+export async function renderFullCharacterSheet(characterData, isModal, isInPlay, targetContainer) {
+    const sheetContainer = targetContainer || document.getElementById('character-sheet-container');
+    if (!sheetContainer && (isModal || isInPlay)) return '';
 
     if (isModal) {
         const index = document.getElementsByClassName('visible').length;
@@ -531,10 +491,8 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     const maxAttributeValue = Math.max(...currentAttributeValues, 1);
 
     const sabTotal = (parseInt(characterData.attributes.sabedoria) || 0) + (totalFixedBonuses.sabedoria || 0);
-    const cdFixed = (totalFixedBonuses.cd || 0);
-    const cdValue = 10 + (parseInt(characterData.level) || 0) + sabTotal + cdFixed;
+    const cdValue = 10 + (parseInt(characterData.level) || 0) + sabTotal;
     const palette = { borderColor: predominantColor.colorLight };
-    const collectionAccentColor = predominantColor.colorLight || predominantColor.color100 || '#cbd5e1';
 
     const origin = isModal || isInPlay ? "" : "transform-origin: top left";
     const transformProp = (isModal || isInPlay) ? 'transform: scale(0.9);' : '';
@@ -565,9 +523,8 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         const sortedAttributes = Object.keys(groupedPericias).sort();
         periciasHtml = sortedAttributes.map(attribute => {
             const periciasList = groupedPericias[attribute].sort((a,b) => a.name.localeCompare(b.name)).map(p => {
-                const total = (parseInt(p.base) || 0) + (parseInt(p.bonus) || 0);
-                const valHtml = formatTotal(total, (parseInt(p.bonus) || 0) !== 0);
-                return `<span class="text-xs text-gray-300">${p.name} ${valHtml};</span>`;
+                const bonusHtml = p.bonus !== 0 ? ` <span class="text-green-400 font-semibold">${p.bonus > 0 ? '+' : ''}${p.bonus}</span>` : '';
+                return `<span class="text-xs text-gray-300">${p.name} ${p.base}${bonusHtml};</span>`;
             }).join(' ');
             return `<div class="text-left mt-1"><p class="text-xs font-bold text-gray-200 uppercase" style="font-size: 11px;">${attribute}</p><div class="flex flex-wrap gap-x-2 gap-y-1 mb-1">${periciasList}</div></div>`;
         }).join('');
@@ -598,17 +555,18 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                      stat === 'critico' ? 'fa-crosshairs' : //critico
                      stat === 'danoSemMana' ? 'fa-skull' : ""; //dano em criatura sem mana
 
-        const parsed = parseAdditiveString(baseValue);
-        const showValue = (parsed.total !== null)
-            ? formatTotal(parsed.total, parsed.hasBonus)
-            : (content || '-');
-
         return `
             <div style="position: relative; transform: scale(.8); display: ${content === "-" ? 'none' : 'block'}" class="mt-4 flex flex-col items-center">
                 <i class="fas ${icon} text-5xl" style="background: ${colorStyle}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(2px 4px 6px black);"></i>
                 <div class="absolute inset-0 flex flex-col items-center justify-center text-white text-xs pointer-events-none" style="margin: auto;">
-                    <div class="text-center text-sm font-bold">
-                        ${showValue}
+                    <div class="text-center text-sm">
+                        <span class="font-bold">
+                            ${content.split("+")[0] || ""}
+                        </span>
+                        <hr style="width: 100%;">
+                        <span style="bottom: 12px;" class="font-bold">
+                            +${content.split("+")[1] || ""}
+                        </span>
                     </div>
                 </div>
             </div> `;
@@ -618,135 +576,87 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     // Gera HTML para Defesa (Card Existente)
     const defenseStatsHtml = Object.entries(defenseStats).map(([stat, label]) => {
         const baseValue = characterData.attributes[stat] || 0;
+        let content = baseValue;
+        let fixedBonusHtml = '';
 
         if (['armadura', 'esquiva', 'bloqueio', 'deslocamento'].includes(stat)) {
-            const numVal = parseInt(baseValue) || 0;
-            const fixedBonus = totalFixedBonuses[stat] || 0;
-            const suffix = stat === 'deslocamento' ? 'm' : '';
-            const total = numVal + fixedBonus;
-            const content = formatTotal(total, fixedBonus !== 0, suffix);
-            return `<div class="text-center"><span>${label}</span><br>${content}</div>`;
+             const fixedBonus = totalFixedBonuses[stat] || 0;
+             fixedBonusHtml = fixedBonus !== 0 ? `<span class="text-green-400 font-bold ml-1">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
+             const suffix = stat === 'deslocamento' ? 'm' : '';
+             content = `${baseValue}${suffix}`;
+        } else {
+             content = baseValue || '-';
         }
-
-        // Fallback (não esperado aqui)
-        const { total, hasBonus } = parseAdditiveString(baseValue);
-        const content = (total !== null) ? formatTotal(total, hasBonus) : (baseValue || '-');
-        return `<div class="text-center"><span>${label}</span><br>${content}</div>`;
+        
+        return `<div class="text-center"><span>${label}</span><br>${content}${fixedBonusHtml}</div>`;
     }).join('');
 
      // Separate spells and skills
     const spellsOnly = magicItems.filter(item => item.type === 'magia' || !item.type);
     const skillsOnly = magicItems.filter(item => item.type === 'habilidade');
-    const relatedCharsData = characterData.relationships
-        ? (await Promise.all(characterData.relationships.map(id => getData('rpgCards', id)))).filter(Boolean)
-        : [];
 
-    const collectionConfigs = [
-        {
-            key: 'relationships',
-            label: 'Relacionamentos',
-            icon: 'fa-users',
-            type: 'character',
-            items: relatedCharsData
-        },
-        {
-            key: 'spells',
-            label: 'Magias',
-            icon: 'fa-magic',
-            type: 'spell',
-            items: spellsOnly
-        },
-        {
-            key: 'skills',
-            label: 'Habilidades',
-            icon: 'fa-fist-raised',
-            type: 'skill',
-            items: skillsOnly
-        },
-        {
-            key: 'attacks',
-            label: 'Ataques',
-            icon: 'fa-khanda',
-            type: 'attack',
-            items: attackItems
-        },
-        {
-            key: 'items',
-            label: 'Itens',
-            icon: 'fa-box',
-            type: 'item',
-            items: inventoryItems
-        }
-    ].filter(config => config.items.length > 0);
+    let relationshipsHtml = '';
+    if (characterData.relationships && characterData.relationships.length > 0) {
+        const relatedCharsData = (await Promise.all(characterData.relationships.map(id => getData('rpgCards', id)))).filter(Boolean);
 
-    const shouldRenderCollectionControls = (isModal || isInPlay) && collectionConfigs.length > 0;
-
-    const collectionButtonsHtml = shouldRenderCollectionControls
-        ? `
-            <div class="character-collection-grid">
-                ${collectionConfigs.map(config => {
-                    const buttonLabel = `${config.label} (${config.items.length})`;
-
-                    return `
-                        <button style="background:  ${predominantColor.colorLight};"
-                            type="button"
-                            class="character-collection-trigger"
-                            data-collection-tone="${config.key}"
-                            data-collection-key="${config.key}"
-                            style="--collection-accent: ${escapeHtml(collectionAccentColor)};"
-                            title="${escapeHtml(buttonLabel)}"
-                            aria-label="${escapeHtml(buttonLabel)}">
-                            <span class="character-collection-trigger__glyph" aria-hidden="true">
-                                <i class="fas ${config.icon}"></i>
-                            </span>
-                            <span class="character-collection-trigger__value" aria-hidden="true">${config.items.length}</span>
-                        </button>
-                    `;
-                }).join('')}
-            </div>
-        `
-        : '';
-
-    const collectionModalHtml = shouldRenderCollectionControls
-        ? `
-            <div id="character-collection-modal-${uniqueId}" class="character-collection-modal hidden" aria-hidden="true">
-                <div class="character-collection-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="character-collection-title-${uniqueId}">
-                    <div class="character-collection-modal__header">
-                        <div>
-                            <p id="character-collection-count-${uniqueId}" class="character-collection-modal__eyebrow"></p>
-                            <h4 id="character-collection-title-${uniqueId}" class="character-collection-modal__title">Colecoes</h4>
-                            <p class="character-collection-modal__subtitle">Escolha um card para abrir a ficha completa.</p>
-                        </div>
-                        <button type="button" id="character-collection-close-${uniqueId}" class="character-collection-modal__close" aria-label="Fechar colecoes">
-                            <i class="fa-solid fa-xmark"></i>
-                        </button>
+        if (relatedCharsData.length > 0) {
+            const relationshipCardsHtml = await Promise.all(relatedCharsData.map(async (char) => {
+                const miniSheetHtml = await renderFullCharacterSheet(char, false, false);
+                return `
+                    <div class="related-character-grid-item" data-id="${char.id}" data-type="character">
+                        ${miniSheetHtml}
                     </div>
-                    <div class="character-collection-tabs">
-                        ${collectionConfigs.map(config => `
-                            <button
-                                type="button"
-                                class="character-collection-tab"
-                                data-collection-tone="${config.key}"
-                                data-collection-key="${config.key}">
-                                <i class="fas ${config.icon}"></i>
-                                <span>${config.label}</span>
-                            </button>
-                        `).join('')}
-                    </div>
-                    <div class="character-collection-modal__body">
-                        ${collectionConfigs.map(config => `
-                            <div class="character-collection-panel hidden" data-collection-panel="${config.key}" data-rendered="false">
-                                <div class="character-collection-panel__status" data-collection-status="${config.key}">
-                                    Carregando mini cards...
-                                </div>
-                                <div class="character-collection-modal-grid hidden" data-collection-grid="${config.key}"></div>
-                            </div>
-                        `).join('')}
-                    </div>
+                `;
+            }));
+
+            relationshipsHtml = `
+                <div id="relationships-grid-${uniqueId}" class="relationships-grid expanded" style="overflow-y: auto;">
+                     ${relationshipCardsHtml.join('')}
                 </div>
-            </div>
-        `
-        : '';
+            `;
+        }
+    }
+
+
+    let spellsGridHtml = '';
+    if (spellsOnly.length > 0) {
+        const spellCardsHtml = await Promise.all(spellsOnly.map(async (spell) => {
+            const miniSheetHtml = await renderFullSpellSheet(spell, false); 
+            return `<div class="related-spell-grid-item" data-id="${spell.id}" data-type="spell"> ${miniSheetHtml} </div>`;
+        }));
+
+        spellsGridHtml = ` <div id="spells-grid-${uniqueId}" class="relationships-grid expanded" style="overflow-y: auto;"> ${spellCardsHtml.join('')} </div>`;
+    }
+
+    let skillsGridHtml = '';
+    if (skillsOnly.length > 0) {
+        const skillCardsHtml = await Promise.all(skillsOnly.map(async (skill) => {
+            const miniSheetHtml = await renderFullSpellSheet(skill, false);
+            return `<div class="related-skill-grid-item" data-id="${skill.id}" data-type="skill"> ${miniSheetHtml} </div>`;
+        }));
+
+        skillsGridHtml = `<div id="skills-grid-${uniqueId}" class="relationships-grid expanded" style="overflow-y: auto;"> ${skillCardsHtml.join('')} </div>`;
+    }
+
+    let attacksGridHtml = '';
+    if (attackItems.length > 0) {
+        const attackCardsHtml = await Promise.all(attackItems.map(async (attack) => {
+            const miniSheetHtml = await renderFullSpellSheet(attack, false);
+            return `<div class="related-attack-grid-item" data-id="${attack.id}" data-type="attack"> ${miniSheetHtml} </div>`;
+        }));
+
+        attacksGridHtml = `<div id="attacks-grid-${uniqueId}" class="relationships-grid expanded"  style="overflow-y: auto;"> ${attackCardsHtml.join('')} </div>`;
+    }
+
+    let itemsGridHtml = '';
+    if (inventoryItems.length > 0) {
+        const itemCardsHtml = await Promise.all(inventoryItems.map(async (item) => {
+            const miniSheetHtml = await renderFullItemSheet(item, false);
+            return `<div class="related-item-grid-item" data-id="${item.id}" data-type="item"> ${miniSheetHtml} </div>`;
+        }));
+
+        itemsGridHtml = `<div id="items-grid-${uniqueId}" class="relationships-grid expanded" style="overflow-y: auto;"> ${itemCardsHtml.join('')} </div>`;
+    }
 
     const permanentMaxVida = (characterData.attributes.vida || 0) + (totalFixedBonuses.vida || 0);
     const permanentMaxMana = (characterData.attributes.mana || 0) + (totalFixedBonuses.mana || 0);
@@ -757,35 +667,9 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     const lorePersonalidadeHtml = characterData.lore?.personalidade ? `<h4>Personalidade</h4><p class="mb-4">${characterData.lore.personalidade}</p>` : '';
     const loreMotivacaoHtml = characterData.lore?.motivacao ? `<h4>Motivação</h4><p>${characterData.lore.motivacao}</p>` : '';
 
-    const loreModalHtml = hasLore
-        ? `
-            <div id="lore-modal-${uniqueId}" class="hidden absolute inset-0 z-[140] bg-black/80 backdrop-blur-sm p-4" tabindex="-1">
-                <div class="w-full h-full flex items-center justify-center">
-                    <div class="w-full max-w-lg max-h-[85%] overflow-hidden rounded-3xl border border-white/10 bg-slate-950/95 text-white shadow-2xl">
-                        <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
-                            <div>
-                                <p class="text-[11px] uppercase tracking-[0.18em] text-gray-400">Lore</p>
-                                <h3 class="text-xl font-bold text-white">${escapeHtml(characterData.title || 'Personagem')}</h3>
-                            </div>
-                            <button type="button" id="close-lore-modal-btn-${uniqueId}" class="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white" aria-label="Fechar lore">
-                                <i class="fa-solid fa-xmark"></i>
-                            </button>
-                        </div>
-                        <div class="max-h-[65vh] overflow-y-auto px-5 py-4 text-sm leading-relaxed text-gray-200 space-y-4">
-                            ${loreHistoriaHtml}
-                            ${lorePersonalidadeHtml}
-                            ${loreMotivacaoHtml}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `
-        : '';
-
     const hasMoney = (characterData.dinheiro || 0) > 0;
     const moneyContainerStyle = hasMoney ? "writing-mode: vertical-rl; text-orientation: upright; top: 141px;" : "display: none;";
-    const finalRelationshipsBar = collectionButtonsHtml;
-    const hasCollectionDock = Boolean(finalRelationshipsBar);
+    const finalRelationshipsBar = relationshipsHtml + spellsGridHtml + skillsGridHtml + attacksGridHtml + itemsGridHtml;
 
     const sheetHtml = `
         <div class="absolute top-6 right-6 z-20 flex flex-col gap-2">
@@ -798,7 +682,11 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                         <div class="div-combat-stats grid grid-row-6 gap-y-2 text-xs absolute top-2" style="border-radius: 28px 5px 28px 5px; background: ${predominantColor.colorLight}; padding: 10px; width: 42px; justify-content: space-evenly; box-shadow: 0 0 10px black;">
                             <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
                             ${defenseStatsHtml}
-                            <div class="text-center">CD<br>${formatTotal(cdValue, cdFixed !== 0)}</div>
+                            <div class="text-center">
+                                CD
+                                <br>${cdValue}
+                                <span class="text-green-400 font-semibold">${totalFixedBonuses.cd > 0 ? '+' : ''}${totalFixedBonuses.cd}</span>
+                            </div>
                         </div>
 
                         <div class="grid grid-row-6 gap-y-2 text-xs absolute bottom-2 div-Stats" style="border-radius: 28px 5px 5px 5px; background: ${predominantColor.colorLight}; padding: 10px; width: 42px; box-shadow: 0 0 10px black; ">
@@ -806,8 +694,8 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                             const baseValue = parseInt(characterData.attributes[key]) || 0;
                             const fixedBonus = totalFixedBonuses[key] || 0;
                             const fixedBonusHtml = fixedBonus !== 0 ? ` <span class="text-green-400 font-semibold">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
-                            return `
-                                <label class="text-center" title="${key}">${formatTotal(baseValue + fixedBonus, fixedBonus !== 0)}<br>${key.slice(0, 3).toUpperCase()}</label>
+                            return `                        
+                                <label class="text-center" title="${key}">${baseValue}${fixedBonusHtml}<br>${key.slice(0, 3).toUpperCase()}</label>                                                      
                             `;
                             }).join('')}
                         </div>
@@ -850,35 +738,27 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     </div>
 
                     <div class="absolute bottom-[-3px] w-full" style="display: ${(isModal || isInPlay) ? 'flex' : 'none'}">
-                        <div class="scrollable-content text-sm text-left ml-2 div-miniCards${hasCollectionDock ? ' has-collection-dock' : ''}" style="display: flex; flex-direction: row; overflow-y: scroll;gap: 12px; scroll-snap-type: x mandatory; margin-left: 55px;">
-                            <div class="pb-4 rounded-3xl w-full character-scroll-panel" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; border-color: ${palette.borderColor}; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end;">
-                                <div class="pericias-scroll-area flex flex-col gap-2 px-2 h-full" style="overflow-y: auto;">
+                        <div class="scrollable-content text-sm text-left ml-2 div-miniCards" style="display: flex; flex-direction: row; overflow-y: scroll;gap: 12px; scroll-snap-type: x mandatory; margin-left: 55px;">
+                            <div class="pb-4 rounded-3xl w-full h-full" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; border-color: ${palette.borderColor}; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end;">
+                                <div class="pericias-scroll-area flex flex-col gap-2 px-2 h-full" style="overflow-y: auto; justify-content: space-around;">
                                     ${periciasHtml}
                                 </div>
                             </div>
+                            <div class="rounded-3xl w-full" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; border-color: ${palette.borderColor}; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end; display: ${finalRelationshipsBar ? 'flex' : 'none'} ">
+                                <!-- RELATIONSHIPS_BAR -->
+                            </div>                           
                         </div>
-                        ${hasCollectionDock ? `
-                            <div class="character-collection-dock rounded-3xl" style="--collection-dock-accent: ${palette.borderColor};">
-                                ${finalRelationshipsBar}
-                            </div>
-                        ` : ''}
                     </div>
                 </div>
                 <div id="lore-icon-${uniqueId}" class="absolute top-8 left-1/2 -translate-x-1/2 text-center z-10"  data-action="toggle-lore">
                     <h3 class="text-2xl font-bold">${characterData.title}</h3>
                     <p class="text-md italic text-gray-300">${characterData.subTitle}</p>
-                </div>
-                ${loreModalHtml}
-                ${collectionModalHtml}
+                </div>                
             </div> 
         </div>
     `;
 
-    const finalHtml = sheetHtml;
-
-    if (staticHtmlOnly) {
-        return finalHtml;
-    }
+    const finalHtml = sheetHtml.replace('<!-- RELATIONSHIPS_BAR -->', finalRelationshipsBar);
 
     sheetContainer.style.background = `url('${imageBack}')`;
     sheetContainer.style.backgroundSize = 'cover';
@@ -890,239 +770,68 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         sheetContainer.classList.add('in-play-animation');
     }
 
+    const setupGridExpand = (gridId) => {
+        const grid = sheetContainer.querySelector(`#${gridId}`);
+        if (grid) {
+            grid.addEventListener('click', (e) => {
+                if (e.target === grid) grid.classList.toggle('expanded');
+            });
+        }
+    };
+
+    setupGridExpand(`relationships-grid-${uniqueId}`);
+    setupGridExpand(`spells-grid-${uniqueId}`);
+    setupGridExpand(`skills-grid-${uniqueId}`);
+    setupGridExpand(`attacks-grid-${uniqueId}`);
+    setupGridExpand(`items-grid-${uniqueId}`);
+
  
 
-    const collectionConfigMap = new Map(collectionConfigs.map(config => [config.key, config]));
-    const collectionModal = sheetContainer.querySelector(`#character-collection-modal-${uniqueId}`);
-    const collectionTitle = sheetContainer.querySelector(`#character-collection-title-${uniqueId}`);
-    const collectionCount = sheetContainer.querySelector(`#character-collection-count-${uniqueId}`);
-    const collectionCloseBtn = sheetContainer.querySelector(`#character-collection-close-${uniqueId}`);
-    const collectionPanels = Array.from(sheetContainer.querySelectorAll('[data-collection-panel]'));
-    const collectionGrids = Array.from(sheetContainer.querySelectorAll('[data-collection-grid]'));
-    const collectionTabs = Array.from(sheetContainer.querySelectorAll('.character-collection-tab'));
-    const collectionTriggers = Array.from(sheetContainer.querySelectorAll('.character-collection-trigger'));
-
-    const renderCollectionMiniCard = async (config, item) => {
-        let miniSheetHtml = '';
-        let wrapperClass = 'related-spell-grid-item';
-
-        if (config.type === 'character') {
-            wrapperClass = 'related-character-grid-item';
-            miniSheetHtml = await renderFullCharacterSheet(item, false, false, null, { staticHtmlOnly: true });
-        } else if (config.type === 'item') {
-            wrapperClass = 'related-item-grid-item';
-            miniSheetHtml = await renderFullItemSheet(item, false);
-        } else if (config.type === 'attack') {
-            wrapperClass = 'related-attack-grid-item';
-            miniSheetHtml = await renderFullAttackSheet(item, false);
-        } else if (config.type === 'skill') {
-            wrapperClass = 'related-skill-grid-item';
-            miniSheetHtml = await renderFullSpellSheet(item, false);
-        } else {
-            miniSheetHtml = await renderFullSpellSheet(item, false);
-        }
-
-        return `
-            <div
-                class="character-collection-mini-card ${wrapperClass}"
-                data-collection-key="${config.key}"
-                data-item-id="${item.id}">
-                ${miniSheetHtml}
-            </div>
-        `;
-    };
-
-    const scaleCollectionGridCards = (grid) => {
-        if (!grid) return;
-
-        const scaleGroup = (selector, sheetIdPrefix) => {
-            grid.querySelectorAll(selector).forEach(item => {
-                const sheet = item.querySelector(`[id^="${sheetIdPrefix}"]`);
-                if (!sheet) return;
-
-                const sheetWidth = sheet.clientWidth;
-                const sheetHeight = sheet.clientHeight;
-                const targetWidth = item.clientWidth;
-                if (sheetWidth > 0 && sheetHeight > 0 && targetWidth > 0) {
-                    const scale = targetWidth / sheetWidth;
-                    item.style.height = `${sheetHeight * scale}px`;
-                    sheet.style.transform = `scale(${scale})`;
-                    sheet.style.transformOrigin = 'top left';
-                }
-            });
-        };
-
-        scaleGroup('.related-character-grid-item', 'character-sheet-');
-        scaleGroup('.related-spell-grid-item, .related-skill-grid-item, .related-attack-grid-item', 'spell-sheet-');
-        scaleGroup('.related-item-grid-item', 'item-sheet-');
-    };
-
-    const ensureCollectionPanelRendered = async (collectionKey) => {
-        const config = collectionConfigMap.get(collectionKey);
-        const panel = collectionPanels.find(item => item.dataset.collectionPanel === collectionKey);
-        const grid = collectionGrids.find(item => item.dataset.collectionGrid === collectionKey);
-        const status = panel?.querySelector(`[data-collection-status="${collectionKey}"]`);
-
-        if (!config || !panel || !grid) return;
-        if (panel.dataset.rendered === 'true') return;
-
-        panel.dataset.rendered = 'loading';
-        if (status) {
-            status.textContent = 'Carregando mini cards...';
-            status.classList.remove('hidden');
-        }
-
-        try {
-            const cardsHtml = await Promise.all(config.items.map(item => renderCollectionMiniCard(config, item)));
-            grid.innerHTML = cardsHtml.join('');
-            grid.classList.remove('hidden');
-            panel.dataset.rendered = 'true';
-            if (status) {
-                status.classList.add('hidden');
-            }
-
-            if (!grid._collectionResizeObserver) {
-                const resizeObserver = new ResizeObserver(() => {
-                    scaleCollectionGridCards(grid);
-                });
-                resizeObserver.observe(grid);
-                grid._collectionResizeObserver = resizeObserver;
-            }
-
-            requestAnimationFrame(() => {
-                scaleCollectionGridCards(grid);
-            });
-        } catch (error) {
-            console.error('Erro ao renderizar mini cards da colecao:', error);
-            panel.dataset.rendered = 'error';
-            if (status) {
-                status.textContent = 'Nao foi possivel carregar estes mini cards.';
-                status.classList.remove('hidden');
-            }
-        }
-    };
-
-    const setActiveCollection = (collectionKey) => {
-        const config = collectionConfigMap.get(collectionKey);
-        if (!config || !collectionModal) return;
-
-        if (collectionTitle) collectionTitle.textContent = config.label;
-        if (collectionCount) {
-            const suffix = config.items.length === 1 ? 'card disponivel' : 'cards disponiveis';
-            collectionCount.textContent = `${config.items.length} ${suffix}`;
-        }
-
-        collectionTabs.forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.collectionKey === collectionKey);
-        });
-
-        collectionPanels.forEach(panel => {
-            panel.classList.toggle('hidden', panel.dataset.collectionPanel !== collectionKey);
-        });
-    };
-
-    const openCollectionModal = async (collectionKey) => {
-        if (!collectionModal) return;
-        setActiveCollection(collectionKey);
-        collectionModal.setAttribute('aria-hidden', 'false');
-        collectionModal.classList.remove('hidden');
-        requestAnimationFrame(() => collectionModal.classList.add('visible'));
-        await ensureCollectionPanelRendered(collectionKey);
-    };
-
-    const closeCollectionModal = () => {
-        if (!collectionModal || collectionModal.classList.contains('hidden')) return;
-        collectionModal.setAttribute('aria-hidden', 'true');
-        collectionModal.classList.remove('visible');
-        setTimeout(() => {
-            if (!collectionModal.classList.contains('visible')) {
-                collectionModal.classList.add('hidden');
-            }
-        }, 180);
-    };
-
-    const openCollectionEntry = async (collectionKey, itemId) => {
-        const config = collectionConfigMap.get(collectionKey);
-        if (!config) return;
-
-        try {
-            if (config.type === 'character') {
-                const data = await getData('rpgCards', itemId);
-                if (data) {
-                    await renderFullCharacterSheet(data, true, false, document.getElementById('nested-sheet-container'));
-                }
-                return;
-            }
-
-            if (config.type === 'item') {
-                const data = await getData('rpgItems', itemId);
-                if (data) {
-                    await renderFullItemSheet(data, true);
-                }
-                return;
-            }
-
-            if (config.type === 'attack') {
-                const data = await getData('rpgEffects', itemId);
-                if (data) {
-                    await renderFullAttackSheet(data, true);
-                }
-                return;
-            }
-
-            const data = await getData('rpgEffects', itemId);
-            if (data) {
-                await renderFullSpellSheet(data, true);
-            }
-        } catch (error) {
-            console.error('Erro ao abrir card relacionado:', error);
-            showCustomAlert('Nao foi possivel abrir este card agora.');
-        }
-    };
-
-    collectionTabs.forEach(tab => {
-        tab.addEventListener('click', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setActiveCollection(tab.dataset.collectionKey);
-            await ensureCollectionPanelRendered(tab.dataset.collectionKey);
-        });
-    });
-
-    if (collectionCloseBtn) {
-        collectionCloseBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            closeCollectionModal();
-        });
-    }
-
-    if (collectionModal) {
-        collectionModal.addEventListener('click', async (e) => {
-            const miniCard = e.target.closest('.character-collection-mini-card');
-            if (miniCard) {
-                e.preventDefault();
+    const addClickHandlers = (selector, getDataFn, renderFn) => {
+        sheetContainer.querySelectorAll(selector).forEach(card => {
+            card.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                await openCollectionEntry(miniCard.dataset.collectionKey, miniCard.dataset.itemId);
-                return;
-            }
-
-            if (e.target === collectionModal) {
-                closeCollectionModal();
-            }
+                const grid = card.parentElement;
+                if (!grid.classList.contains('expanded')) {
+                    grid.classList.add('expanded');
+                } else {
+                    const data = await getDataFn(card.dataset.id);
+                    if (data) {
+                        const container = selector.includes('character') ? document.getElementById('nested-sheet-container') : undefined;
+                        await renderFn(data, true, false, container);
+                    }
+                }
+            });
         });
-    }
+    };
 
-    sheetContainer.addEventListener('click', async (e) => {
-        const collectionTrigger = e.target.closest('.character-collection-trigger');
-        if (collectionTrigger && sheetContainer.contains(collectionTrigger)) {
-            e.preventDefault();
-            e.stopPropagation();
-            await openCollectionModal(collectionTrigger.dataset.collectionKey);
-        }
-    });
+    addClickHandlers('.related-character-grid-item', (id) => getData('rpgCards', id), renderFullCharacterSheet);
+    addClickHandlers('.related-spell-grid-item', (id) => getData('rpgEffects', id), renderFullSpellSheet);
+    addClickHandlers('.related-skill-grid-item', (id) => getData('rpgEffects', id), renderFullSpellSheet);
+    addClickHandlers('.related-attack-grid-item', (id) => getData('rpgEffects', id), renderFullSpellSheet);
+    addClickHandlers('.related-item-grid-item', (id) => getData('rpgItems', id), renderFullItemSheet);
 
    setTimeout(() => {
+    const scaleItems = (selector, sheetIdPrefix) => {
+        sheetContainer.querySelectorAll(selector).forEach(item => {
+            const sheet = item.querySelector(`[id^="${sheetIdPrefix}"]`);
+            if (sheet) {
+                const sheetWidth = sheet.clientWidth;
+                const sheetHeight = sheet.clientHeight;
+                 if (sheetWidth > 0 && sheetHeight > 0) {
+                     item.style.width = `${sheetWidth * 0.11}px`;
+                     item.style.height = `${sheetHeight * 0.11}px`;
+                     sheet.style.transform = 'scale(0.11)'; // Aplica visualmente o escalonamento para dentro da div
+                }
+            }
+        });
+    };
+    scaleItems('.related-character-grid-item', 'character-sheet-');
+    scaleItems('.related-spell-grid-item', 'spell-sheet-');
+    scaleItems('.related-skill-grid-item', 'spell-sheet-');
+    scaleItems('.related-attack-grid-item', 'attack-sheet-');
+    scaleItems('.related-item-grid-item', 'item-sheet-');
+
      // --- LÓGICA DE AJUSTE DE ALTURA ---
     const miniCardsDiv = sheetContainer.querySelector('.div-miniCards');
     const statsDiv = sheetContainer.querySelector('.div-Stats');
@@ -1174,13 +883,6 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             delete sheetContainer._statsResizeObserver;
         }
 
-        collectionGrids.forEach(grid => {
-            if (grid._collectionResizeObserver) {
-                grid._collectionResizeObserver.disconnect();
-                delete grid._collectionResizeObserver;
-            }
-        });
-
         sheetContainer.classList.remove('visible');
         const handler = () => {
             sheetContainer.classList.add('hidden');
@@ -1193,12 +895,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     };
 
     if (loreIcon && loreModal && closeLoreModalBtn) {
-        if (hasLore) {
-            loreIcon.addEventListener('click', () => {
-                loreModal.classList.remove('hidden');
-                loreModal.focus();
-            });
-        }
+        if (hasLore) loreIcon.addEventListener('click', () => loreModal.classList.remove('hidden'));
         
         closeLoreModalBtn.addEventListener('click', () => loreModal.classList.add('hidden'));
          loreModal.addEventListener('keydown', (e) => {
@@ -1227,18 +924,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         }
     });
      document.addEventListener('keydown', (e) => {
-        if (e.key !== 'Escape') return;
-        const hasExpandedRelatedSheet = ['spell-sheet-container', 'item-sheet-container', 'attack-sheet-container', 'nested-sheet-container']
-            .some(id => {
-                const modal = document.getElementById(id);
-                return modal && modal.classList.contains('visible');
-            });
-        if (hasExpandedRelatedSheet) return;
-        if (collectionModal && !collectionModal.classList.contains('hidden')) {
-            closeCollectionModal();
-            return;
-        }
-        if (sheetContainer.id === 'character-sheet-container' && sheetContainer.classList.contains('visible')) {
+        if (e.key === 'Escape' && sheetContainer.id === 'character-sheet-container' && sheetContainer.classList.contains('visible')) {
             closeSheet();
         }
      });

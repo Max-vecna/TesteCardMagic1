@@ -1,17 +1,14 @@
 import { saveCharacterCard, editCard, importCard, getCurrentEditingCardId, exportCard, resetCharacterFormState, populateCharacterSelect, getCharacterItems } from './character_manager.js';
 import { populateSpellAumentosSelect, saveSpellCard, editSpell, importSpell, exportSpell, showImagePreview } from './magic_manager.js';
 import { populateItemAumentosSelect, saveItemCard, editItem, importItem, removeItem, exportItem } from './item_manager.js';
-import { saveAttackCard, editAttack, removeAttack, exportAttack, importAttack } from './attack_manager.js';
 import { renderCategoryScreen, populateCategorySelect } from './category_manager.js';
 import { renderGrimoireScreen } from './grimoire_manager.js';
-import { renderFullAttackSheet } from './attack_renderer.js';
 import { openDatabase, removeData, getData, saveData, exportDatabase, importDatabase, exportImagesAsPng, showProgressModal, hideProgressModal, updateProgress, manualSaveToDrive, manualLoadFromDrive } from './local_db.js';
 import { renderFullCharacterSheet } from './card-renderer.js';
 import { renderFullSpellSheet } from './magic_renderer.js';
 import { renderFullItemSheet } from './item_renderer.js';
 import { showCustomAlert, showCustomConfirm } from './ui_utils.js';
 import { bufferToBlob } from './ui_utils.js';
-import { createMiniCardsFloat } from './splash_screen.js';
 
 let renderContent;
 const viewCache = {};
@@ -73,11 +70,15 @@ function applyThumbnailScaling(container) {
             }
         });
 
-        const thumbnails = container.querySelectorAll('.rpg-thumbnail');
+        const thumbnails = Array.from(container.querySelectorAll('.rpg-thumbnail'));
+
+        thumbnails.forEach(t => t.classList.remove('visible'));
+        //svoid container.offsetHeight;
+
         thumbnails.forEach((cardWrapper, index) => {
-            if (!cardWrapper.classList.contains('visible')) {
-                setTimeout(() => cardWrapper.classList.add('visible'), index * 50);
-            }
+            setTimeout(() => cardWrapper.classList.add('visible'), index * 50);
+
+            
         });
     });
 }
@@ -157,10 +158,10 @@ export async function openSelectionModal(type) {
     let storeName;
     switch(type) {
         case 'item': storeName = 'rpgItems'; break;
-        case 'magic': storeName = 'rpgSpells'; break;
+        case 'magic': storeName = 'rpgEffects'; break;
         case 'relationship': storeName = 'rpgCards'; break;
-        case 'attack': storeName = 'rpgAttacks'; break;
-        default: storeName = 'rpgSpells';
+        case 'attack': storeName = 'rpgEffects'; break;
+        default: storeName = 'rpgEffects';
     }
 
     const title = isItem ? 'Selecionar Item' : (type === 'magic' ? 'Selecionar Magia/Habilidade' : (type === 'attack' ? 'Selecionar Ataque' : 'Selecionar Relacionamento'));
@@ -215,13 +216,16 @@ export async function openSelectionModal(type) {
                 data = data.filter(c => c.id !== currentCharacterId);
             }
         } else if (characterId && characterId !== 'all') {
-             data = data.filter(item => {
-                const characterMatch = item.characterId === characterId;
-                if (storeName === 'rpgSpells') {
-                    return characterMatch;
-                }
-                return characterMatch;
-            });
+            data = data.filter(item => item.characterId === characterId);
+        }
+
+        // Filtragem por tipo quando usamos o store unificado
+        if (storeName === 'rpgEffects') {
+            if (type === 'magic') {
+                data = data.filter(item => item.type === 'magia' || item.type === 'habilidade');
+            } else if (type === 'attack') {
+                data = data.filter(item => item.type === 'ataque');
+            }
         }
         
         listContainer.innerHTML = '';
@@ -275,7 +279,7 @@ export async function openSelectionModal(type) {
 
             el.addEventListener('click', () => {
                 let eventType = 'addItemToCharacter';
-                let detail = { data: item, type: type === 'relationship' ? 'relationship' : (storeName === 'rpgItems' ? 'item' : (storeName === 'rpgSpells' ? 'magic' : 'attack')) };
+                let detail = { data: item, type: type === 'relationship' ? 'relationship' : (type === 'item' ? 'item' : (type === 'magic' ? 'magic' : 'attack')) };
 
                 if (type === 'relationship') eventType = 'addRelationshipToCharacter';
 
@@ -366,8 +370,13 @@ async function renderGroupedList({ type, storeName, buttonText, buttonAction, im
     const unassignedItems = [];
 
     allItems.forEach(item => {
-        if (type === 'magias' && item.type === 'habilidade') return;
+        // Store unificado (rpgEffects): filtrar por tipo para não misturar telas.
+        // Compatibilidade: efeitos antigos sem `type` são tratados como "magia".
+        if (type === 'magias') {
+            if (item.type && item.type !== 'magia') return;
+        }
         if (type === 'habilidades' && item.type !== 'habilidade') return;
+        if (type === 'ataques' && item.type !== 'ataque') return;
 
         const charId = item.characterId;
         if (charId && charactersById[charId]) {
@@ -579,7 +588,7 @@ async function renderSpellList(container, type = 'magias') {
     const isHabilidade = type === 'habilidades';
     await renderGroupedList({
         type: type,
-        storeName: 'rpgSpells',
+        storeName: 'rpgEffects',
         buttonText: isHabilidade ? 'Adicionar Habilidade' : 'Adicionar Magia',
         buttonAction: isHabilidade ? 'add-habilidade' : 'add-spell',
         importBtnId: isHabilidade ? 'import-habilidade-btn' : 'import-spell-btn',
@@ -611,15 +620,15 @@ async function renderItemList(container) {
 async function renderAttackList(container) {
     await renderGroupedList({
         type: 'ataques',
-        storeName: 'rpgAttacks',
+        storeName: 'rpgEffects',
         buttonText: 'Adicionar Ataque',
         buttonAction: 'add-attack',
         importBtnId: 'import-attack-btn',
         importInputId: 'import-attack-json-input',
         importTitle: 'Importar Ataque (JSON)',
-        importFunction: importAttack,
+        importFunction: importSpell,
         themeColor: 'text-red-400',
-        renderSheetFunction: renderFullAttackSheet,
+        renderSheetFunction: renderFullSpellSheet,
         unassignedTitle: 'Ataques Sem Dono'
     }, container);
 }
@@ -629,8 +638,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ... [Styles and DOM element selection remain the same] ...
     const style = document.createElement('style');
     style.innerHTML = `
-        .rpg-thumbnail { opacity: 0; transform: translateY(20px) scale(0.95); transition: opacity 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.2s ease-in-out; will-change: transform, opacity; }
-        .rpg-thumbnail.visible { opacity: 1; transform: translateY(0) scale(1); }
+        .rpg-thumbnail { opacity: 0; transition: opacity 0.4s ease; will-change: opacity; }
+        .rpg-thumbnail.visible { opacity: 1; }
         .category-tooltip { position: absolute; background-color: rgba(0, 0, 0, 0.85); color: white; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; white-space: pre-wrap; z-index: 1000; max-width: 250px; pointer-events: none; border: 1px solid #4a5568; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
         .view-section.hidden { display: none !important; }
         .view-section { width: 100%; height: 100%; }
@@ -859,13 +868,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             await populateCharacterSelect('itemCharacterOwner');
             await populateCategorySelect('item-category-select', 'item');
         });
-        if (action === "add-attack") showView(attackCreationSection, false, async () => {
-            attackForm.reset();
-            attackFormTitle.textContent = 'Novo Ataque';
-            attackSubmitButton.textContent = 'Criar Ataque';
-            showImagePreview(document.getElementById('attackImagePreview'), null, true);
-            await populateCharacterSelect('attackCharacterOwner');
-            await populateCategorySelect('attack-category-select', 'ataque');
+        if (action === "add-attack") showView(spellCreationSection, false, async () => {
+            spellForm.reset();
+            spellForm.dataset.type = 'ataque';
+            spellFormTitle.textContent = 'Novo Ataque';
+            spellSubmitButton.textContent = 'Criar Ataque';
+            document.getElementById('mana-cost-wrapper').classList.add('hidden');
+            enhanceWrapper.classList.add('hidden');
+            trueWrapper.classList.add('hidden');
+            populateSpellAumentosSelect();
+            document.getElementById('spell-aumentos-list').innerHTML = '';
+            showImagePreview(document.getElementById('spellImagePreview'), null, true);
+            await populateCharacterSelect('spellCharacterOwner');
+            await populateCategorySelect('spell-category-select', 'ataque');
         });
         if (e.target.closest('#select-character-btn')) showCharacterSelectionModalForPlay();
     });
@@ -922,7 +937,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     attackForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        await saveAttackCard(attackForm);
+        await saveSpellCard(attackForm, 'ataque');
         closeForm(attackCreationSection);
     });
 
@@ -954,7 +969,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await openDatabase();
 
-   
     const emJogoButtons = document.querySelectorAll('[data-target="personagem-em-jogo"]');
     emJogoButtons.forEach(btn => btn.classList.add('active'));
     renderContent('personagem-em-jogo');
@@ -1030,14 +1044,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    document.addEventListener('settingsChanged', (e) => {
-        if (e.detail.key === 'aspectRatio') {
-            // Se o aspect ratio mudar, precisamos reconstruir tudo para recalcular tamanhos
-            Array.from(contentDisplay.children).forEach(child => child.remove());
-            const activeNav = document.querySelector('.nav-button.active, .desktop-nav-button.active')?.dataset.target || 'personagem-em-jogo';
-            renderContent(activeNav, true);
-        }
-    });
 
      document.addEventListener('dataChanged', (e) => {
         const type = e.detail.type;
@@ -1072,9 +1078,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const cardId = thumbCard.dataset.id;
             const cardType = thumbCard.dataset.type;
             if (cardType === 'character') await renderFullCharacterSheet(await getData('rpgCards', cardId), true, false);
-            if (cardType === 'spell') await renderFullSpellSheet(await getData('rpgSpells', cardId), true);
+            if (cardType === 'spell') await renderFullSpellSheet(await getData('rpgEffects', cardId), true);
             if (cardType === 'item') await renderFullItemSheet(await getData('rpgItems', cardId), true);
-            if (cardType === 'attack') await renderFullAttackSheet(await getData('rpgAttacks', cardId), true);
+            if (cardType === 'attack') await renderFullSpellSheet(await getData('rpgEffects', cardId), true);
             return;
         }
 
@@ -1124,15 +1130,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     showView(creationSection, true);
                     await editCard(cardId);
                 } else if (cardType === 'spell') {
-                    const spellData = await getData('rpgSpells', cardId);
+                    const spellData = await getData('rpgEffects', cardId);
                     if (spellData) {
                         const isHabilidade = spellData.type === 'habilidade';
+                        const isAtaque = spellData.type === 'ataque';
                         spellForm.dataset.type = spellData.type || 'magia';
-                        spellFormTitle.textContent = isHabilidade ? 'Editando Habilidade' : 'Editando Magia';
-                        spellSubmitButton.textContent = isHabilidade ? 'Salvar Habilidade' : 'Salvar Magia';
-                         document.getElementById('mana-cost-wrapper').classList.toggle('hidden', isHabilidade);
-                        enhanceWrapper.classList.toggle('hidden', isHabilidade);
-                        trueWrapper.classList.toggle('hidden', isHabilidade);
+                        if (isAtaque) {
+                            spellFormTitle.textContent = 'Editando Ataque';
+                            spellSubmitButton.textContent = 'Salvar Ataque';
+                            document.getElementById('mana-cost-wrapper').classList.add('hidden');
+                            enhanceWrapper.classList.add('hidden');
+                            trueWrapper.classList.add('hidden');
+                        } else {
+                            spellFormTitle.textContent = isHabilidade ? 'Editando Habilidade' : 'Editando Magia';
+                            spellSubmitButton.textContent = isHabilidade ? 'Salvar Habilidade' : 'Salvar Magia';
+                            document.getElementById('mana-cost-wrapper').classList.toggle('hidden', isHabilidade);
+                            enhanceWrapper.classList.toggle('hidden', isHabilidade);
+                            trueWrapper.classList.toggle('hidden', isHabilidade);
+                        }
 
                         showView(spellCreationSection, true);
                         await editSpell(cardId);
@@ -1143,10 +1158,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     showView(itemCreationSection, true);
                     await editItem(cardId);
                 } else if (cardType === 'attack') {
-                    attackFormTitle.textContent = 'Editando Ataque';
-                    attackSubmitButton.textContent = 'Salvar Ataque';
-                    showView(attackCreationSection, true);
-                    await editAttack(cardId);
+                    spellForm.dataset.type = 'ataque';
+                    spellFormTitle.textContent = 'Editando Ataque';
+                    spellSubmitButton.textContent = 'Salvar Ataque';
+                    document.getElementById('mana-cost-wrapper').classList.add('hidden');
+                    enhanceWrapper.classList.add('hidden');
+                    trueWrapper.classList.add('hidden');
+                    showView(spellCreationSection, true);
+                    await editSpell(cardId);
                 }
             } else if (action === 'remove' || action === 'delete') {
                 if (await showCustomConfirm('Tem certeza que deseja excluir?')) {
@@ -1154,9 +1173,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     let eventType = activeNav;
 
                     if(cardType === 'character') { storeName = 'rpgCards'; eventType = 'personagem'; }
-                    else if (cardType === 'spell') { storeName = 'rpgSpells'; eventType = (await getData('rpgSpells', cardId))?.type === 'habilidade' ? 'habilidades' : 'magias'; }
+                    else if (cardType === 'spell') {
+                        storeName = 'rpgEffects';
+                        const t = (await getData('rpgEffects', cardId))?.type;
+                        eventType = t === 'habilidade' ? 'habilidades' : (t === 'ataque' ? 'ataques' : 'magias');
+                    }
                     else if (cardType === 'item') { storeName = 'rpgItems'; eventType = 'itens'; }
-                    else if (cardType === 'attack') { storeName = 'rpgAttacks'; eventType = 'ataques'; }
+                    else if (cardType === 'attack') { storeName = 'rpgEffects'; eventType = 'ataques'; }
 
                     if(storeName) {
                         await removeData(storeName, cardId);
@@ -1167,7 +1190,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                  if (cardType === 'character') await exportCard(cardId);
                  if (cardType === 'spell') await exportSpell(cardId);
                  if (cardType === 'item') await exportItem(cardId);
-                 if (cardType === 'attack') await exportAttack(cardId);
+                 if (cardType === 'attack') await exportSpell(cardId);
             } else if (action === 'set-in-play' || action === 'remove-from-play') {
                 const isSettingInPlay = action === 'set-in-play';
                 const allCharacters = await getData('rpgCards');

@@ -154,6 +154,55 @@ export function showImagePreview(element, url, isImageElement = true) {
     }
 }
 
+function clampRgb(value) {
+    return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function parseRgbColor(color) {
+    if (!color || typeof color !== 'string') return null;
+
+    const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (rgbMatch) {
+        return {
+            r: clampRgb(rgbMatch[1]),
+            g: clampRgb(rgbMatch[2]),
+            b: clampRgb(rgbMatch[3])
+        };
+    }
+
+    const hexMatch = color.trim().match(/^#([0-9a-f]{6})$/i);
+    if (hexMatch) {
+        const hex = hexMatch[1];
+        return {
+            r: parseInt(hex.slice(0, 2), 16),
+            g: parseInt(hex.slice(2, 4), 16),
+            b: parseInt(hex.slice(4, 6), 16)
+        };
+    }
+
+    return null;
+}
+
+function buildLightColor({ r, g, b }, amount = 0.35) {
+    const mix = (channel) => clampRgb(channel + ((255 - channel) * amount));
+    return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+}
+
+function normalizePalette(colorSet) {
+    const palette = {
+        color30: 'rgba(74, 85, 104, 0.3)',
+        color100: 'rgb(74, 85, 104)',
+        ...colorSet
+    };
+
+    if (!palette.colorLight) {
+        const parsed = parseRgbColor(palette.color100);
+        palette.colorLight = parsed ? buildLightColor(parsed) : palette.color100;
+    }
+
+    return palette;
+}
+
 export async function calculateColor(imageBuffer, imageMimeType, defaultColor = { color30: 'rgba(74, 85, 104, 0.3)', color100: 'rgb(74, 85, 104)' }) {
     let imageUrl;
     let createdObjectUrl = null;
@@ -162,7 +211,7 @@ export async function calculateColor(imageBuffer, imageMimeType, defaultColor = 
         createdObjectUrl = URL.createObjectURL(bufferToBlob(imageBuffer, imageMimeType));
         imageUrl = createdObjectUrl;
     } else {
-        return defaultColor;
+        return normalizePalette(defaultColor);
     }
 
     try {
@@ -189,23 +238,18 @@ export async function calculateColor(imageBuffer, imageMimeType, defaultColor = 
                     g = Math.floor(g / count);
                     b = Math.floor(b / count);
 
-                    const lighten = (value, amount = 0.4) => Math.min(255, Math.floor(value + (100 - value) * amount));
-                    
-                    resolve({
+                    resolve(normalizePalette({
                         color30: `rgba(${r}, ${g}, ${b}, 0.3)`,
-                        color100: `rgb(${r}, ${g}, ${b})`,
-                        colorLight: `rgb(${lighten(r)}, ${lighten(g)}, ${lighten(b)})`
-                    });
+                        color100: `rgb(${r}, ${g}, ${b})`
+                    }));
                 } catch (e) { reject(e); }
             };
             img.onerror = reject;
         });
     } catch (error) {
         console.error('Erro ao calcular cor:', error);
-        return defaultColor;
+        return normalizePalette(defaultColor);
     } finally {
         if (createdObjectUrl) URL.revokeObjectURL(createdObjectUrl);
     }
 }
-
-//AIzaSyCYcqir8zIlJFtnOctoZoJJCpAh2Bd0aC8

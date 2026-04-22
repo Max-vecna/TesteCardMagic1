@@ -6,11 +6,14 @@ const CLIENT_ID = '482226146549-8eej5aii7eh2phesneh7qjeq5gtse8s5.apps.googleuser
 const API_KEY = 'AIzaSyCYcqir8zIlJFtnOctoZoJJCpAh2Bd0aC8'; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file'; 
 const DB_FILE_NAME = 'rpg_manager_db.json';
+const GOOGLE_API_SCRIPT = 'https://apis.google.com/js/api.js';
+const GOOGLE_IDENTITY_SCRIPT = 'https://accounts.google.com/gsi/client';
 
 let tokenClient;
 let gapiInited = false;
 let gisInited = false;
 let isAuthenticated = false;
+let googleLibrariesPromise = null;
 
 // Evento para avisar o app que o Drive está pronto
 const driveReadyEvent = new Event('driveReady');
@@ -59,17 +62,61 @@ function clearTokenStorage() {
 
 
 // --- Função de Espera ---
-function waitForGoogleLibraries() {
-    return new Promise((resolve) => {
-        const check = () => {
-            if (typeof gapi !== 'undefined' && typeof google !== 'undefined' && google.accounts) {
+function loadExternalScript(src) {
+    return new Promise((resolve, reject) => {
+        const existingScript = document.querySelector(`script[src="${src}"]`);
+        if (existingScript) {
+            if (existingScript.dataset.loaded === 'true') {
                 resolve();
-            } else {
-                setTimeout(check, 100);
+                return;
             }
-        };
-        check();
+
+            existingScript.addEventListener('load', () => {
+                existingScript.dataset.loaded = 'true';
+                resolve();
+            }, { once: true });
+            existingScript.addEventListener('error', reject, { once: true });
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.defer = true;
+        script.addEventListener('load', () => {
+            script.dataset.loaded = 'true';
+            resolve();
+        }, { once: true });
+        script.addEventListener('error', reject, { once: true });
+        document.head.appendChild(script);
     });
+}
+
+function waitForGoogleLibraries() {
+    if (!googleLibrariesPromise) {
+        googleLibrariesPromise = Promise.all([
+            loadExternalScript(GOOGLE_API_SCRIPT),
+            loadExternalScript(GOOGLE_IDENTITY_SCRIPT)
+        ]).then(() => new Promise((resolve, reject) => {
+            let attempts = 0;
+            const maxAttempts = 100;
+
+            const check = () => {
+                if (typeof gapi !== 'undefined' && typeof google !== 'undefined' && google.accounts) {
+                    resolve();
+                } else if (attempts >= maxAttempts) {
+                    reject(new Error('Bibliotecas do Google nao ficaram disponiveis a tempo.'));
+                } else {
+                    attempts += 1;
+                    setTimeout(check, 100);
+                }
+            };
+
+            check();
+        }));
+    }
+
+    return googleLibrariesPromise;
 }
 
 export async function initDrive() {

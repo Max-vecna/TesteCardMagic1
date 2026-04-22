@@ -1,4 +1,3 @@
-import { getAspectRatio } from './settings_manager.js';
 import { bufferToBlob } from './ui_utils.js';
 
 export async function renderFullSpellSheet(spellData, isModal) {
@@ -10,7 +9,7 @@ export async function renderFullSpellSheet(spellData, isModal) {
         sheetContainer.style.zIndex = 100000000 + index;
     }
 
-    const aspectRatio = isModal?  getAspectRatio() : 10/16;
+    const aspectRatio = 9 / 16;
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;
     let finalWidth, finalHeight;
@@ -25,11 +24,13 @@ export async function renderFullSpellSheet(spellData, isModal) {
 
     let mainImageUrl;
     let createdMainObjectUrl = null;
+    const typeLabel = spellData.type === 'ataque' ? 'Ataque' : (spellData.type === 'habilidade' ? 'Habilidade' : 'Magia');
+
     if (spellData.image) {
         createdMainObjectUrl = URL.createObjectURL(bufferToBlob(spellData.image, spellData.imageMimeType));
         mainImageUrl = createdMainObjectUrl;
     } else {
-        mainImageUrl = 'https://placehold.co/400x400/00796B/B2DFDB?text=Magia';
+        mainImageUrl = `https://placehold.co/400x400/00796B/B2DFDB?text=${encodeURIComponent(typeLabel)}`;
     }
 
     let enhanceImageUrl = null;
@@ -46,7 +47,10 @@ export async function renderFullSpellSheet(spellData, isModal) {
         trueImageUrl = createdTrueObjectUrl;
     }
 
-    const predominantColor = spellData.predominantColor || { color30: 'rgba(13, 148, 136, 0.3)', color100: 'rgb(13, 148, 136)' };
+    const defaultColor = spellData.type === 'ataque'
+        ? { color30: 'rgba(248, 113, 113, 0.3)', color100: 'rgb(248, 113, 113)' }
+        : { color30: 'rgba(13, 148, 136, 0.3)', color100: 'rgb(13, 148, 136)' };
+    const predominantColor = spellData.predominantColor || defaultColor;
     const origin = isModal ?  "" : "transform-origin: top left";
     const transformProp = isModal ? 'transform: scale(0.9);' : '';
     
@@ -143,10 +147,10 @@ export async function renderFullSpellSheet(spellData, isModal) {
         <button id="close-spell-sheet-btn-${uniqueId}" class="absolute top-4 right-4 bg-red-600 hover:text-white z-50 thumb-btn" style="display:${isModal? "block": "none"};">
             <i class="fa-solid fa-xmark"></i>
         </button>
-        <div id="spell-sheet-${uniqueId}" class="w-full h-full rounded-lg shadow-2xl overflow-hidden relative text-white transition-all duration-500" style="${origin}; width: ${finalWidth}px; height: ${finalHeight}px; ${transformProp} margin: 0 auto; box-shadow: 0 0 20px ${predominantColor.color100}; background-color: #1a1a1a;">        
+        <div id="spell-sheet-${uniqueId}" class="w-full h-full rounded-lg shadow-2xl overflow-hidden relative text-white" style="${origin}; width: ${finalWidth}px; height: ${finalHeight}px; ${transformProp} margin: 0 auto; box-shadow: 0 0 20px ${predominantColor.color100}; background-color: #1a1a1a;">        
             
-            <div id="spell-bg-1-${uniqueId}" class="absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-700 ease-in-out" style="background-image: url('${mainImageUrl}'); z-index: 0; opacity: 1;"></div>
-            <div id="spell-bg-2-${uniqueId}" class="absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-700 ease-in-out" style="background-image: url('${mainImageUrl}'); z-index: 0; opacity: 0;"></div>
+            <div id="spell-bg-1-${uniqueId}" class="absolute inset-0 w-full h-full bg-cover bg-center" style="background-image: url('${mainImageUrl}'); z-index: 0; opacity: 1;"></div>
+            <div id="spell-bg-2-${uniqueId}" class="absolute inset-0 w-full h-full bg-cover bg-center" style="background-image: url('${mainImageUrl}'); z-index: 0; opacity: 0;"></div>
 
             <div class="absolute inset-0 w-full h-full z-10" style="background: linear-gradient(-180deg, #000000a4, transparent, transparent, #0000008f, #0000008f, #000000a4); display: flex; align-items: center; justify-content: center; pointer-events: none;box-shadow: inset 0px 0px 5px black; ">
                 <div class="rounded-lg" style="width: 100%; height: calc(100% - 20px); border: 3px solid ${predominantColor.color100}; margin: 10px;box-shadow: inset 0px 0px 5px black, 0px 0px 5px black;"></div>
@@ -177,7 +181,7 @@ export async function renderFullSpellSheet(spellData, isModal) {
     if (!isModal) return sheetHtml;
 
     sheetContainer.innerHTML = sheetHtml;
-    sheetContainer.style.backgroundImage = `url(icons/fundo.png)`;
+    sheetContainer.style.backgroundImage = `url(icons/fundo.svg)`;
     sheetContainer.style.backgroundSize = 'cover';
     sheetContainer.style.backgroundPosition = 'center';
     

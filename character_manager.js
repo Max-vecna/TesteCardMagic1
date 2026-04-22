@@ -12,17 +12,87 @@ const PERICIAS_DATA = {
     "VIGOR": { "Fortitude": "..." }
 };
 
+const CLASS_FORMULAS = {
+    mago: { hpBase: 12, hpGain: 3, mpBase: 6, mpGain: 4, mpAttr: 'sabedoria' },
+    bardo: { hpBase: 12, hpGain: 4, mpBase: 2, mpGain: 2, mpAttr: 'carisma' },
+    paladino: { hpBase: 20, hpGain: 4, mpBase: 4, mpGain: 2, mpAttr: 'sabedoria' }
+};
+
 let currentEditingCardId = null;
 let characterImageFile = null;
 let backgroundImageFile = null;
 let currentCharacterItems = [];
+
+function toInt(value) {
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) ? n : null;
+}
+
+function calcMaxVidaMana({ classe, level, vigor, sabedoria, carisma }) {
+    const cfg = CLASS_FORMULAS[classe];
+    if (!cfg) return null;
+
+    const L = Math.max(1, level ?? 1);
+    const VIG = vigor ?? 0;
+
+    const mpAttrValue = cfg.mpAttr === 'sabedoria' ? (sabedoria ?? 0) : (carisma ?? 0);
+
+    const vidaMax = (cfg.hpBase + VIG) + (L - 1) * (cfg.hpGain + VIG);
+    const manaMax = (cfg.mpBase + mpAttrValue) + (L - 1) * (cfg.mpGain + mpAttrValue);
+
+    return { vidaMax: Math.max(0, vidaMax), manaMax: Math.max(0, manaMax) };
+}
+
+function updateDerivedStatsInForm() {
+    const classSelect = document.getElementById('cardClass');
+    const levelInput = document.getElementById('cardLevel');
+    const vigorInput = document.getElementById('vigor');
+    const sabedoriaInput = document.getElementById('sabedoria');
+    const carismaInput = document.getElementById('carisma');
+
+    const vidaInput = document.getElementById('vida');
+    const manaInput = document.getElementById('mana');
+    const vidaAtualInput = document.getElementById('vidaAtual');
+    const manaAtualInput = document.getElementById('manaAtual');
+
+    if (!classSelect || !levelInput || !vigorInput || !sabedoriaInput || !carismaInput || !vidaInput || !manaInput) return;
+
+    const classe = classSelect.value;
+    const level = toInt(levelInput.value);
+    const vigor = toInt(vigorInput.value);
+    const sabedoria = toInt(sabedoriaInput.value);
+    const carisma = toInt(carismaInput.value);
+
+    if (!classe || level === null || vigor === null) return;
+
+    const cfg = CLASS_FORMULAS[classe];
+    if (!cfg) return;
+
+    if (cfg.mpAttr === 'sabedoria' && sabedoria === null) return;
+    if (cfg.mpAttr === 'carisma' && carisma === null) return;
+
+    const result = calcMaxVidaMana({ classe, level, vigor, sabedoria, carisma });
+    if (!result) return;
+
+    vidaInput.value = result.vidaMax;
+    manaInput.value = result.manaMax;
+
+    if (vidaAtualInput) {
+        const vNow = toInt(vidaAtualInput.value);
+        if (vNow === null || vNow > result.vidaMax) vidaAtualInput.value = result.vidaMax;
+    }
+    if (manaAtualInput) {
+        const mNow = toInt(manaAtualInput.value);
+        if (mNow === null || mNow > result.manaMax) manaAtualInput.value = result.manaMax;
+    }
+}
 
 export function resetCharacterFormState() {
     currentEditingCardId = null;
     characterImageFile = null;
     backgroundImageFile = null;
     currentCharacterItems = [];
-    
+
     const cardForm = document.getElementById('cardForm');
     if (cardForm) cardForm.reset();
 
@@ -31,15 +101,16 @@ export function resetCharacterFormState() {
     document.getElementById('selected-attacks-container').innerHTML = '';
     document.getElementById('selected-relationships-container').innerHTML = '';
     document.getElementById('form-inventory-section').classList.add('hidden');
-    
+
     showImagePreview(document.getElementById('characterImagePreview'), null, true);
     showImagePreview(document.getElementById('backgroundImagePreview'), null, false);
-    
+
     populatePericiasCheckboxes();
     renderInventoryForForm([], 0);
+
+    updateDerivedStatsInForm();
 }
 
-// Função exportada para permitir que o navigation_manager acesse os itens atuais
 export function getCharacterItems() {
     return currentCharacterItems;
 }
@@ -50,16 +121,14 @@ function getCustomPericias() {
 
 function saveCustomPericia(attribute, periciaName, periciaDescription) {
     const customPericias = getCustomPericias();
-    if (!customPericias[attribute]) {
-        customPericias[attribute] = {};
-    }
+    if (!customPericias[attribute]) customPericias[attribute] = {};
     customPericias[attribute][periciaName] = periciaDescription || `Descrição para ${periciaName}.`;
     localStorage.setItem('customPericias', JSON.stringify(customPericias));
 }
 
 function getMergedPericiasData() {
     const customPericias = getCustomPericias();
-    const merged = JSON.parse(JSON.stringify(PERICIAS_DATA)); 
+    const merged = JSON.parse(JSON.stringify(PERICIAS_DATA));
     for (const attr in customPericias) {
         if (!merged[attr]) merged[attr] = {};
         Object.assign(merged[attr], customPericias[attr]);
@@ -70,7 +139,7 @@ function getMergedPericiasData() {
 export function getAumentosData() {
     const mergedPericias = getMergedPericiasData();
     const aumentosData = {
-        "Status": ["Vida", "Mana", "Armadura", "Esquiva", "Bloqueio", "Deslocamento"],
+        "Status": ["Vida", "Mana", "Armadura", "Esquiva", "Bloqueio", "Deslocamento", "CD"],
         "Atributos": ["Agilidade", "Carisma", "Força", "Inteligência", "Sabedoria", "Vigor"],
         "Perícias": {}
     };
@@ -87,7 +156,7 @@ export async function populateCharacterSelect(selectId, includeNoneOption = true
     const selectElement = document.getElementById(selectId);
     if (!selectElement) return;
 
-    selectElement.innerHTML = ''; 
+    selectElement.innerHTML = '';
 
     if (includeNoneOption) {
         const noneOption = document.createElement('option');
@@ -107,18 +176,11 @@ export async function populateCharacterSelect(selectId, includeNoneOption = true
     }
 }
 
-/**
- * Cria e renderiza um elemento selecionado (magia, habilidade, ataque ou relacionamento)
- * em seu respectivo container no formulário.
- * * @param {object} data - O objeto com os dados do item.
- * @param {string} type - O tipo do item ('magic', 'skill', 'attack', 'relationship', 'item').
- */
 function createSelectedElement(data, type) {
     let containerId;
     let iconClass;
     let isImageRound = false;
 
-    // Mapeamento de tipo para Container e Ícone
     if (type === 'magic') {
         containerId = 'selected-magics-container';
         iconClass = 'fa-magic';
@@ -136,7 +198,6 @@ function createSelectedElement(data, type) {
         iconClass = 'fa-user';
         isImageRound = true;
     } else if (type === 'item') {
-        // Itens são tratados separadamente no inventário, mas se precisarmos de uma lista visual simples:
         containerId = 'selected-items-container';
         iconClass = 'fa-box';
     } else {
@@ -144,14 +205,12 @@ function createSelectedElement(data, type) {
     }
 
     const container = document.getElementById(containerId);
-    
-    // Verifica duplicidade visual
     if (!container || container.querySelector(`[data-id="${data.id}"]`)) return;
 
     const itemElement = document.createElement('div');
     itemElement.className = 'flex items-center justify-between bg-gray-800 p-2 rounded mt-1 mb-1';
     itemElement.dataset.id = data.id;
-    
+
     let iconHtml = '';
     if (data.image) {
         const imageUrl = URL.createObjectURL(bufferToBlob(data.image, data.imageMimeType));
@@ -160,7 +219,6 @@ function createSelectedElement(data, type) {
         iconHtml = `<i class="fas ${iconClass} w-6 text-center mr-2"></i>`;
     }
 
-    // Usa 'title' para personagens, 'name' para outros
     const displayText = data.name || data.title;
 
     itemElement.innerHTML = `
@@ -179,7 +237,7 @@ export function populatePericiasCheckboxes(selectedPericias = []) {
     const container = document.getElementById('pericias-checkboxes-container');
     if (!container) return;
     container.innerHTML = '';
-    
+
     const ALL_PERICIAS = getMergedPericiasData();
     const periciaDescriptionDisplay = document.getElementById('pericia-description-display');
     const periciaDescriptionTitle = document.getElementById('periciaDescriptionTitle');
@@ -209,7 +267,7 @@ export function populatePericiasCheckboxes(selectedPericias = []) {
             const periciaItem = document.createElement('div');
             periciaItem.className = 'flex items-center justify-between pericia-item rounded-md p-1';
             const periciaId = `pericia-${periciaName.replace(/\s+/g, '-')}`;
-            
+
             const selectedPericia = selectedPericias.find(p => p.name === periciaName);
             const isChecked = selectedPericia ? 'checked' : '';
             const value = selectedPericia ? selectedPericia.value : '';
@@ -259,12 +317,14 @@ export async function saveCharacterCard(cardForm) {
     const historiaInput = document.getElementById('historia');
     const personalidadeInput = document.getElementById('personalidade');
     const motivacaoInput = document.getElementById('motivacao');
-    
-    // NOVOS INPUTS
+    const cardClassSelect = document.getElementById('cardClass');
+
     const acertoInput = document.getElementById('acerto');
     const danoInput = document.getElementById('dano');
     const acertoInputSemMana = document.getElementById('critico');
     const danoInputSemMana = document.getElementById('danoSemMana');
+
+    updateDerivedStatsInForm();
 
     const selectedPericias = [];
     document.querySelectorAll('#pericias-checkboxes-container input[type="checkbox"]:checked').forEach(cb => {
@@ -293,12 +353,12 @@ export async function saveCharacterCard(cardForm) {
         sabedoria: parseInt(sabedoriaInput.value) || 0,
         vigor: parseInt(vigorInput.value) || 0,
         pericias: selectedPericias,
-        // Salvando Acerto e Dano (String para permitir "+5" ou "1d8")
         acerto: acertoInput.value,
         dano: danoInput.value,
         critico: acertoInputSemMana.value,
         danoSemMana: danoInputSemMana.value
     };
+
     const lore = {
         historia: historiaInput.value,
         personalidade: personalidadeInput.value,
@@ -315,10 +375,9 @@ export async function saveCharacterCard(cardForm) {
 
     const backgroundBuffer = backgroundImageFile ? await readFileAsArrayBuffer(backgroundImageFile) : (existingData ? existingData.backgroundImage : null);
     const backgroundMimeType = backgroundImageFile ? backgroundImageFile.type : (existingData ? existingData.backgroundMimeType : null);
-    
+
     const itemIds = currentCharacterItems.map(item => item.id);
-    
-    // Coleta IDs tanto de magias quanto de habilidades para salvar no array único 'spells' do DB
+
     const magicIds = [
         ...Array.from(document.querySelectorAll('#selected-magics-container [data-id]')),
         ...Array.from(document.querySelectorAll('#selected-skills-container [data-id]'))
@@ -326,7 +385,9 @@ export async function saveCharacterCard(cardForm) {
 
     const attackIds = Array.from(document.querySelectorAll('#selected-attacks-container [data-id]')).map(el => el.dataset.id);
     const relationshipIds = Array.from(document.querySelectorAll('#selected-relationships-container [data-id]')).map(el => el.dataset.id);
-    
+
+    const classe = cardClassSelect ? cardClassSelect.value : '';
+
     let cardData;
     if (currentEditingCardId) {
         cardData = existingData;
@@ -335,6 +396,7 @@ export async function saveCharacterCard(cardForm) {
             subTitle: cardSubTitleInput.value,
             level: parseInt(cardLevelInput.value) || 1,
             dinheiro: parseInt(dinheiroInput.value) || 0,
+            classe,
             attributes,
             lore,
             items: itemIds,
@@ -353,6 +415,7 @@ export async function saveCharacterCard(cardForm) {
             subTitle: cardSubTitleInput.value,
             level: parseInt(cardLevelInput.value) || 1,
             dinheiro: parseInt(dinheiroInput.value) || 0,
+            classe,
             attributes,
             lore,
             items: itemIds,
@@ -377,18 +440,21 @@ export async function saveCharacterCard(cardForm) {
 export async function editCard(cardId) {
     const cardData = await getData('rpgCards', cardId);
     if (!cardData) return;
-    
+
     resetCharacterFormState();
 
     document.getElementById('form-title').textContent = 'Editando: ' + cardData.title;
     document.getElementById('submitButton').textContent = 'Salvar Edição';
     currentEditingCardId = cardId;
-    
+
     document.getElementById('cardTitle').value = cardData.title;
     document.getElementById('cardSubTitle').value = cardData.subTitle;
     document.getElementById('cardLevel').value = cardData.level;
     document.getElementById('dinheiro').value = cardData.dinheiro || 0;
-    
+
+    const classSelect = document.getElementById('cardClass');
+    if (classSelect) classSelect.value = cardData.classe || '';
+
     const attrs = cardData.attributes;
     document.getElementById('vida').value = attrs.vida;
     document.getElementById('mana').value = attrs.mana;
@@ -405,24 +471,21 @@ export async function editCard(cardId) {
     document.getElementById('sabedoria').value = attrs.sabedoria;
     document.getElementById('vigor').value = attrs.vigor;
 
-    // PREENCHE ACERTO E DANO
     document.getElementById('acerto').value = attrs.acerto || '';
     document.getElementById('dano').value = attrs.dano || '';
     document.getElementById('critico').value = attrs.critico || '';
     document.getElementById('danoSemMana').value = attrs.danoSemMana || '';
-    
+
     document.getElementById('historia').value = cardData.lore?.historia || '';
     document.getElementById('personalidade').value = cardData.lore?.personalidade || '';
     document.getElementById('motivacao').value = cardData.lore?.motivacao || '';
 
     populatePericiasCheckboxes(attrs.pericias);
 
-    // Carrega Magias e Habilidades e distribui nos containers corretos
     if (cardData.spells) {
         for (const magicId of cardData.spells) {
-            const magicData = await getData('rpgSpells', magicId);
+            const magicData = await getData('rpgEffects', magicId);
             if (magicData) {
-                // Se o tipo for habilidade, renderiza no container de habilidades, senão no de magias
                 const renderType = magicData.type === 'habilidade' ? 'skill' : 'magic';
                 createSelectedElement(magicData, renderType);
             }
@@ -431,7 +494,7 @@ export async function editCard(cardId) {
 
     if (cardData.attacks) {
         for (const attackId of cardData.attacks) {
-            const attackData = await getData('rpgAttacks', attackId);
+            const attackData = await getData('rpgEffects', attackId);
             if (attackData) createSelectedElement(attackData, 'attack');
         }
     }
@@ -451,11 +514,13 @@ export async function editCard(cardId) {
         const backgroundBlob = bufferToBlob(cardData.backgroundImage, cardData.backgroundMimeType);
         showImagePreview(document.getElementById('backgroundImagePreview'), URL.createObjectURL(backgroundBlob), false);
     }
-    
+
     const items = cardData.items ? (await Promise.all(cardData.items.map(id => getData('rpgItems', id)))).filter(Boolean) : [];
     currentCharacterItems = items;
     document.getElementById('form-inventory-section').classList.remove('hidden');
     renderInventoryForForm(currentCharacterItems, attrs.forca || 0);
+
+    updateDerivedStatsInForm();
 }
 
 export async function exportCard(cardId) {
@@ -486,11 +551,11 @@ export async function importCard(file) {
                 if (!importedCard || importedCard.id === undefined) throw new Error("Formato inválido.");
 
                 importedCard.id = Date.now().toString();
-                importedCard.inPlay = false; 
+                importedCard.inPlay = false;
 
                 if (importedCard.image) importedCard.image = base64ToArrayBuffer(importedCard.image);
                 if (importedCard.backgroundImage) importedCard.backgroundImage = base64ToArrayBuffer(importedCard.backgroundImage);
-                
+
                 importedCard.predominantColor = await calculateColor(importedCard.backgroundImage, importedCard.backgroundMimeType);
 
                 await saveData('rpgCards', importedCard);
@@ -523,28 +588,32 @@ function getCurrentlySelectedPericias() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('characterImageUpload').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            characterImageFile = file;
-            showImagePreview(document.getElementById('characterImagePreview'), URL.createObjectURL(file), true);
-        }
-    });
+    const characterImageUpload = document.getElementById('characterImageUpload');
+    if (characterImageUpload) {
+        characterImageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                characterImageFile = file;
+                showImagePreview(document.getElementById('characterImagePreview'), URL.createObjectURL(file), true);
+            }
+        });
+    }
 
-    document.getElementById('backgroundImageUpload').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            backgroundImageFile = file;
-            showImagePreview(document.getElementById('backgroundImagePreview'), URL.createObjectURL(file), false);
-        }
-    });
+    const backgroundImageUpload = document.getElementById('backgroundImageUpload');
+    if (backgroundImageUpload) {
+        backgroundImageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                backgroundImageFile = file;
+                showImagePreview(document.getElementById('backgroundImagePreview'), URL.createObjectURL(file), false);
+            }
+        });
+    }
 
     document.addEventListener('addItemToCharacter', (e) => {
         const { data, type } = e.detail;
-        
-        // Verifica o tipo de dado para direcionar ao container correto
+
         if (type === 'magic') {
-            // Se veio do modal de seleção como 'magic', verifica se o objeto interno é habilidade
             const finalType = data.type === 'habilidade' ? 'skill' : 'magic';
             createSelectedElement(data, finalType);
         } else if (type === 'item') {
@@ -554,7 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
             createSelectedElement(data, 'attack');
         }
     });
-    
+
     document.addEventListener('addRelationshipToCharacter', (e) => createSelectedElement(e.detail.data, 'relationship'));
 
     document.addEventListener('requestItemRemoval', (e) => {
@@ -565,21 +634,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    document.getElementById('forca').addEventListener('input', (e) => {
-        renderInventoryForForm(currentCharacterItems, parseInt(e.target.value) || 0);
-    });
-    
-    document.getElementById('add-item-to-inventory-btn').addEventListener('click', () => openItemSelectionModal('item'));
-
-    // Botão de adicionar habilidade
-    const addSkillBtn = document.getElementById('add-skill-to-char-btn');
-    if (addSkillBtn) {
-        addSkillBtn.addEventListener('click', () => {
-            // Reutiliza o modal de seleção de magias, já que ele lista ambos (magias e habilidades)
-            // O sistema de filtragem no addItemToCharacter separará visualmente.
-            openItemSelectionModal('magic'); 
+    const forcaEl = document.getElementById('forca');
+    if (forcaEl) {
+        forcaEl.addEventListener('input', (e) => {
+            renderInventoryForForm(currentCharacterItems, parseInt(e.target.value) || 0);
         });
     }
+
+    const addItemBtn = document.getElementById('add-item-to-inventory-btn');
+    if (addItemBtn) addItemBtn.addEventListener('click', () => openItemSelectionModal('item'));
+
+    const addSkillBtn = document.getElementById('add-skill-to-char-btn');
+    if (addSkillBtn) addSkillBtn.addEventListener('click', () => openItemSelectionModal('magic'));
 
     const showBtn = document.getElementById('show-add-pericia-form-btn');
     const addForm = document.getElementById('add-pericia-form');
@@ -607,4 +673,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    const watchIds = ['cardClass', 'cardLevel', 'vigor', 'sabedoria', 'carisma'];
+    watchIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', updateDerivedStatsInForm);
+        el.addEventListener('change', updateDerivedStatsInForm);
+    });
+
+    updateDerivedStatsInForm();
 });

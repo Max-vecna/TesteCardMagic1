@@ -3,7 +3,15 @@ import { renderFullItemSheet } from './item_renderer.js';
 import { openSelectionModal } from './navigation_manager.js';
 import { getAumentosData, populateCharacterSelect } from './character_manager.js';
 import { populateCategorySelect } from './category_manager.js';
-import { showImagePreview } from './ui_utils.js';
+import {
+    showImagePreview,
+    readFileAsArrayBuffer as readFileAsArrayBufferUtil,
+    bufferToBlob as bufferToBlobUtil,
+    arrayBufferToBase64 as arrayBufferToBase64Util,
+    base64ToArrayBuffer as base64ToArrayBufferUtil,
+    calculateColor as calculateColorUtil,
+    showCustomAlert
+} from './ui_utils.js';
 
 let currentEditingItemId = null;
 let itemImageFile = null;
@@ -48,7 +56,7 @@ async function calculateColor(imageBuffer, imageMimeType) {
         createdObjectUrl = URL.createObjectURL(bufferToBlob(imageBuffer, imageMimeType));
         imageUrl = createdObjectUrl;
     } else {
-        imageUrl = './icons/back.png'; // Imagem padrão
+        imageUrl = './icons/back.svg'; // Imagem padrão
     }
 
     let predominantColor;
@@ -193,7 +201,7 @@ export async function saveItemCard(itemForm) {
         existingData = await getData('rpgItems', currentEditingItemId);
     }
 
-    const imageBuffer = itemImageFile ? await readFileAsArrayBuffer(itemImageFile) : (existingData ? existingData.image : null);
+    const imageBuffer = itemImageFile ? await readFileAsArrayBufferUtil(itemImageFile) : (existingData ? existingData.image : null);
     const imageMimeType = itemImageFile ? itemImageFile.type : (existingData ? existingData.imageMimeType : null);
     
     let itemData;
@@ -222,7 +230,7 @@ export async function saveItemCard(itemForm) {
         };
     }
 
-    itemData.predominantColor = await calculateColor(itemData.image, itemData.imageMimeType);
+    itemData.predominantColor = await calculateColorUtil(itemData.image, itemData.imageMimeType, { color30: 'rgba(217, 119, 6, 0.3)', color100: 'rgb(217, 119, 6)' });
 
     await saveData('rpgItems', itemData);
 
@@ -263,7 +271,7 @@ export async function editItem(itemId) {
 
     const itemImagePreview = document.getElementById('itemImagePreview');
     if (itemData.image) {
-        const imageBlob = bufferToBlob(itemData.image, itemData.imageMimeType);
+        const imageBlob = bufferToBlobUtil(itemData.image, itemData.imageMimeType);
         showImagePreview(itemImagePreview, URL.createObjectURL(imageBlob));
     } else {
         showImagePreview(itemImagePreview, null);
@@ -278,7 +286,7 @@ export async function exportItem(itemId) {
     const itemData = await getData('rpgItems', itemId);
     if (itemData) {
         const dataToExport = { ...itemData };
-        if (dataToExport.image) dataToExport.image = arrayBufferToBase64(dataToExport.image);
+        if (dataToExport.image) dataToExport.image = arrayBufferToBase64Util(dataToExport.image);
         const jsonString = JSON.stringify(dataToExport, null, 2);
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -298,9 +306,9 @@ export async function importItem(file) {
                 const importedItem = JSON.parse(e.target.result);
                 importedItem.id = Date.now().toString(); 
                 if (importedItem.image) {
-                    importedItem.image = base64ToArrayBuffer(importedItem.image);
+                    importedItem.image = base64ToArrayBufferUtil(importedItem.image);
                 }
-                importedItem.predominantColor = await calculateColor(importedItem.image, importedItem.imageMimeType);
+                importedItem.predominantColor = await calculateColorUtil(importedItem.image, importedItem.imageMimeType, { color30: 'rgba(217, 119, 6, 0.3)', color100: 'rgb(217, 119, 6)' });
                 await saveData('rpgItems', importedItem);
                 resolve(importedItem);
             } catch (error) {
@@ -327,7 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const valor = parseInt(valueInput.value, 10) || 0;
             const tipo = typeRadio.value;
             if (!nome || valor === 0) {
-                alert("Por favor, selecione um tipo de aumento e insira um valor diferente de zero.");
+                showCustomAlert('Selecione um tipo de aumento e informe um valor diferente de zero.');
                 return;
             }
             renderAumentoNaLista({ nome, valor, tipo });
@@ -336,13 +344,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-document.getElementById('itemImageUpload').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        itemImageFile = file;
-        showImagePreview(document.getElementById('itemImagePreview'), URL.createObjectURL(file));
-    }
-});
+const itemImageUpload = document.getElementById('itemImageUpload');
+if (itemImageUpload) {
+    itemImageUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            itemImageFile = file;
+            showImagePreview(document.getElementById('itemImagePreview'), URL.createObjectURL(file));
+        }
+    });
+}
 
 export function renderInventoryForForm(characterItems, strengthValue) {
     const strength = strengthValue || 0;

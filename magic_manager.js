@@ -2,9 +2,18 @@ import { saveData, getData, removeData } from './local_db.js';
 import { renderFullSpellSheet } from './magic_renderer.js';
 import { getAumentosData, populateCharacterSelect } from './character_manager.js';
 import { populateCategorySelect } from './category_manager.js';
-import { showImagePreview } from './ui_utils.js';
+import {
+    showImagePreview,
+    readFileAsArrayBuffer as readFileAsArrayBufferUtil,
+    bufferToBlob as bufferToBlobUtil,
+    arrayBufferToBase64 as arrayBufferToBase64Util,
+    base64ToArrayBuffer as base64ToArrayBufferUtil,
+    calculateColor as calculateColorUtil,
+    showCustomAlert,
+    showCustomConfirm
+} from './ui_utils.js';
 
-export { showImagePreview }; 
+export { showImagePreview } from './ui_utils.js';
 
 let currentEditingSpellId = null;
 let spellImageFile = null;
@@ -51,7 +60,7 @@ async function calculateColor(imageBuffer, imageMimeType) {
         createdObjectUrl = URL.createObjectURL(bufferToBlob(imageBuffer, imageMimeType));
         imageUrl = createdObjectUrl;
     } else {
-        imageUrl = './icons/back.png';
+        imageUrl = './icons/back.svg';
     }
 
     let predominantColor;
@@ -219,16 +228,16 @@ export async function saveSpellCard(spellForm, type) {
 
     let existingData = null;
     if (currentEditingSpellId) {
-        existingData = await getData('rpgSpells', currentEditingSpellId);
+        existingData = await getData('rpgEffects', currentEditingSpellId);
     }
 
-    const imageBuffer = spellImageFile ? await readFileAsArrayBuffer(spellImageFile) : (existingData ? existingData.image : null);
+    const imageBuffer = spellImageFile ? await readFileAsArrayBufferUtil(spellImageFile) : (existingData ? existingData.image : null);
     const imageMimeType = spellImageFile ? spellImageFile.type : (existingData ? existingData.imageMimeType : null);
 
-    const enhanceImageBuffer = spellEnhanceImageFile ? await readFileAsArrayBuffer(spellEnhanceImageFile) : (existingData ? existingData.enhanceImage : null);
+    const enhanceImageBuffer = spellEnhanceImageFile ? await readFileAsArrayBufferUtil(spellEnhanceImageFile) : (existingData ? existingData.enhanceImage : null);
     const enhanceImageMimeType = spellEnhanceImageFile ? spellEnhanceImageFile.type : (existingData ? existingData.enhanceImageMimeType : null);
 
-    const trueImageBuffer = spellTrueImageFile ? await readFileAsArrayBuffer(spellTrueImageFile) : (existingData ? existingData.trueImage : null);
+    const trueImageBuffer = spellTrueImageFile ? await readFileAsArrayBufferUtil(spellTrueImageFile) : (existingData ? existingData.trueImage : null);
     const trueImageMimeType = spellTrueImageFile ? spellTrueImageFile.type : (existingData ? existingData.trueImageMimeType : null);
 
     let spellData;
@@ -272,10 +281,12 @@ export async function saveSpellCard(spellForm, type) {
         };
     }
 
-    spellData.predominantColor = await calculateColor(spellData.image, spellData.imageMimeType);
-    await saveData('rpgSpells', spellData);
+    spellData.predominantColor = await calculateColorUtil(spellData.image, spellData.imageMimeType, spellData.type === 'ataque'
+        ? { color30: 'rgba(248, 113, 113, 0.3)', color100: 'rgb(248, 113, 113)' }
+        : { color30: 'rgba(13, 148, 136, 0.3)', color100: 'rgb(13, 148, 136)' });
+    await saveData('rpgEffects', spellData);
 
-    const eventType = type === 'habilidade' ? 'habilidades' : 'magias';
+    const eventType = type === 'habilidade' ? 'habilidades' : (type === 'ataque' ? 'ataques' : 'magias');
     document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: eventType } }));
 
     spellForm.reset();
@@ -290,7 +301,7 @@ export async function saveSpellCard(spellForm, type) {
 }
 
 export async function editSpell(spellId) {
-    const spellData = await getData('rpgSpells', spellId);
+    const spellData = await getData('rpgEffects', spellId);
     if (!spellData) return;
 
     currentEditingSpellId = spellId;
@@ -330,14 +341,14 @@ export async function editSpell(spellId) {
 
     const spellImagePreview = document.getElementById('spellImagePreview');
     if (spellData.image) {
-        const imageBlob = bufferToBlob(spellData.image, spellData.imageMimeType);
+        const imageBlob = bufferToBlobUtil(spellData.image, spellData.imageMimeType);
         showImagePreview(spellImagePreview, URL.createObjectURL(imageBlob), true);
     } else {
         showImagePreview(spellImagePreview, null, true);
     }
 
     if (spellData.enhanceImage) {
-        const blob = bufferToBlob(spellData.enhanceImage, spellData.enhanceImageMimeType);
+        const blob = bufferToBlobUtil(spellData.enhanceImage, spellData.enhanceImageMimeType);
         document.getElementById('spellEnhanceImagePreview').src = URL.createObjectURL(blob);
         document.getElementById('spellEnhanceImagePreviewContainer').classList.remove('hidden');
     } else {
@@ -345,7 +356,7 @@ export async function editSpell(spellId) {
     }
 
     if (spellData.trueImage) {
-        const blob = bufferToBlob(spellData.trueImage, spellData.trueImageMimeType);
+        const blob = bufferToBlobUtil(spellData.trueImage, spellData.trueImageMimeType);
         document.getElementById('spellTrueImagePreview').src = URL.createObjectURL(blob);
         document.getElementById('spellTrueImagePreviewContainer').classList.remove('hidden');
     } else {
@@ -354,26 +365,27 @@ export async function editSpell(spellId) {
 }
 
 export async function removeSpell(spellId) {
-    if (window.confirm('Tem certeza que deseja excluir este item?')) {
-        await removeData('rpgSpells', spellId);
+    if (await showCustomConfirm('Tem certeza que deseja excluir este efeito?')) {
+        await removeData('rpgEffects', spellId);
     }
 }
 
 export async function exportSpell(spellId) {
-    const spellData = await getData('rpgSpells', spellId);
+    const spellData = await getData('rpgEffects', spellId);
     if (spellData) {
         const dataToExport = { ...spellData };
-        if (dataToExport.image) dataToExport.image = arrayBufferToBase64(dataToExport.image);
-        if (dataToExport.enhanceImage) dataToExport.enhanceImage = arrayBufferToBase64(dataToExport.enhanceImage);
-        if (dataToExport.trueImage) dataToExport.trueImage = arrayBufferToBase64(dataToExport.trueImage);
+        if (dataToExport.image) dataToExport.image = arrayBufferToBase64Util(dataToExport.image);
+        if (dataToExport.enhanceImage) dataToExport.enhanceImage = arrayBufferToBase64Util(dataToExport.enhanceImage);
+        if (dataToExport.trueImage) dataToExport.trueImage = arrayBufferToBase64Util(dataToExport.trueImage);
 
         const jsonString = JSON.stringify(dataToExport, null, 2);
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        const safeName = (dataToExport.name || 'item').replace(/\s+/g, '_');
-        a.download = `${safeName}.json`;
+        const safeName = (dataToExport.name || 'efeito').replace(/\s+/g, '_');
+        const prefix = dataToExport.type === 'habilidade' ? 'habilidade' : (dataToExport.type === 'ataque' ? 'ataque' : 'magia');
+        a.download = `${prefix}_${safeName}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -392,14 +404,18 @@ export async function importSpell(file, type) {
                 }
 
                 importedSpell.id = Date.now().toString();
-                importedSpell.type = type === 'habilidades' ? 'habilidade' : 'magia';
+                if (type === 'habilidades') importedSpell.type = 'habilidade';
+                else if (type === 'ataques') importedSpell.type = 'ataque';
+                else importedSpell.type = 'magia';
 
-                if (importedSpell.image) importedSpell.image = base64ToArrayBuffer(importedSpell.image);
-                if (importedSpell.enhanceImage) importedSpell.enhanceImage = base64ToArrayBuffer(importedSpell.enhanceImage);
-                if (importedSpell.trueImage) importedSpell.trueImage = base64ToArrayBuffer(importedSpell.trueImage);
+                if (importedSpell.image) importedSpell.image = base64ToArrayBufferUtil(importedSpell.image);
+                if (importedSpell.enhanceImage) importedSpell.enhanceImage = base64ToArrayBufferUtil(importedSpell.enhanceImage);
+                if (importedSpell.trueImage) importedSpell.trueImage = base64ToArrayBufferUtil(importedSpell.trueImage);
 
-                importedSpell.predominantColor = await calculateColor(importedSpell.image, importedSpell.imageMimeType);
-                await saveData('rpgSpells', importedSpell);
+                importedSpell.predominantColor = await calculateColorUtil(importedSpell.image, importedSpell.imageMimeType, importedSpell.type === 'ataque'
+                    ? { color30: 'rgba(248, 113, 113, 0.3)', color100: 'rgb(248, 113, 113)' }
+                    : { color30: 'rgba(13, 148, 136, 0.3)', color100: 'rgb(13, 148, 136)' });
+                await saveData('rpgEffects', importedSpell);
                 resolve(importedSpell);
             } catch (error) {
                 console.error("Erro ao importar item:", error);
@@ -427,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const tipo = typeRadio.value;
 
             if (!nome || valor === 0) {
-                alert("Por favor, selecione um tipo de aumento e insira um valor diferente de zero.");
+                showCustomAlert('Selecione um tipo de aumento e informe um valor diferente de zero.');
                 return;
             }
 

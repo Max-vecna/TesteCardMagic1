@@ -9,9 +9,8 @@ const CATEGORY_TYPES = {
 };
 
 const ITEM_STORES_TO_CHECK = [
-    'rpgSpells',  // Armazena tanto magias quanto habilidades
+    'rpgEffects',  // Armazena magias, habilidades e ataques
     'rpgItems',
-    'rpgAttacks'
 ];
 
 /**

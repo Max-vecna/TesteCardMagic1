@@ -1,11 +1,10 @@
-import { getAspectRatio } from './settings_manager.js';
 import { bufferToBlob } from './ui_utils.js';
 
 export async function renderFullItemSheet(itemData, isModal) {
     const sheetContainer = document.getElementById('item-sheet-container');
     if (!sheetContainer) return '';
 
-    const aspectRatio = isModal?  getAspectRatio() : 10/16;
+    const aspectRatio = 9 / 16;
 
     if(isModal) {  
         const index = document.getElementsByClassName('visible').length;
@@ -112,7 +111,7 @@ export async function renderFullItemSheet(itemData, isModal) {
     if (!isModal) return sheetHtml;
 
     sheetContainer.innerHTML = sheetHtml;
-    sheetContainer.style.backgroundImage = `url(icons/fundo.png)`;
+    sheetContainer.style.backgroundImage = `url(icons/fundo.svg)`;
     sheetContainer.style.backgroundSize = 'cover';
     sheetContainer.style.backgroundPosition = 'center';
     sheetContainer.classList.remove('hidden');
