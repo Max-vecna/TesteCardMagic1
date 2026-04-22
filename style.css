@@ -765,6 +765,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
 .character-collection-dock {
     position: absolute;
     right: -18px;
+    top: 50%;
     z-index: 6;
     display: flex;
     flex-direction: column;
@@ -774,6 +775,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     border-radius: 0;
     background: transparent;
     box-shadow: none;
+    transform: translateY(-50%);
 }
 
 .character-collection-trigger {

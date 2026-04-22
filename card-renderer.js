@@ -1156,13 +1156,24 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             statsDiv.style.justifyContent = 'space-evenly'; 
 
             if (collectionDock && collectionGrid) {
-                const statsHeight = statsDiv.offsetHeight;
-                collectionDock.style.height = `${statsHeight}px`;
-                collectionDock.style.top = '50%';
-                collectionDock.style.bottom = 'auto';
-                collectionDock.style.transform = 'translateY(-50%)';
-                collectionGrid.style.height = '100%';
-                collectionGrid.style.justifyContent = 'center';
+                const collectionDockWrapper = collectionDock.parentElement;
+                const statsRect = statsDiv.getBoundingClientRect();
+                const wrapperRect = collectionDockWrapper?.getBoundingClientRect();
+                const statsHeight = Math.max(
+                    Math.round(statsRect.height || 0),
+                    statsDiv.offsetHeight || 0
+                );
+
+                if (wrapperRect && statsHeight > 0 && wrapperRect.height > 0) {
+                    const statsCenterY = (statsRect.top - wrapperRect.top) + (statsRect.height / 2);
+
+                    collectionDock.style.height = `${statsHeight}px`;
+                    //collectionDock.style.top = `${statsCenterY}px`;
+                    collectionDock.style.bottom = 'auto';
+                    collectionDock.style.transform = 'translateY(-50%)';
+                    collectionGrid.style.height = '100%';
+                    collectionGrid.style.justifyContent = 'center';
+                }
             }
         };
 
@@ -1182,7 +1193,130 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
 
 }, 100); 
 
-    populateInventory(sheetContainer, characterData, uniqueId);
+    const enhancedMiniCardsDiv = sheetContainer.querySelector('.div-miniCards');
+    const enhancedStatsDiv = sheetContainer.querySelector('.div-Stats');
+    const enhancedCollectionDock = sheetContainer.querySelector('.character-collection-dock');
+    const enhancedCollectionGrid = sheetContainer.querySelector('.character-collection-grid');
+    const enhancedCharacterSheetEl = sheetContainer.querySelector(`#character-sheet-${uniqueId}`);
+    const enhancedCollectionDockWrapper = enhancedCollectionDock?.parentElement;
+
+    if (enhancedMiniCardsDiv && enhancedStatsDiv) {
+        let enhancedAlignmentFrame = null;
+
+        const adjustCollectionDockAlignment = () => {
+            enhancedAlignmentFrame = null;
+
+            const miniCardsHeight = Math.max(
+                enhancedMiniCardsDiv.offsetHeight || 0,
+                Math.round(enhancedMiniCardsDiv.getBoundingClientRect().height || 0)
+            );
+
+            if (miniCardsHeight > 0) {
+                enhancedStatsDiv.style.minHeight = `${Math.max(miniCardsHeight - 10, 0)}px`;
+            }
+
+            enhancedStatsDiv.style.display = 'flex';
+            enhancedStatsDiv.style.flexDirection = 'column';
+            enhancedStatsDiv.style.justifyContent = 'space-evenly';
+
+            if (enhancedCollectionDock && enhancedCollectionGrid && enhancedCollectionDockWrapper) {
+                const statsRect = enhancedStatsDiv.getBoundingClientRect();
+                const wrapperRect = enhancedCollectionDockWrapper.getBoundingClientRect();
+                const statsHeight = Math.max(
+                    Math.round(statsRect.height || 0),
+                    enhancedStatsDiv.offsetHeight || 0
+                );
+
+                if (statsHeight > 0 && wrapperRect.height > 0) {
+                    const statsCenterY = (statsRect.top - wrapperRect.top) + (statsRect.height / 2);
+
+                    enhancedCollectionDock.style.height = `${statsHeight}px`;
+                   // enhancedCollectionDock.style.top = `${statsCenterY}px`;
+                    enhancedCollectionDock.style.bottom = 'auto';
+                    enhancedCollectionDock.style.transform = 'translateY(-50%)';
+                    enhancedCollectionGrid.style.height = '100%';
+                    enhancedCollectionGrid.style.justifyContent = 'center';
+                }
+            }
+        };
+
+        const scheduleCollectionDockAlignment = () => {
+            if (enhancedAlignmentFrame !== null) {
+                cancelAnimationFrame(enhancedAlignmentFrame);
+            }
+
+            enhancedAlignmentFrame = requestAnimationFrame(() => {
+                adjustCollectionDockAlignment();
+            });
+        };
+
+        const runAlignmentPasses = (remainingPasses = 6) => {
+            scheduleCollectionDockAlignment();
+            if (remainingPasses <= 0) return;
+
+            requestAnimationFrame(() => {
+                runAlignmentPasses(remainingPasses - 1);
+            });
+        };
+
+        const handleCollectionDockViewportChange = () => {
+            scheduleCollectionDockAlignment();
+        };
+
+        runAlignmentPasses();
+        setTimeout(() => scheduleCollectionDockAlignment(), 120);
+        setTimeout(() => scheduleCollectionDockAlignment(), 260);
+
+        const dockResizeObserver = new ResizeObserver(() => {
+            scheduleCollectionDockAlignment();
+        });
+
+        dockResizeObserver.observe(enhancedMiniCardsDiv);
+        dockResizeObserver.observe(enhancedStatsDiv);
+
+        if (enhancedCharacterSheetEl) {
+            dockResizeObserver.observe(enhancedCharacterSheetEl);
+            enhancedCharacterSheetEl.addEventListener('transitionend', handleCollectionDockViewportChange);
+        }
+
+        if (enhancedCollectionDockWrapper) {
+            dockResizeObserver.observe(enhancedCollectionDockWrapper);
+        }
+
+        window.addEventListener('resize', handleCollectionDockViewportChange);
+        window.addEventListener('orientationchange', handleCollectionDockViewportChange);
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', handleCollectionDockViewportChange);
+        }
+
+        sheetContainer._scheduleStatsAndCollectionDockAlignment = scheduleCollectionDockAlignment;
+        sheetContainer._collectionDockResizeObserver = dockResizeObserver;
+        sheetContainer._collectionDockAlignmentCleanup = () => {
+            if (enhancedAlignmentFrame !== null) {
+                cancelAnimationFrame(enhancedAlignmentFrame);
+            }
+
+            window.removeEventListener('resize', handleCollectionDockViewportChange);
+            window.removeEventListener('orientationchange', handleCollectionDockViewportChange);
+
+            if (window.visualViewport) {
+                window.visualViewport.removeEventListener('resize', handleCollectionDockViewportChange);
+            }
+
+            if (enhancedCharacterSheetEl) {
+                enhancedCharacterSheetEl.removeEventListener('transitionend', handleCollectionDockViewportChange);
+            }
+        };
+    }
+
+    populateInventory(sheetContainer, characterData, uniqueId).finally(() => {
+        if (typeof sheetContainer._scheduleStatsAndCollectionDockAlignment === 'function') {
+            requestAnimationFrame(() => {
+                sheetContainer._scheduleStatsAndCollectionDockAlignment();
+            });
+        }
+    });
 
     if (isModal || isInPlay) {
         setTimeout(() => sheetContainer.classList.add('visible'), 10);
@@ -1199,6 +1333,20 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         if (sheetContainer._statsResizeObserver) {
             sheetContainer._statsResizeObserver.disconnect();
             delete sheetContainer._statsResizeObserver;
+        }
+
+        if (sheetContainer._collectionDockResizeObserver) {
+            sheetContainer._collectionDockResizeObserver.disconnect();
+            delete sheetContainer._collectionDockResizeObserver;
+        }
+
+        if (sheetContainer._collectionDockAlignmentCleanup) {
+            sheetContainer._collectionDockAlignmentCleanup();
+            delete sheetContainer._collectionDockAlignmentCleanup;
+        }
+
+        if (sheetContainer._scheduleStatsAndCollectionDockAlignment) {
+            delete sheetContainer._scheduleStatsAndCollectionDockAlignment;
         }
 
         collectionGrids.forEach(grid => {
