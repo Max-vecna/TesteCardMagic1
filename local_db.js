@@ -28,6 +28,31 @@ const DB_CONFIG = {
     }
 };
 
+const STORES_WITH_AUMENTOS = new Set(['rpgItems', 'rpgEffects', 'rpgSpells', 'rpgAttacks']);
+
+function normalizeAumentos(aumentos) {
+    if (!Array.isArray(aumentos)) return [];
+
+    return aumentos
+        .filter(Boolean)
+        .map(aumento => ({
+            ...aumento,
+            nome: aumento.nome || '',
+            valor: parseInt(aumento.valor, 10) || 0,
+            tipo: 'fixo'
+        }))
+        .filter(aumento => aumento.nome && aumento.valor !== 0);
+}
+
+function normalizeStoreRecord(storeName, record) {
+    if (!record || !STORES_WITH_AUMENTOS.has(storeName)) return record;
+
+    return {
+        ...record,
+        aumentos: normalizeAumentos(record.aumentos)
+    };
+}
+
 async function migrateEffectsStoreIfNeeded() {
     // Esta migração faz 2 coisas:
     // 1) Garante que quaisquer dados antigos (rpgSpells/rpgAttacks) existam em rpgEffects.
@@ -306,7 +331,7 @@ async function restoreDataFromJSON(jsonData) {
                         return entry;
                     });
                 }
-                await store.put(item);
+                await store.put(normalizeStoreRecord(storeName, item));
             }
         }
     }
@@ -505,7 +530,7 @@ export function saveData(storeName, data) {
         
         const transaction = db.transaction([storeName], 'readwrite');
         const store = transaction.objectStore(storeName);
-        const request = store.put(data);
+        const request = store.put(normalizeStoreRecord(storeName, data));
 
         request.onsuccess = async () => {
             resolve(request.result);
@@ -522,7 +547,16 @@ export function getData(storeName, key) {
         const store = transaction.objectStore(storeName);
         const request = key ? store.get(key) : store.getAll();
 
-        request.onsuccess = () => resolve(request.result);
+        request.onsuccess = () => {
+            const result = request.result;
+
+            if (Array.isArray(result)) {
+                resolve(result.map(item => normalizeStoreRecord(storeName, item)));
+                return;
+            }
+
+            resolve(normalizeStoreRecord(storeName, result));
+        };
         request.onerror = (e) => reject(e.target.error);
     });
 }

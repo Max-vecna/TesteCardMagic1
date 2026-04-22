@@ -53,12 +53,13 @@ export async function renderFullSpellSheet(spellData, isModal) {
     const predominantColor = spellData.predominantColor || defaultColor;
     const origin = isModal ?  "" : "transform-origin: top left";
     const transformProp = isModal ? 'transform: scale(0.9);' : '';
+    spellData.aumentos = Array.isArray(spellData.aumentos)
+        ? spellData.aumentos.filter(a => (a?.tipo || 'fixo') === 'fixo')
+        : [];
     
     let aumentosHtml = '';
     if (spellData.aumentos && spellData.aumentos.length > 0) {
-        const aumentosFixos = spellData.aumentos.filter(a => a.tipo === 'fixo');
-        const aumentosTemporarios = spellData.aumentos.filter(a => a.tipo === 'temporario');
-
+        const aumentosFixos = spellData.aumentos.filter(a => (a?.tipo || 'fixo') === 'fixo');
         const createList = (list, title, color) => {
             if (list.length === 0) return '';
             const items = list.map(a => `<li><span class="font-semibold">${a.nome}:</span> ${a.valor > 0 ? '+' : ''}${a.valor}</li>`).join('');
@@ -70,7 +71,7 @@ export async function renderFullSpellSheet(spellData, isModal) {
                 <h3 class="text-sm font-semibold flex items-center gap-2">Aumentos</h3>
                 <div class="text-gray-300 text-xs leading-relaxed mt-1 space-y-1">
                     ${createList(aumentosFixos, 'Bônus Fixos', 'text-green-300')}
-                    ${createList(aumentosTemporarios, 'Bônus Temporários (Informativo)', 'text-blue-300')}
+                    ${''}
                 </div>
             </div>
         `;

@@ -16,6 +16,19 @@ import {
 let currentEditingItemId = null;
 let itemImageFile = null;
 
+function normalizeFixedAumentos(aumentos) {
+    if (!Array.isArray(aumentos)) return [];
+
+    return aumentos
+        .filter(Boolean)
+        .map(aumento => ({
+            nome: aumento.nome,
+            valor: parseInt(aumento.valor, 10) || 0,
+            tipo: 'fixo'
+        }))
+        .filter(aumento => aumento.nome && aumento.valor !== 0);
+}
+
 // --- Funções de Cálculo de Cor ---
 function getPredominantColor(imageUrl) {
     return new Promise((resolve, reject) => {
@@ -152,17 +165,19 @@ function renderAumentoNaLista(aumento) {
     const list = document.getElementById('item-aumentos-list');
     if (!list) return;
 
+    const normalizedAumento = normalizeFixedAumentos([aumento])[0];
+    if (!normalizedAumento) return;
+
     const div = document.createElement('div');
     div.className = 'flex items-center justify-between bg-gray-800 p-2 rounded-lg';
-    div.dataset.nome = aumento.nome;
-    div.dataset.valor = aumento.valor;
-    div.dataset.tipo = aumento.tipo;
+    div.dataset.nome = normalizedAumento.nome;
+    div.dataset.valor = normalizedAumento.valor;
+    div.dataset.tipo = 'fixo';
 
     div.innerHTML = `
         <div>
-            <span class="font-semibold text-amber-300">${aumento.nome}</span>
-            <span class="text-white ml-2">${aumento.valor > 0 ? '+' : ''}${aumento.valor}</span>
-            <span class="text-xs ${aumento.tipo === 'fixo' ? 'text-green-400' : 'text-blue-400'} ml-2 capitalize">(${aumento.tipo})</span>
+            <span class="font-semibold text-amber-300">${normalizedAumento.nome}</span>
+            <span class="text-white ml-2">${normalizedAumento.valor > 0 ? '+' : ''}${normalizedAumento.valor}</span>
         </div>
         <button type="button" class="text-red-500 hover:text-red-400 remove-aumento-btn text-xl leading-none">&times;</button>
     `;
@@ -192,9 +207,10 @@ export async function saveItemCard(itemForm) {
         aumentos.push({
             nome: el.dataset.nome,
             valor: parseInt(el.dataset.valor, 10),
-            tipo: el.dataset.tipo
+            tipo: 'fixo'
         });
     });
+    const normalizedAumentos = normalizeFixedAumentos(aumentos);
 
     let existingData = null;
     if (currentEditingItemId) {
@@ -215,7 +231,7 @@ export async function saveItemCard(itemForm) {
         characterId: itemCharacterOwnerInput.value,
         categoryId: itemCategorySelect.value,
         acerto: itemAcertoInput.value, // Salvando acerto
-        aumentos,
+        aumentos: normalizedAumentos,
         image: imageBuffer,
         imageMimeType: imageMimeType,
     };
@@ -265,9 +281,7 @@ export async function editItem(itemId) {
 
     const aumentosList = document.getElementById('item-aumentos-list');
     aumentosList.innerHTML = '';
-    if (itemData.aumentos && Array.isArray(itemData.aumentos)) {
-        itemData.aumentos.forEach(aumento => renderAumentoNaLista(aumento));
-    }
+    normalizeFixedAumentos(itemData.aumentos).forEach(aumento => renderAumentoNaLista(aumento));
 
     const itemImagePreview = document.getElementById('itemImagePreview');
     if (itemData.image) {
@@ -330,15 +344,13 @@ document.addEventListener('DOMContentLoaded', () => {
         addBtn.addEventListener('click', () => {
             const select = document.getElementById('item-aumento-select');
             const valueInput = document.getElementById('item-aumento-value');
-            const typeRadio = document.querySelector('input[name="item-aumento-type"]:checked');
             const nome = select.options[select.selectedIndex].text;
             const valor = parseInt(valueInput.value, 10) || 0;
-            const tipo = typeRadio.value;
             if (!nome || valor === 0) {
-                showCustomAlert('Selecione um tipo de aumento e informe um valor diferente de zero.');
+                showCustomAlert('Selecione um aumento e informe um valor diferente de zero.');
                 return;
             }
-            renderAumentoNaLista({ nome, valor, tipo });
+            renderAumentoNaLista({ nome, valor, tipo: 'fixo' });
             valueInput.value = '0';
         });
     }

@@ -850,7 +850,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                             </div> 
 
                             <div style="position: relative;" data-action="edit-stat" data-stat-type="dinheiro" data-stat-max="${characterData.dinheiro || 0}" class="mt-4 flex flex-col items-center">
-                                <i class="fas fa-coins text-4xl" style="background: rgb(255 185 0); -webkit-background-clip: text; -webkit-text-fill-color: transparent;filter: drop-shadow(2px 4px 6px black);"></i>
+                                <i class="fas fa-coins text-4xl" style="background: rgb(205 149 0); -webkit-background-clip: text; -webkit-text-fill-color: transparent;filter: drop-shadow(2px 4px 6px black);"></i>
                                 <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none pt-2" style="margin: auto;">
                                     <span data-stat-current="dinheiro" style="bottom: 12px;">
                                         ${characterData.dinheiro || 0}
