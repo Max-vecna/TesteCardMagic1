@@ -53,6 +53,101 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
+function interpolateColor(start, end, ratio) {
+    return {
+        r: start.r + ((end.r - start.r) * ratio),
+        g: start.g + ((end.g - start.g) * ratio),
+        b: start.b + ((end.b - start.b) * ratio)
+    };
+}
+
+function rgbToCss(color) {
+    return `rgb(${Math.round(color.r)} ${Math.round(color.g)} ${Math.round(color.b)})`;
+}
+
+function getSafeStatRatio(currentValue, maxValue) {
+    const safeMax = Math.max(parseInt(maxValue, 10) || 0, 1);
+    const safeCurrent = clamp(parseInt(currentValue, 10) || 0, 0, safeMax);
+    return safeCurrent / safeMax;
+}
+
+function getHeartVisualVariables(currentValue, maxValue) {
+    const ratio = getSafeStatRatio(currentValue, maxValue);
+    const fillColor = rgbToCss(interpolateColor(
+        { r: 92, g: 11, b: 11 },
+        { r: 231, g: 46, b: 46 },
+        Math.pow(ratio, 0.9)
+    ));
+    const glowColor = rgbToCss(interpolateColor(
+        { r: 110, g: 20, b: 20 },
+        { r: 255, g: 112, b: 112 },
+        ratio
+    ));
+
+    return {
+        '--heart-fill': fillColor,
+        '--heart-glow-color': glowColor,
+        '--heart-beat-duration': `${(1.85 - (ratio * 0.9)).toFixed(2)}s`,
+        '--heart-scale-strong': (1.06 + (ratio * 0.12)).toFixed(3),
+        '--heart-scale-soft': (1.03 + (ratio * 0.07)).toFixed(3),
+        '--heart-brightness-idle': (0.48 + (ratio * 0.44)).toFixed(2),
+        '--heart-brightness-peak': (0.72 + (ratio * 0.68)).toFixed(2),
+        '--heart-glow-size-idle': `${(2 + (ratio * 7)).toFixed(1)}px`,
+        '--heart-glow-size-peak': `${(8 + (ratio * 20)).toFixed(1)}px`
+    };
+}
+
+function getManaVisualVariables(currentValue, maxValue) {
+    const ratio = getSafeStatRatio(currentValue, maxValue);
+    const fillColor = rgbToCss(interpolateColor(
+        { r: 18, g: 39, b: 82 },
+        { r: 46, g: 110, b: 231 },
+        ratio
+    ));
+    const sparkColor = rgbToCss(interpolateColor(
+        { r: 123, g: 152, b: 207 },
+        { r: 226, g: 244, b: 255 },
+        ratio
+    ));
+
+    return {
+        '--mana-fill': fillColor,
+        '--mana-spark': sparkColor,
+        '--mana-glow-size': `${(3 + (ratio * 15)).toFixed(1)}px`,
+        '--mana-brightness-low': (0.55 + (ratio * 0.45)).toFixed(2),
+        '--mana-brightness-high': (0.72 + (ratio * 0.75)).toFixed(2),
+        '--mana-opacity-low': (0.38 + (ratio * 0.32)).toFixed(2),
+        '--mana-opacity-high': (0.56 + (ratio * 0.44)).toFixed(2),
+        '--mana-spark-opacity': (0.18 + (ratio * 0.82)).toFixed(2),
+        '--mana-spark-travel': `${(12 + (ratio * 16)).toFixed(1)}px`
+    };
+}
+
+function serializeCssVariables(variables) {
+    return Object.entries(variables)
+        .map(([name, value]) => `${name}: ${value}`)
+        .join('; ');
+}
+
+function applyStatIconVisualState(sheetContainer, statType, currentValue, maxValue) {
+    const variables = statType === 'vida'
+        ? getHeartVisualVariables(currentValue, maxValue)
+        : getManaVisualVariables(currentValue, maxValue);
+
+    const targets = sheetContainer?.querySelectorAll(`[data-stat-icon="${statType}"], [data-stat-sparks="${statType}"]`);
+    if (!targets?.length) return;
+
+    targets.forEach(target => {
+        Object.entries(variables).forEach(([name, value]) => {
+            target.style.setProperty(name, value);
+        });
+    });
+}
+
 function getCollectionItemLabel(item) {
     return item?.title || item?.name || 'Sem nome';
 }
@@ -104,6 +199,7 @@ export async function updateStatDisplay(sheetContainer, characterData) {
         const vidaMaxEl = vidaMaxContainer.querySelector('[data-stat-max-display="vida"]');
         if (vidaMaxEl) vidaMaxEl.textContent = permanentMaxVida;
     }
+    applyStatIconVisualState(sheetContainer, 'vida', characterData.attributes.vidaAtual, permanentMaxVida);
 
     const manaEl = sheetContainer.querySelector('[data-stat-current="mana"]');
     if (manaEl) manaEl.textContent = characterData.attributes.manaAtual || 0;
@@ -114,6 +210,7 @@ export async function updateStatDisplay(sheetContainer, characterData) {
         const manaMaxEl = manaMaxContainer.querySelector('[data-stat-max-display="mana"]');
         if (manaMaxEl) manaMaxEl.textContent = permanentMaxMana;
     }
+    applyStatIconVisualState(sheetContainer, 'mana', characterData.attributes.manaAtual, permanentMaxMana);
 
     const dinheiroEl = sheetContainer.querySelector('[data-stat-current="dinheiro"]');
     if (dinheiroEl) dinheiroEl.textContent = characterData.dinheiro || 0;
@@ -750,6 +847,8 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
 
     const permanentMaxVida = (characterData.attributes.vida || 0) + (totalFixedBonuses.vida || 0);
     const permanentMaxMana = (characterData.attributes.mana || 0) + (totalFixedBonuses.mana || 0);
+    const heartIconStyle = serializeCssVariables(getHeartVisualVariables(characterData.attributes.vidaAtual, permanentMaxVida));
+    const manaIconStyle = serializeCssVariables(getManaVisualVariables(characterData.attributes.manaAtual, permanentMaxMana));
 
     const hasLore = characterData.lore && (characterData.lore.historia || characterData.lore.personalidade || characterData.lore.motivacao);
     
@@ -816,8 +915,8 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     <div class="h-full right-2 absolute top-0 right-0 bottom-0 flex flex-col" style="align-items: flex-end; justify-content: space-between;">
                         <div class="mt-2 flex flex-col items-center">
                             <div style="position: relative;" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}">
-                                <i class="fa-solid fa-heart text-5xl" style="background: #e72e2e; -webkit-background-clip: text; -webkit-text-fill-color: transparent;filter: drop-shadow(2px 4px 6px black);"></i>
-                                <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto;">
+                                <i class="fa-solid fa-heart text-5xl status-resource-icon status-heart-icon" data-stat-icon="vida" style="${heartIconStyle}"></i>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto; z-index: 2;">
                                     <span data-stat-current="vida">
                                         ${characterData.attributes.vidaAtual || 0}
                                     </span>
@@ -829,8 +928,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                             </div>
                             
                             <div style="position: relative;" data-action="edit-stat" data-stat-type="mana" data-stat-max="${permanentMaxMana}" class="mt-4 flex flex-col items-center">
-                                <i class="fas fa-fire text-5xl" style="background: #2e6ee7; -webkit-background-clip: text; -webkit-text-fill-color: transparent;filter: drop-shadow(2px 4px 6px black);"></i>
-                                <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none pt-2" style="margin: auto;">
+                                 <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none pt-2" style="margin: auto; z-index: 2;">
                                     <span data-stat-current="mana">
                                         ${characterData.attributes.manaAtual || 0}
                                     </span>
@@ -838,12 +936,19 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                                     <span data-stat-max-display="mana" style="bottom: 12px;">
                                         ${permanentMaxMana}
                                     </span>
-                                </div>
+                                </div><span class="status-fire-sparks" data-stat-sparks="mana" style="${manaIconStyle}" aria-hidden="true"></span>
+                                <i class="fas fa-fire text-5xl status-resource-icon status-fire-icon" data-stat-icon="mana" style="${manaIconStyle}"></i>
+                               
                             </div> 
 
                             <div style="position: relative;" data-action="edit-stat" data-stat-type="dinheiro" data-stat-max="${characterData.dinheiro || 0}" class="mt-4 flex flex-col items-center">
-                                <i class="fas fa-coins text-4xl" style="background: rgb(205 149 0); -webkit-background-clip: text; -webkit-text-fill-color: transparent;filter: drop-shadow(2px 4px 6px black);"></i>
-                                <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none pt-2" style="margin: auto;">
+                                <span class="status-coins-stack text-4xl" aria-hidden="true">
+                                    <i class="fas fa-coins status-coins-base"></i>
+                                    <span class="status-coins-shine">
+                                        <i class="fas fa-coins"></i>
+                                    </span>
+                                </span>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none pt-2" style="margin: auto; z-index: 2;">
                                     <span data-stat-current="dinheiro" style="bottom: 12px;">
                                         ${characterData.dinheiro || 0}
                                     </span>
@@ -897,6 +1002,8 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     sheetContainer.style.backgroundPosition = 'center';
     sheetContainer.style.boxShadow = 'inset 0px 0px 10px 0px black';
     sheetContainer.innerHTML = finalHtml;
+    applyStatIconVisualState(sheetContainer, 'vida', characterData.attributes.vidaAtual, permanentMaxVida);
+    applyStatIconVisualState(sheetContainer, 'mana', characterData.attributes.manaAtual, permanentMaxMana);
 
     if (isInPlay) {
         sheetContainer.classList.add('in-play-animation');
