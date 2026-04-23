@@ -775,6 +775,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                             ${loreHistoriaHtml}
                             ${lorePersonalidadeHtml}
                             ${loreMotivacaoHtml}
+                            <br>
                         </div>
                     </div>
                 </div>
@@ -788,16 +789,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     const hasCollectionDock = Boolean(finalRelationshipsBar);
 
     const sheetHtml = `
-        <div class="absolute top-6 right-6 z-20 flex flex-col gap-2">
-            <button
-                id="open-lore-modal-btn-${uniqueId}"
-                class="bg-slate-900/80 hover:text-white thumb-btn"
-                style="display: ${hasLore ? 'flex' : 'none'}"
-                type="button"
-                title="Abrir lore"
-                aria-label="Abrir lore do personagem">
-                <i class="fa-solid fa-book-open"></i>
-            </button>
+        <div class="absolute top-6 right-6 z-20 flex flex-col gap-2">            
             <button id="close-sheet-btn-${uniqueId}" class="bg-red-600 hover:text-white thumb-btn" style="display: ${isModal ? 'flex' : 'none'}"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div id="character-sheet-${uniqueId}" class="w-full h-full rounded-lg shadow-2xl overflow-hidden relative text-white" style="${origin}; background-image: url('${imageUrl}'); background-size: cover; background-position: center; box-shadow: 0 0 20px ${predominantColor.colorLight}; width: ${finalWidth}px; height: ${finalHeight}px; ${transformProp} margin: 0 auto;">
@@ -824,7 +816,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     <div class="h-full right-2 absolute top-0 right-0 bottom-0 flex flex-col" style="align-items: flex-end; justify-content: space-between;">
                         <div class="mt-2 flex flex-col items-center">
                             <div style="position: relative;" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}">
-                                <i class="fa-solid fa-heart text-5xl" style="background: ${predominantColor.colorLight}; -webkit-background-clip: text; -webkit-text-fill-color: transparent;filter: drop-shadow(2px 4px 6px black);"></i>
+                                <i class="fa-solid fa-heart text-5xl" style="background: #e72e2e; -webkit-background-clip: text; -webkit-text-fill-color: transparent;filter: drop-shadow(2px 4px 6px black);"></i>
                                 <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto;">
                                     <span data-stat-current="vida">
                                         ${characterData.attributes.vidaAtual || 0}
@@ -837,7 +829,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                             </div>
                             
                             <div style="position: relative;" data-action="edit-stat" data-stat-type="mana" data-stat-max="${permanentMaxMana}" class="mt-4 flex flex-col items-center">
-                                <i class="fas fa-fire text-5xl" style="background: ${predominantColor.colorLight}; -webkit-background-clip: text; -webkit-text-fill-color: transparent;filter: drop-shadow(2px 4px 6px black);"></i>
+                                <i class="fas fa-fire text-5xl" style="background: #2e6ee7; -webkit-background-clip: text; -webkit-text-fill-color: transparent;filter: drop-shadow(2px 4px 6px black);"></i>
                                 <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none pt-2" style="margin: auto;">
                                     <span data-stat-current="mana">
                                         ${characterData.attributes.manaAtual || 0}
@@ -856,6 +848,12 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                                         ${characterData.dinheiro || 0}
                                     </span>
                                 </div>
+                            </div> 
+
+                            <div style="position: relative;" class="mt-4 flex flex-col items-center">
+                                <button id="open-lore-modal-btn-${uniqueId}" class="thumb-btn" style="display: ${hasLore ? 'flex' : 'none'}" type="button" title="Abrir lore" aria-label="Abrir lore do personagem">
+                                    <i class="fas fa-book-open text-3xl" style="background: rgb(165, 165, 165); -webkit-background-clip: text; -webkit-text-fill-color: transparent;filter: drop-shadow(2px 4px 6px black);"></i>
+                                </button>
                             </div> 
                         </div>  
                         <div class="mb-2 flex flex-col items-center">
