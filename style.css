@@ -641,6 +641,56 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     animation: coins-metal-shine 2.8s linear infinite;
 }
 
+.status-lore-stack {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    animation: lore-book-float 3.4s ease-in-out infinite;
+}
+
+.status-lore-base {
+    position: relative;
+    z-index: 0;
+    display: block;
+    color: rgb(165 165 165);
+    filter:
+        drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.75))
+        drop-shadow(0 0 6px rgba(232, 236, 255, 0.18));
+}
+
+.status-lore-shine {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.status-lore-shine i {
+    display: block;
+    background-image: linear-gradient(
+        108deg,
+        rgba(255, 255, 255, 0) 22%,
+        rgba(217, 225, 255, 0.12) 36%,
+        rgba(255, 255, 255, 0.95) 49%,
+        rgba(216, 226, 255, 0.22) 61%,
+        rgba(255, 255, 255, 0) 74%
+    );
+    background-size: 240% 100%;
+    background-position: 135% 50%;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    opacity: 0.88;
+    animation: lore-page-shine 3.6s linear infinite;
+}
+
 @keyframes stat-heartbeat {
     0%, 100% {
         transform: scale(1);
@@ -734,6 +784,37 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
 
     100% {
         background-position: -70% 50%;
+        opacity: 0;
+    }
+}
+
+@keyframes lore-book-float {
+    0%, 100% {
+        transform: translateY(0) rotate(-1deg);
+    }
+
+    50% {
+        transform: translateY(-2px) rotate(1.2deg);
+    }
+}
+
+@keyframes lore-page-shine {
+    0% {
+        background-position: 145% 50%;
+        opacity: 0;
+    }
+
+    14% {
+        opacity: 0.82;
+    }
+
+    52% {
+        background-position: 48% 50%;
+        opacity: 0.98;
+    }
+
+    100% {
+        background-position: -72% 50%;
         opacity: 0;
     }
 }
@@ -972,15 +1053,13 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     flex-wrap: nowrap;
     justify-content: center;
     align-items: center;
-    gap: 0.4rem;
+    gap: 1rem;
     flex-direction: column;
     padding: 0;
     height: 100%;
 }
 
 .character-collection-dock {
-    position: absolute;
-    right: -18px;
     top: 50%;
     z-index: 6;
     display: flex;
@@ -991,13 +1070,12 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     border-radius: 0;
     background: transparent;
     box-shadow: none;
-    transform: translateY(-50%);
 }
 
 .character-collection-trigger {
     --collection-accent: #cbd5e1;
     --collection-tone: rgba(148, 163, 184, 0.55);
-    width: 2.5rem;
+    width: 2.8rem;
     height: 2.5rem;
     position: relative;
     border: 0;
@@ -1010,7 +1088,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     color: #fff;
     background: transparent;
     transition: transform 0.2s ease, background-color 0.2s ease;
-    clip-path: polygon(20% 0%, 100% 0, 100% 100%, 20% 100%, 0% 80%, 0% 20%);
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
 }
 
 
@@ -1318,7 +1396,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
 
 @media (max-width: 480px) {
     .character-collection-grid {
-        gap: 0.8rem;
+        gap: 1rem;
     }
 
     .character-collection-modal {

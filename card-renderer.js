@@ -894,25 +894,32 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         <div id="character-sheet-${uniqueId}" class="w-full h-full rounded-lg shadow-2xl overflow-hidden relative text-white" style="${origin}; background-image: url('${imageUrl}'); background-size: cover; background-position: center; box-shadow: 0 0 20px ${predominantColor.colorLight}; width: ${finalWidth}px; height: ${finalHeight}px; ${transformProp} margin: 0 auto;">
             <div class="w-full h-full" style="background: linear-gradient(to bottom, #000000a4, transparent, transparent, #0000008f, #0000008f, #000000a4); box-shadow: inset 0px 0px 5px black;">
                 <div class="rounded-lg absolute inset-0" style="width: 94%; height: 96%; border: 3px solid ${predominantColor.colorLight}; margin: auto; box-shadow: inset 0px 0px 5px black, 0px 0px 5px black;">
-                    <div class="h-full w-12 left-2 absolute top-0 bottom-0">
-                        <div class="div-combat-stats grid grid-row-6 gap-y-2 text-xs absolute top-2" style="border-radius: 28px 5px 28px 5px; background: ${predominantColor.colorLight}; padding: 10px; width: 42px; justify-content: space-evenly; box-shadow: 0 0 10px black;">
-                            <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
-                            ${defenseStatsHtml}
-                            <div class="text-center">CD<br>${formatTotal(cdValue, cdFixed !== 0)}</div>
+                    <div class="h-full w-12 left-2 top-2 pb-4 absolute top-0 bottom-0 flex flex-col items-center justify-content" style="justify-content: space-between;">
+                       <div> 
+                            <div class="div-combat-stats grid grid-row-6 gap-y-2 text-xs w-12" style="border-radius: 28px 5px 28px 5px; background: ${predominantColor.colorLight}; padding: 10px; justify-content: space-evenly; box-shadow: 0 0 10px black;">
+                                <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
+                                ${defenseStatsHtml}
+                                <div class="text-center">CD<br>${formatTotal(cdValue, cdFixed !== 0)}</div>                           
+                            </div>
+                            <div style="position: relative;" class="mt-8 flex flex-col items-center">
+                                <button id="open-lore-modal-btn-${uniqueId}" class="thumb-btn" style="display: ${hasLore ? 'flex' : 'none'}" type="button" title="Abrir lore" aria-label="Abrir lore do personagem">
+                                    <span class="status-lore-stack text-3xl" aria-hidden="true">
+                                        <i class="fas fa-book-open status-lore-base"></i>
+                                        <span class="status-lore-shine">
+                                            <i class="fas fa-book-open"></i>
+                                        </span>
+                                    </span>
+                                </button>
+                            </div>
                         </div>
-
-                        <div class="grid grid-row-6 gap-y-2 text-xs absolute bottom-2 div-Stats" style="border-radius: 28px 5px 5px 5px; background: ${predominantColor.colorLight}; padding: 10px; width: 42px; box-shadow: 0 0 10px black; ">
-                            ${mainAttributes.map(key => {
-                            const baseValue = parseInt(characterData.attributes[key]) || 0;
-                            const fixedBonus = totalFixedBonuses[key] || 0;
-                            const fixedBonusHtml = fixedBonus !== 0 ? ` <span class="text-green-400 font-semibold">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
-                            return `
-                                <label class="text-center" title="${key}">${formatTotal(baseValue + fixedBonus, fixedBonus !== 0)}<br>${key.slice(0, 3).toUpperCase()}</label>
-                            `;
-                            }).join('')}
-                        </div>
+                       ${hasCollectionDock ? `
+                            <div class="character-collection-dock rounded-3xl" style="--collection-dock-accent: ${palette.borderColor};">
+                                ${finalRelationshipsBar}
+                            </div>
+                        ` : ''}
                     </div>
-                    <div class="h-full right-2 absolute top-0 right-0 bottom-0 flex flex-col" style="align-items: flex-end; justify-content: space-between;">
+
+                    <div class="h-full w-12 right-2 top-2 pb-4 absolute top-0 bottom-0 flex flex-col items-center justify-content" style="justify-content: space-between;">
                         <div class="mt-2 flex flex-col items-center">
                             <div style="position: relative;" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}">
                                 <i class="fa-solid fa-heart text-5xl status-resource-icon status-heart-icon" data-stat-icon="vida" style="${heartIconStyle}"></i>
@@ -937,8 +944,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                                         ${permanentMaxMana}
                                     </span>
                                 </div><span class="status-fire-sparks" data-stat-sparks="mana" style="${manaIconStyle}" aria-hidden="true"></span>
-                                <i class="fas fa-fire text-5xl status-resource-icon status-fire-icon" data-stat-icon="mana" style="${manaIconStyle}"></i>
-                               
+                                <i class="fas fa-fire text-5xl status-resource-icon status-fire-icon" data-stat-icon="mana" style="${manaIconStyle}"></i>                               
                             </div> 
 
                             <div style="position: relative;" data-action="edit-stat" data-stat-type="dinheiro" data-stat-max="${characterData.dinheiro || 0}" class="mt-4 flex flex-col items-center">
@@ -953,16 +959,20 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                                         ${characterData.dinheiro || 0}
                                     </span>
                                 </div>
-                            </div> 
-
-                            <div style="position: relative;" class="mt-4 flex flex-col items-center">
-                                <button id="open-lore-modal-btn-${uniqueId}" class="thumb-btn" style="display: ${hasLore ? 'flex' : 'none'}" type="button" title="Abrir lore" aria-label="Abrir lore do personagem">
-                                    <i class="fas fa-book-open text-3xl" style="background: rgb(165, 165, 165); -webkit-background-clip: text; -webkit-text-fill-color: transparent;filter: drop-shadow(2px 4px 6px black);"></i>
-                                </button>
-                            </div> 
+                            </div>                             
                         </div>  
                         <div class="mb-2 flex flex-col items-center">
                             ${attackStatsHtml}
+                        </div>
+                        <div class="grid grid-row-6 gap-y-2 text-xs div-Stats w-12" style="border-radius: 28px 5px 28px 5px; background: ${predominantColor.colorLight}; padding: 10px; box-shadow: 0 0 10px black; ">
+                            ${mainAttributes.map(key => {
+                            const baseValue = parseInt(characterData.attributes[key]) || 0;
+                            const fixedBonus = totalFixedBonuses[key] || 0;
+                            const fixedBonusHtml = fixedBonus !== 0 ? ` <span class="text-green-400 font-semibold">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
+                            return `
+                                <label class="text-center" title="${key}">${formatTotal(baseValue + fixedBonus, fixedBonus !== 0)}<br>${key.slice(0, 3).toUpperCase()}</label>
+                            `;
+                            }).join('')}
                         </div>
                     </div>
 
@@ -973,12 +983,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                                     ${periciasHtml}
                                 </div>
                             </div>
-                        </div>
-                        ${hasCollectionDock ? `
-                            <div class="character-collection-dock rounded-3xl" style="--collection-dock-accent: ${palette.borderColor};">
-                                ${finalRelationshipsBar}
-                            </div>
-                        ` : ''}
+                        </div>                        
                     </div>
                 </div>
                 <div id="lore-icon-${uniqueId}" class="absolute top-8 left-1/2 -translate-x-1/2 text-center z-10"  data-action="toggle-lore">
@@ -1272,10 +1277,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                 if (wrapperRect && statsHeight > 0 && wrapperRect.height > 0) {
                     const statsCenterY = (statsRect.top - wrapperRect.top) + (statsRect.height / 2);
 
-                    collectionDock.style.height = `${statsHeight}px`;
-                    collectionDock.style.top = `${statsCenterY}px`;
                     collectionDock.style.bottom = 'auto';
-                    collectionDock.style.transform = 'translateY(-50%)';
                     collectionGrid.style.height = '100%';
                     collectionGrid.style.justifyContent = 'center';
                 }
@@ -1335,10 +1337,8 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                 if (statsHeight > 0 && wrapperRect.height > 0) {
                     const statsCenterY = (statsRect.top - wrapperRect.top) + (statsRect.height / 2);
 
-                    enhancedCollectionDock.style.height = `${statsHeight}px`;
                     enhancedCollectionDock.style.top = `${statsCenterY}px`;
                     enhancedCollectionDock.style.bottom = 'auto';
-                    enhancedCollectionDock.style.transform = 'translateY(-50%)';
                     enhancedCollectionGrid.style.height = '100%';
                     enhancedCollectionGrid.style.justifyContent = 'center';
                 }
