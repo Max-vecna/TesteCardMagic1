@@ -42,6 +42,9 @@
             <button class="desktop-nav-button" data-target="personagem" title="Personagens">
                 <i class="fas fa-users"></i><span>Personagens</span>
             </button>
+            <button class="desktop-nav-button" data-target="criaturas" title="Criaturas">
+                <i class="fas fa-dragon"></i><span>Criaturas</span>
+            </button>
             <button class="desktop-nav-button" data-target="ataques" title="Ataques">
                 <i class="fas fa-khanda"></i><span>Ataques</span>
             </button>
@@ -256,7 +259,7 @@
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">Desloc.</label><input type="number" id="deslocamento" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                               </div>
                         </div>
-                        <div class="bg-gray-800/50 p-2 rounded border border-gray-700/50">
+                        <div id="character-roll-section" class="bg-gray-800/50 p-2 rounded border border-gray-700/50">
                             <h3 class="text-xs font-bold text-red-400 uppercase mb-2">Combate</h3>
                             <!-- GRID ALTERADO PARA 5 COLUNAS PARA CABER ACERTO E DANO -->
                             <div class="grid grid-cols-2 gap-2">
@@ -271,7 +274,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div id="character-lore-section" class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                         <label for="historia" class="block text-xs font-semibold text-gray-400 mb-1">História</label>
                         <textarea id="historia" rows="3" class="h-64 w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none"></textarea>
@@ -286,7 +289,7 @@
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-gray-800/30 p-2 rounded">
+                    <div id="character-pericias-section" class="bg-gray-800/30 p-2 rounded">
                          <div class="flex justify-between items-center mb-1">
                             <h3 class="text-xs font-bold text-indigo-300 uppercase">Perícias</h3>
                             <button type="button" id="show-add-pericia-form-btn" class="text-indigo-400 hover:text-indigo-200 text-xs font-bold">+ Nova</button>
@@ -331,7 +334,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+                <div id="character-relations-section" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
                     <div>
                          <div class="flex justify-between items-center mb-1">
                             <h3 class="text-xs font-bold text-teal-300 uppercase">Magias</h3>
@@ -452,40 +455,30 @@
                         </div>
                     </div>
                  </div>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div class="grid grid-cols-1 gap-3">
                     <div class="md:col-span-2">
                         <label for="spellDescription" class="block text-xs font-semibold text-gray-400 mb-1">Descrição</label>
                         <textarea id="spellDescription" rows="3" class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
                     </div>
-                    <div id="enhance-wrapper">
-                        <div class="flex justify-between items-center mb-1">
-                            <label for="spellEnhance" class="block text-xs font-semibold text-gray-400">Aprimoramento</label>
-                             <div class="relative group">
-                                <label for="spellEnhanceImageUpload" class="cursor-pointer text-xs text-teal-400 hover:text-teal-200"><i class="fas fa-image"></i> Add Img</label>
-                                <input type="file" id="spellEnhanceImageUpload" accept="image/*" class="hidden">
+                    <div id="spell-related-wrapper" class="bg-gray-800/50 p-3 rounded border border-gray-700/50">
+                        <input type="hidden" id="spellEnhanceCardId">
+                        <input type="hidden" id="spellTrueCardId">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <h3 class="text-xs font-bold text-teal-300 uppercase">Cards relacionados</h3>
+                            <button type="button" id="open-spell-relations-btn" class="bg-teal-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-teal-500">
+                                Relacionar Cards
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <div class="spell-relation-pill">
+                                <span>Aprimorar</span>
+                                <strong id="spellEnhanceCardName">Nenhum card selecionado</strong>
+                            </div>
+                            <div class="spell-relation-pill">
+                                <span>Verdadeiro</span>
+                                <strong id="spellTrueCardName">Nenhum card selecionado</strong>
                             </div>
                         </div>
-                        <div id="spellEnhanceImagePreviewContainer" class="hidden mb-2 relative w-full h-64 bg-gray-800 rounded border border-gray-600 overflow-hidden group">
-                             <img id="spellEnhanceImagePreview" class="w-full h-full object-cover opacity-50">
-                             <button type="button" id="removeEnhanceImageBtn" class="absolute top-1 right-1 text-red-500 hover:text-white bg-black/50 hover:bg-red-600 rounded-full w-5 h-5 flex items-center justify-center text-xs">&times;</button>
-                             <span class="absolute bottom-1 left-2 text-[10px] text-white font-bold drop-shadow-md">Imagem selecionada</span>
-                        </div>
-                        <textarea id="spellEnhance" rows="2" class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
-                    </div>
-                    <div id="true-wrapper">
-                        <div class="flex justify-between items-center mb-1">
-                            <label for="spellTrue" class="block text-xs font-semibold text-gray-400">Verdadeiro</label>
-                            <div class="relative group">
-                                <label for="spellTrueImageUpload" class="cursor-pointer text-xs text-teal-400 hover:text-teal-200"><i class="fas fa-image"></i> Add Img</label>
-                                <input type="file" id="spellTrueImageUpload" accept="image/*" class="hidden">
-                            </div>
-                        </div>
-                        <div id="spellTrueImagePreviewContainer" class="hidden mb-2 relative w-full h-64 bg-gray-800 rounded border border-gray-600 overflow-hidden group">
-                             <img id="spellTrueImagePreview" class="w-full h-full object-cover opacity-50">
-                             <button type="button" id="removeTrueImageBtn" class="absolute top-1 right-1 text-red-500 hover:text-white bg-black/50 hover:bg-red-600 rounded-full w-5 h-5 flex items-center justify-center text-xs">&times;</button>
-                             <span class="absolute bottom-1 left-2 text-[10px] text-white font-bold drop-shadow-md">Imagem selecionada</span>
-                        </div>
-                        <textarea id="spellTrue" rows="2" class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
                     </div>
                  </div>
                 <div class="bg-gray-800/30 p-2 rounded border border-gray-700/50">
@@ -509,6 +502,23 @@
             </form>
         </div>
     </div>
+    <div id="spell-relations-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4">
+        <div class="form-container w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                <div>
+                    <h2 class="text-xl font-bold text-teal-300">Relacionar Cards</h2>
+                    <p class="text-xs text-gray-400">Selecione cards ja criados para Aprimorar e Verdadeiro.</p>
+                </div>
+                <button type="button" id="close-spell-relations-modal-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+            </div>
+            <div class="flex gap-2 mb-3">
+                <button type="button" class="spell-relation-tab active" data-relation-type="enhance">Aprimorar</button>
+                <button type="button" class="spell-relation-tab" data-relation-type="true">Verdadeiro</button>
+            </div>
+            <div id="spell-relations-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 overflow-y-auto pr-1"></div>
+        </div>
+    </div>
+
     <div id="item-creation-section" class="hidden">
         <!-- Conteúdo do form de item -->
          <div class="form-container" style="max-width: 1000px;">
@@ -718,6 +728,9 @@
         </button>
         <button class="nav-button px-4 py-2 text-sm font-semibold rounded-full focus:outline-none flex items-center gap-2" data-target="personagem" title="Personagens">
             <i class="fas fa-users"></i>
+        </button>
+        <button class="nav-button px-4 py-2 text-sm font-semibold rounded-full focus:outline-none flex items-center gap-2" data-target="criaturas" title="Criaturas">
+            <i class="fas fa-dragon"></i>
         </button>
         <button class="nav-button px-4 py-2 text-sm font-semibold rounded-full focus:outline-none flex items-center gap-2" data-target="ataques" title="Ataques">
             <i class="fas fa-khanda"></i>

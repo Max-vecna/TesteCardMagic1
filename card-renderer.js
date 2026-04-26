@@ -586,7 +586,8 @@ async function populateInventory(container, characterData, uniqueId) {
 
 
 export async function renderFullCharacterSheet(characterData, isModal, isInPlay, targetContainer, renderOptions = {}) {
-    const { staticHtmlOnly = false } = renderOptions;
+    const { staticHtmlOnly = false, previewFull = false } = renderOptions;
+    const isCreature = characterData.cardType === 'creature';
     const sheetContainer = staticHtmlOnly ? targetContainer : (targetContainer || document.getElementById('character-sheet-container'));
     if (!sheetContainer && !staticHtmlOnly && (isModal || isInPlay)) return '';
 
@@ -596,9 +597,9 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         sheetContainer.classList.remove('hidden');
     }
 
-    const inventoryItems = characterData.items ? (await Promise.all(characterData.items.map(id => getData('rpgItems', id)))).filter(Boolean) : [];
-    const magicItems = characterData.spells ? (await Promise.all(characterData.spells.map(id => getData('rpgEffects', id)))).filter(Boolean) : [];
-    const attackItems = characterData.attacks ? (await Promise.all(characterData.attacks.map(id => getData('rpgEffects', id)))).filter(Boolean) : [];
+    const inventoryItems = !isCreature && characterData.items ? (await Promise.all(characterData.items.map(id => getData('rpgItems', id)))).filter(Boolean) : [];
+    const magicItems = !isCreature && characterData.spells ? (await Promise.all(characterData.spells.map(id => getData('rpgEffects', id)))).filter(Boolean) : [];
+    const attackItems = !isCreature && characterData.attacks ? (await Promise.all(characterData.attacks.map(id => getData('rpgEffects', id)))).filter(Boolean) : [];
     
     const { totalFixedBonuses } = calculateBonuses(characterData, inventoryItems, magicItems);
 
@@ -615,7 +616,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         finalHeight = finalWidth / aspectRatio;
     }
 
-    const imageUrl = characterData.image ? URL.createObjectURL(bufferToBlob(characterData.image, characterData.imageMimeType)) : 'https://placehold.co/800x600/4a5568/a0aec0?text=Personagem';
+    const imageUrl = characterData.image ? URL.createObjectURL(bufferToBlob(characterData.image, characterData.imageMimeType)) : `https://placehold.co/800x600/4a5568/a0aec0?text=${isCreature ? 'Criatura' : 'Personagem'}`;
     const imageBack = characterData.backgroundImage ? URL.createObjectURL(bufferToBlob(characterData.backgroundImage, characterData.backgroundMimeType)) : imageUrl;
 
     const uniqueId = `char-${characterData.id}-${Date.now()}`;
@@ -683,7 +684,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
    
 
     // Gera HTML para Acerto e Dano (Novo Card)
-    const attackStatsHtml = Object.entries(attackStats).map(([stat, label]) => 
+    const attackStatsHtml = isCreature ? Object.entries(attackStats).map(([stat, label]) => 
     {
         const baseValue = characterData.attributes[stat] || 0;
         const content = baseValue || '-';
@@ -709,7 +710,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     </div>
                 </div>
             </div> `;
-    }).join('');
+    }).join('') : '';
 
 
     // Gera HTML para Defesa (Card Existente)
@@ -734,7 +735,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
      // Separate spells and skills
     const spellsOnly = magicItems.filter(item => item.type === 'magia' || !item.type);
     const skillsOnly = magicItems.filter(item => item.type === 'habilidade');
-    const relatedCharsData = characterData.relationships
+    const relatedCharsData = !isCreature && characterData.relationships
         ? (await Promise.all(characterData.relationships.map(id => getData('rpgCards', id)))).filter(Boolean)
         : [];
 
@@ -776,7 +777,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         }
     ].filter(config => config.items.length > 0);
 
-    const shouldRenderCollectionControls = (isModal || isInPlay) && collectionConfigs.length > 0;
+    const shouldRenderCollectionControls = !isCreature && (isModal || isInPlay || previewFull) && collectionConfigs.length > 0;
 
     const collectionButtonsHtml = shouldRenderCollectionControls
         ? `
@@ -850,7 +851,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     const heartIconStyle = serializeCssVariables(getHeartVisualVariables(characterData.attributes.vidaAtual, permanentMaxVida));
     const manaIconStyle = serializeCssVariables(getManaVisualVariables(characterData.attributes.manaAtual, permanentMaxMana));
 
-    const hasLore = characterData.lore && (characterData.lore.historia || characterData.lore.personalidade || characterData.lore.motivacao);
+    const hasLore = !isCreature && characterData.lore && (characterData.lore.historia || characterData.lore.personalidade || characterData.lore.motivacao);
     
     const loreHistoriaHtml = characterData.lore?.historia ? `<h4>História</h4><p class="mb-4">${characterData.lore.historia}</p>` : '';
     const lorePersonalidadeHtml = characterData.lore?.personalidade ? `<h4>Personalidade</h4><p class="mb-4">${characterData.lore.personalidade}</p>` : '';
@@ -976,7 +977,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                         </div>
                     </div>
 
-                    <div class="absolute bottom-[-3px] w-full" style="display: ${(isModal || isInPlay) ? 'flex' : 'none'}">
+                    <div class="absolute bottom-[-3px] w-full" style="display: ${(isModal || isInPlay || previewFull) ? 'flex' : 'none'}">
                         <div class="scrollable-content text-sm text-left ml-2 div-miniCards${hasCollectionDock ? ' has-collection-dock' : ''}" style="display: flex; flex-direction: row; overflow-y: scroll;gap: 12px; scroll-snap-type: x mandatory; margin-left: 55px;">
                             <div class="pb-4 rounded-3xl w-full character-scroll-panel" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; border-color: ${palette.borderColor}; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end;">
                                 <div class="pericias-scroll-area flex flex-col gap-2 px-2 h-full" style="overflow-y: auto;">

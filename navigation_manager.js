@@ -1,5 +1,5 @@
-import { saveCharacterCard, editCard, importCard, getCurrentEditingCardId, exportCard, resetCharacterFormState, populateCharacterSelect, getCharacterItems } from './character_manager.js';
-import { populateSpellAumentosSelect, saveSpellCard, editSpell, importSpell, exportSpell, showImagePreview } from './magic_manager.js';
+import { saveCharacterCard, editCard, importCard, getCurrentEditingCardId, exportCard, resetCharacterFormState, setCharacterFormType, populateCharacterSelect, getCharacterItems } from './character_manager.js';
+import { populateSpellAumentosSelect, saveSpellCard, editSpell, importSpell, exportSpell, showImagePreview, resetSpellFormState } from './magic_manager.js';
 import { populateItemAumentosSelect, saveItemCard, editItem, importItem, removeItem, exportItem } from './item_manager.js';
 import { renderCategoryScreen, populateCategorySelect } from './category_manager.js';
 import { renderGrimoireScreen } from './grimoire_manager.js';
@@ -21,7 +21,7 @@ export function isCombatActive() {
 
 // ... (renderCharacterInGame function remains unchanged) ...
 async function renderCharacterInGame(container) {
-    const allCharacters = await getData('rpgCards');
+    const allCharacters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
     const characterInPlay = allCharacters.find(char => char.inPlay);
 
     container.innerHTML = '';
@@ -49,7 +49,8 @@ async function renderCharacterInGame(container) {
 function applyThumbnailScaling(container) {
     requestAnimationFrame(() => {
         container.querySelectorAll('.rpg-thumbnail').forEach(thumbnail => {
-            const innerSheet = thumbnail.querySelector('.miniCard > div[style*="width"]');
+            const stackedSheets = thumbnail.querySelectorAll('.related-card-stack-layer > div[style*="width"]');
+            const innerSheet = stackedSheets[0] || thumbnail.querySelector('.miniCard > div[style*="width"]');
             if (innerSheet) {
                 const sheetWidth = parseFloat(innerSheet.style.width);
                 const sheetHeight = parseFloat(innerSheet.style.height);
@@ -65,6 +66,11 @@ function applyThumbnailScaling(container) {
 
                         innerSheet.style.transformOrigin = 'top left';
                         innerSheet.style.transform = `scale(${scale})`;
+
+                        stackedSheets.forEach(relatedSheet => {
+                            relatedSheet.style.transformOrigin = 'top left';
+                            relatedSheet.style.transform = `scale(${scale})`;
+                        });
                     }
                 }
             }
@@ -92,7 +98,7 @@ export async function openCharacterSelectionForRelationship() {
 
     modalTitleEl.textContent = 'Adicionar Relacionamento';
     selectCharacterList.innerHTML = '';
-    const allCharacters = await getData('rpgCards');
+    const allCharacters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
     const currentCharacterId = getCurrentEditingCardId();
 
     const charactersToShow = allCharacters.filter(c => c.id !== currentCharacterId);
@@ -213,7 +219,7 @@ export async function openSelectionModal(type) {
         if (type === 'relationship') {
             const currentCharacterId = getCurrentEditingCardId();
             if (data && Array.isArray(data)) {
-                data = data.filter(c => c.id !== currentCharacterId);
+                data = data.filter(c => c.id !== currentCharacterId && c.cardType !== 'creature');
             }
         } else if (characterId && characterId !== 'all') {
             data = data.filter(item => item.characterId === characterId);
@@ -292,7 +298,7 @@ export async function openSelectionModal(type) {
 
     if (type !== 'relationship') {
         const filterSelect = document.getElementById('selection-modal-filter');
-        const allCharacters = await getData('rpgCards');
+        const allCharacters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
         let optionsHtml = '<option value="all">Todos</option><option value="">Nenhum</option>';
         if (allCharacters) {
             allCharacters.sort((a,b) => a.title.localeCompare(b.title)).forEach(char => {
@@ -323,6 +329,17 @@ async function createItemGrid(items, type, renderSheetFunction) {
 
     const cardElements = await Promise.all(items.map(async (item) => {
         const sheetHtml = await renderSheetFunction(item, false);
+        const shouldStackRelated = type === 'magias' || type === 'habilidades' || type === 'ataques';
+        const relatedIds = shouldStackRelated ? [item.enhanceCardId, item.trueCardId].filter(Boolean) : [];
+        const relatedCards = (await Promise.all(relatedIds.map(id => getData('rpgEffects', id)))).filter(Boolean);
+        const hasRelatedStack = shouldStackRelated && relatedCards.length > 0;
+        const baseLayerHtml = hasRelatedStack
+            ? `<div class="related-card-stack-layer related-card-stack-layer-base">${sheetHtml}</div>`
+            : sheetHtml;
+        const relatedStackHtml = (await Promise.all(relatedCards.map(async (related, index) => {
+            const relatedHtml = await renderSheetFunction(related, false);
+            return `<div class="related-card-stack-layer related-card-stack-layer-${index + 1}">${relatedHtml}</div>`;
+        }))).join('');
         const cardWrapper = document.createElement('div');
         let cardType = type;
 
@@ -337,7 +354,8 @@ async function createItemGrid(items, type, renderSheetFunction) {
         cardWrapper.dataset.id = item.id;
         cardWrapper.innerHTML = `
             <div class="miniCard absolute inset-0 text-white">
-                ${sheetHtml}
+                ${baseLayerHtml}
+                ${relatedStackHtml}
             </div>
             <div class="thumbnail-actions absolute z-10">
                 <button class="thumb-btn thumb-btn-menu"><i class="fas fa-ellipsis-v"></i></button>
@@ -355,12 +373,35 @@ async function createItemGrid(items, type, renderSheetFunction) {
     return gridContainer;
 }
 
+function effectBelongsToListType(item, type) {
+    if (!item) return false;
+    if (type === 'magias') return !item.type || item.type === 'magia';
+    if (type === 'habilidades') return item.type === 'habilidade';
+    if (type === 'ataques') return item.type === 'ataque';
+    return true;
+}
+
+function filterStandaloneEffectCards(items, type) {
+    if (!['magias', 'habilidades', 'ataques'].includes(type)) return items;
+
+    const visibleItems = items.filter(item => effectBelongsToListType(item, type));
+    const relatedIds = new Set();
+
+    visibleItems.forEach(item => {
+        [item.enhanceCardId, item.trueCardId]
+            .filter(Boolean)
+            .forEach(id => relatedIds.add(id));
+    });
+
+    return visibleItems.filter(item => !relatedIds.has(item.id));
+}
+
 
 async function renderGroupedList({ type, storeName, buttonText, buttonAction, importBtnId, importInputId, importTitle, importFunction, themeColor, renderSheetFunction, unassignedTitle }, container) {
     container.innerHTML = '';
 
-    const allItems = await getData(storeName);
-    const allCharacters = await getData('rpgCards');
+    const allItems = filterStandaloneEffectCards(await getData(storeName), type);
+    const allCharacters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
     const allCategories = (await getData('rpgCategories')) || [];
 
     const charactersById = allCharacters.reduce((acc, char) => { acc[char.id] = char; return acc; }, {});
@@ -509,8 +550,12 @@ async function renderGroupedList({ type, storeName, buttonText, buttonAction, im
     });
 }
 
-async function renderCharacterList(container) {
-    const allCharacters = await getData('rpgCards');
+async function renderCharacterList(container, listType = 'character') {
+    const isCreatureList = listType === 'creature';
+    const allCharacters = (await getData('rpgCards')).filter(char => {
+        const isCreature = char.cardType === 'creature';
+        return isCreatureList ? isCreature : !isCreature;
+    });
 
     const gridContainer = document.createElement('div');
     gridContainer.className = 'grid gap-4 w-full justify-items-center grid-cols-3 md:grid-cols-4 lg:grid-cols-5 p-6';
@@ -519,25 +564,25 @@ async function renderCharacterList(container) {
     addButtonWrapper.className = 'relative w-full h-full aspect-square';
     addButtonWrapper.style.aspectRatio = '120 / 160';
     addButtonWrapper.innerHTML = `
-        <button class="add-card-button absolute inset-0" data-action="add-character">
+        <button class="add-card-button absolute inset-0" data-action="${isCreatureList ? 'add-creature' : 'add-character'}">
             <i class="fas fa-plus text-2xl mb-2"></i>
-            <span class="text-sm font-semibold">Adicionar Personagem</span>
+            <span class="text-sm font-semibold">${isCreatureList ? 'Adicionar Criatura' : 'Adicionar Personagem'}</span>
         </button>
         <div class="absolute -bottom-3 w-full flex justify-center gap-2">
-             <button class="thumb-btn bg-indigo-200 hover:bg-indigo-600 rounded-full w-8 h-8 flex items-center justify-center" id="import-cards-btn" title="Importar Personagem (JSON)">
+             <button class="thumb-btn bg-indigo-200 hover:bg-indigo-600 rounded-full w-8 h-8 flex items-center justify-center" id="${isCreatureList ? 'import-creatures-btn' : 'import-cards-btn'}" title="${isCreatureList ? 'Importar Criatura (JSON)' : 'Importar Personagem (JSON)'}">
                 <i class="fas fa-upload text-xs"></i>
             </button>
-            <input type="file" id="import-json-input" accept=".json" class="hidden">
+            <input type="file" id="${isCreatureList ? 'import-creature-json-input' : 'import-json-input'}" accept=".json" class="hidden">
         </div>
     `;
     gridContainer.appendChild(addButtonWrapper);
 
     const cardElements = await Promise.all(allCharacters.map(async (char) => {
-        const characterSheetHtml = await renderFullCharacterSheet(char, false, false);
+        const characterSheetHtml = await renderFullCharacterSheet(char, false, false, null, { staticHtmlOnly: true, previewFull: true });
         const cardWrapper = document.createElement('div');
         cardWrapper.className = 'rpg-thumbnail bg-cover bg-center relative';
         cardWrapper.dataset.action = "view";
-        cardWrapper.dataset.type = "character";
+        cardWrapper.dataset.type = isCreatureList ? "creature" : "character";
         cardWrapper.dataset.id = char.id;
 
         cardWrapper.innerHTML = `
@@ -552,9 +597,9 @@ async function renderCharacterList(container) {
                     <button class="menu-item" data-action="edit" data-id="${char.id}"><i class="fas fa-edit"></i></button>
                     <button class="menu-item" data-action="remove" data-id="${char.id}"><i class="fas fa-trash-alt"></i></button>
                     <button class="menu-item" data-action="export-json" data-id="${char.id}"><i class="fas fa-file-download"></i></button>
-                    ${char.inPlay
+                    ${!isCreatureList ? (char.inPlay
                         ? `<button class="menu-item" data-action="remove-from-play" data-id="${char.id}"><i class="fas fa-sign-out-alt"></i></button>`
-                        : `<button class="menu-item" data-action="set-in-play" data-id="${char.id}"><i class="fas fa-play-circle"></i></button>`}
+                        : `<button class="menu-item" data-action="set-in-play" data-id="${char.id}"><i class="fas fa-play-circle"></i></button>`) : ''}
                 </div>
             </div>
         `;
@@ -564,18 +609,23 @@ async function renderCharacterList(container) {
     cardElements.forEach(el => gridContainer.appendChild(el));
     container.appendChild(gridContainer);
 
-    document.getElementById('import-cards-btn').addEventListener('click', () => {
-        document.getElementById('import-json-input').click();
+    const importBtnId = isCreatureList ? 'import-creatures-btn' : 'import-cards-btn';
+    const importInputId = isCreatureList ? 'import-creature-json-input' : 'import-json-input';
+
+    document.getElementById(importBtnId).addEventListener('click', () => {
+        document.getElementById(importInputId).click();
     });
 
-    document.getElementById('import-json-input').addEventListener('change', async (e) => {
+    document.getElementById(importInputId).addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file) {
              try {
-                await importCard(file);
-                renderContent('personagem', true);
+                const imported = await importCard(file);
+                imported.cardType = isCreatureList ? 'creature' : 'character';
+                await saveData('rpgCards', imported);
+                renderContent(isCreatureList ? 'criaturas' : 'personagem', true);
             } catch (error) {
-                showCustomAlert(`Erro ao importar personagem: ${error.message}`);
+                showCustomAlert(`Erro ao importar ${isCreatureList ? 'criatura' : 'personagem'}: ${error.message}`);
                 console.error("Import error:", error);
             } finally {
                 e.target.value = '';
@@ -668,8 +718,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const spellForm = document.getElementById('spellForm');
     const spellFormTitle = document.getElementById('spell-form-title');
     const spellSubmitButton = document.getElementById('spellSubmitButton');
-    const enhanceWrapper = document.getElementById('enhance-wrapper');
-    const trueWrapper = document.getElementById('true-wrapper');
+    const spellRelatedWrapper = document.getElementById('spell-related-wrapper');
 
     const itemForm = document.getElementById('itemForm');
     const itemFormTitle = document.getElementById('item-form-title');
@@ -735,7 +784,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             viewContainer.className = 'view-section';
             contentDisplay.appendChild(viewContainer);
 
-            if (target === 'personagem') await renderCharacterList(viewContainer);
+            if (target === 'personagem') await renderCharacterList(viewContainer, 'character');
+            else if (target === 'criaturas') await renderCharacterList(viewContainer, 'creature');
             else if (target === 'magias') await renderSpellList(viewContainer, 'magias');
             else if (target === 'habilidades') await renderSpellList(viewContainer, 'habilidades');
             else if (target === 'itens') await renderItemList(viewContainer);
@@ -770,7 +820,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const modalTitleEl = selectCharacterModal.querySelector('h3');
         modalTitleEl.textContent = 'Selecionar Personagem em Jogo';
         selectCharacterList.innerHTML = '';
-        const allCharacters = await getData('rpgCards');
+        const allCharacters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
 
         if (!allCharacters || allCharacters.length === 0) {
             selectCharacterList.innerHTML = '<p class="text-gray-400">Nenhum personagem disponível.</p>';
@@ -839,22 +889,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (action === "add-character") showView(creationSection, false, () => {
             resetCharacterFormState();
+            setCharacterFormType('character');
             formTitle.textContent = 'Novo Personagem';
             submitButton.textContent = 'Criar Cartão';
             document.getElementById('form-inventory-section').classList.remove('hidden');
         });
+        if (action === "add-creature") showView(creationSection, false, () => {
+            resetCharacterFormState();
+            setCharacterFormType('creature');
+        });
          if (action === "add-spell" || action === "add-habilidade") showView(spellCreationSection, false, async () => {
             const isHabilidade = action === "add-habilidade";
-            spellForm.reset();
+            resetSpellFormState();
             spellForm.dataset.type = isHabilidade ? 'habilidade' : 'magia';
             spellFormTitle.textContent = isHabilidade ? 'Nova Habilidade' : 'Nova Magia';
             spellSubmitButton.textContent = isHabilidade ? 'Criar Habilidade' : 'Criar Magia';
             document.getElementById('mana-cost-wrapper').classList.toggle('hidden', isHabilidade);
-            enhanceWrapper.classList.toggle('hidden', isHabilidade);
-            trueWrapper.classList.toggle('hidden', isHabilidade);
+            spellRelatedWrapper?.classList.remove('hidden');
             populateSpellAumentosSelect();
-             document.getElementById('spell-aumentos-list').innerHTML = '';
-             showImagePreview(document.getElementById('spellImagePreview'), null, true);
             await populateCharacterSelect('spellCharacterOwner');
             await populateCategorySelect('spell-category-select', isHabilidade ? 'habilidade' : 'magia');
         });
@@ -869,16 +921,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             await populateCategorySelect('item-category-select', 'item');
         });
         if (action === "add-attack") showView(spellCreationSection, false, async () => {
-            spellForm.reset();
+            resetSpellFormState();
             spellForm.dataset.type = 'ataque';
             spellFormTitle.textContent = 'Novo Ataque';
             spellSubmitButton.textContent = 'Criar Ataque';
             document.getElementById('mana-cost-wrapper').classList.add('hidden');
-            enhanceWrapper.classList.add('hidden');
-            trueWrapper.classList.add('hidden');
+            spellRelatedWrapper?.classList.remove('hidden');
             populateSpellAumentosSelect();
-            document.getElementById('spell-aumentos-list').innerHTML = '';
-            showImagePreview(document.getElementById('spellImagePreview'), null, true);
             await populateCharacterSelect('spellCharacterOwner');
             await populateCategorySelect('spell-category-select', 'ataque');
         });
@@ -889,8 +938,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (section.id === 'creation-section') {
             resetCharacterFormState();
         } else if (section.id === 'spell-creation-section') {
-             showImagePreview(document.getElementById('spellImagePreview'), null, true);
-             document.getElementById('spell-aumentos-list').innerHTML = '';
+             resetSpellFormState();
         } else if (section.id === 'item-creation-section') {
              showImagePreview(document.getElementById('itemImagePreview'), null, true);
              document.getElementById('item-aumentos-list').innerHTML = '';
@@ -1050,6 +1098,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Invalida cache específico
         let targetView = '';
         if (type === 'personagem') targetView = 'personagem';
+        else if (type === 'criaturas') targetView = 'criaturas';
         else if (type === 'magias') targetView = 'magias';
         else if (type === 'habilidades') targetView = 'habilidades';
         else if (type === 'itens') targetView = 'itens';
@@ -1077,7 +1126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (thumbCard && !menuBtn && !menuItem) {
             const cardId = thumbCard.dataset.id;
             const cardType = thumbCard.dataset.type;
-            if (cardType === 'character') await renderFullCharacterSheet(await getData('rpgCards', cardId), true, false);
+            if (cardType === 'character' || cardType === 'creature') await renderFullCharacterSheet(await getData('rpgCards', cardId), true, false);
             if (cardType === 'spell') await renderFullSpellSheet(await getData('rpgEffects', cardId), true);
             if (cardType === 'item') await renderFullItemSheet(await getData('rpgItems', cardId), true);
             if (cardType === 'attack') await renderFullSpellSheet(await getData('rpgEffects', cardId), true);
@@ -1126,7 +1175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             if (action === 'edit') {
-                if (cardType === 'character') {
+                if (cardType === 'character' || cardType === 'creature') {
                     showView(creationSection, true);
                     await editCard(cardId);
                 } else if (cardType === 'spell') {
@@ -1139,17 +1188,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                             spellFormTitle.textContent = 'Editando Ataque';
                             spellSubmitButton.textContent = 'Salvar Ataque';
                             document.getElementById('mana-cost-wrapper').classList.add('hidden');
-                            enhanceWrapper.classList.add('hidden');
-                            trueWrapper.classList.add('hidden');
                         } else {
                             spellFormTitle.textContent = isHabilidade ? 'Editando Habilidade' : 'Editando Magia';
                             spellSubmitButton.textContent = isHabilidade ? 'Salvar Habilidade' : 'Salvar Magia';
                             document.getElementById('mana-cost-wrapper').classList.toggle('hidden', isHabilidade);
-                            enhanceWrapper.classList.toggle('hidden', isHabilidade);
-                            trueWrapper.classList.toggle('hidden', isHabilidade);
                         }
 
+                        spellRelatedWrapper?.classList.remove('hidden');
                         showView(spellCreationSection, true);
+                        resetSpellFormState();
                         await editSpell(cardId);
                     }
                 } else if (cardType === 'item') {
@@ -1162,9 +1209,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     spellFormTitle.textContent = 'Editando Ataque';
                     spellSubmitButton.textContent = 'Salvar Ataque';
                     document.getElementById('mana-cost-wrapper').classList.add('hidden');
-                    enhanceWrapper.classList.add('hidden');
-                    trueWrapper.classList.add('hidden');
+                    spellRelatedWrapper?.classList.remove('hidden');
                     showView(spellCreationSection, true);
+                    resetSpellFormState();
                     await editSpell(cardId);
                 }
             } else if (action === 'remove' || action === 'delete') {
@@ -1172,7 +1219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     let storeName;
                     let eventType = activeNav;
 
-                    if(cardType === 'character') { storeName = 'rpgCards'; eventType = 'personagem'; }
+                    if(cardType === 'character' || cardType === 'creature') { storeName = 'rpgCards'; eventType = cardType === 'creature' ? 'criaturas' : 'personagem'; }
                     else if (cardType === 'spell') {
                         storeName = 'rpgEffects';
                         const t = (await getData('rpgEffects', cardId))?.type;
@@ -1187,13 +1234,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }
             } else if (action === 'export-json') {
-                 if (cardType === 'character') await exportCard(cardId);
+                 if (cardType === 'character' || cardType === 'creature') await exportCard(cardId);
                  if (cardType === 'spell') await exportSpell(cardId);
                  if (cardType === 'item') await exportItem(cardId);
                  if (cardType === 'attack') await exportSpell(cardId);
             } else if (action === 'set-in-play' || action === 'remove-from-play') {
                 const isSettingInPlay = action === 'set-in-play';
-                const allCharacters = await getData('rpgCards');
+                const allCharacters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
                 if (isSettingInPlay) {
                     await Promise.all(allCharacters.map(c => {
                         if (c.inPlay) {

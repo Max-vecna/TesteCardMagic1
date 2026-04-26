@@ -1,4 +1,4 @@
-const CACHE_NAME = 'magic-cards-shell-v2';
+const CACHE_NAME = 'magic-cards-shell-v3';
 
 const LOCAL_ASSETS = [
     './',

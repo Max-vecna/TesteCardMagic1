@@ -17,8 +17,28 @@ export { showImagePreview } from './ui_utils.js';
 
 let currentEditingSpellId = null;
 let spellImageFile = null;
-let spellEnhanceImageFile = null; 
-let spellTrueImageFile = null;    
+let activeSpellRelationType = 'enhance';
+
+function normalizeEffectType(type) {
+    if (type === 'habilidade' || type === 'ataque') return type;
+    return 'magia';
+}
+
+function getCurrentSpellFormType() {
+    const form = document.getElementById('spellForm');
+    return normalizeEffectType(form?.dataset.type);
+}
+
+function getEffectTypeMeta(type) {
+    const normalizedType = normalizeEffectType(type);
+    if (normalizedType === 'habilidade') {
+        return { label: 'Habilidade', icon: 'fa-fist-raised', tone: 'text-cyan-300' };
+    }
+    if (normalizedType === 'ataque') {
+        return { label: 'Ataque', icon: 'fa-khanda', tone: 'text-red-400' };
+    }
+    return { label: 'Magia', icon: 'fa-magic', tone: 'text-teal-300' };
+}
 
 function normalizeFixedAumentos(aumentos) {
     if (!Array.isArray(aumentos)) return [];
@@ -195,19 +215,43 @@ function renderAumentoNaLista(aumento) {
     list.appendChild(div);
 }
 
-function resetExtraImagePreviews() {
-    const enhancePreview = document.getElementById('spellEnhanceImagePreview');
-    const enhanceContainer = document.getElementById('spellEnhanceImagePreviewContainer');
-    const truePreview = document.getElementById('spellTrueImagePreview');
-    const trueContainer = document.getElementById('spellTrueImagePreviewContainer');
+export function resetSpellFormState() {
+    currentEditingSpellId = null;
+    spellImageFile = null;
 
-    if(enhancePreview) enhancePreview.src = '';
-    if(enhanceContainer) enhanceContainer.classList.add('hidden');
-    if(truePreview) truePreview.src = '';
-    if(trueContainer) trueContainer.classList.add('hidden');
-    
-    document.getElementById('spellEnhanceImageUpload').value = '';
-    document.getElementById('spellTrueImageUpload').value = '';
+    const spellForm = document.getElementById('spellForm');
+    if (spellForm) spellForm.reset();
+
+    const aumentosList = document.getElementById('spell-aumentos-list');
+    if (aumentosList) aumentosList.innerHTML = '';
+
+    showImagePreview(document.getElementById('spellImagePreview'), null, true);
+
+    const enhanceInput = document.getElementById('spellEnhanceCardId');
+    const trueInput = document.getElementById('spellTrueCardId');
+    const enhanceLabel = document.getElementById('spellEnhanceCardName');
+    const trueLabel = document.getElementById('spellTrueCardName');
+
+    if (enhanceInput) enhanceInput.value = '';
+    if (trueInput) trueInput.value = '';
+    if (enhanceLabel) enhanceLabel.textContent = 'Nenhum card selecionado';
+    if (trueLabel) trueLabel.textContent = 'Nenhum card selecionado';
+}
+
+async function updateSpellRelationLabels() {
+    const relations = [
+        { inputId: 'spellEnhanceCardId', labelId: 'spellEnhanceCardName' },
+        { inputId: 'spellTrueCardId', labelId: 'spellTrueCardName' }
+    ];
+
+    await Promise.all(relations.map(async ({ inputId, labelId }) => {
+        const input = document.getElementById(inputId);
+        const label = document.getElementById(labelId);
+        if (!input || !label) return;
+
+        const related = input.value ? await getData('rpgEffects', input.value) : null;
+        label.textContent = related?.name || 'Nenhum card selecionado';
+    }));
 }
 
 export async function saveSpellCard(spellForm, type) {
@@ -220,8 +264,8 @@ export async function saveSpellCard(spellForm, type) {
     const spellDurationInput = document.getElementById('spellDuration');
     const spellResistenciaInput = document.getElementById('spellResistencia');
     const spellDescriptionInput = document.getElementById('spellDescription');
-    const spellEnhanceInput = document.getElementById('spellEnhance');
-    const spellTrueInput = document.getElementById('spellTrue');
+    const spellEnhanceCardInput = document.getElementById('spellEnhanceCardId');
+    const spellTrueCardInput = document.getElementById('spellTrueCardId');
     const spellCharacterOwnerInput = document.getElementById('spellCharacterOwner');
     const spellCategorySelect = document.getElementById('spell-category-select');
     
@@ -250,12 +294,6 @@ export async function saveSpellCard(spellForm, type) {
     const imageBuffer = spellImageFile ? await readFileAsArrayBufferUtil(spellImageFile) : (existingData ? existingData.image : null);
     const imageMimeType = spellImageFile ? spellImageFile.type : (existingData ? existingData.imageMimeType : null);
 
-    const enhanceImageBuffer = spellEnhanceImageFile ? await readFileAsArrayBufferUtil(spellEnhanceImageFile) : (existingData ? existingData.enhanceImage : null);
-    const enhanceImageMimeType = spellEnhanceImageFile ? spellEnhanceImageFile.type : (existingData ? existingData.enhanceImageMimeType : null);
-
-    const trueImageBuffer = spellTrueImageFile ? await readFileAsArrayBufferUtil(spellTrueImageFile) : (existingData ? existingData.trueImage : null);
-    const trueImageMimeType = spellTrueImageFile ? spellTrueImageFile.type : (existingData ? existingData.trueImageMimeType : null);
-
     let spellData;
     const baseData = {
         name: spellNameInput.value,
@@ -267,8 +305,8 @@ export async function saveSpellCard(spellForm, type) {
         duration: spellDurationInput.value,
         resistencia: spellResistenciaInput.value,
         description: spellDescriptionInput.value,
-        enhance: spellEnhanceInput.value,
-        true: spellTrueInput.value,
+        enhanceCardId: spellEnhanceCardInput?.value || '',
+        trueCardId: spellTrueCardInput?.value || '',
         aumentos: normalizedAumentos,
         type: type,
         characterId: spellCharacterOwnerInput.value,
@@ -279,12 +317,7 @@ export async function saveSpellCard(spellForm, type) {
         dano: spellDamageInput.value,  
         // Novos campos salvos
         critico: spellcriticoInput ? spellcriticoInput.value : '',
-        danoSemMana: spellDanoSemManaInput ? spellDanoSemManaInput.value : '',
-        
-        enhanceImage: enhanceImageBuffer,
-        enhanceImageMimeType: enhanceImageMimeType,
-        trueImage: trueImageBuffer,
-        trueImageMimeType: trueImageMimeType
+        danoSemMana: spellDanoSemManaInput ? spellDanoSemManaInput.value : ''
     };
 
     if (currentEditingSpellId) {
@@ -305,15 +338,7 @@ export async function saveSpellCard(spellForm, type) {
     const eventType = type === 'habilidade' ? 'habilidades' : (type === 'ataque' ? 'ataques' : 'magias');
     document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: eventType } }));
 
-    spellForm.reset();
-    spellImageFile = null;
-    spellEnhanceImageFile = null;
-    spellTrueImageFile = null;
-    
-    document.getElementById('spell-aumentos-list').innerHTML = '';
-    showImagePreview(document.getElementById('spellImagePreview'), null, true);
-    resetExtraImagePreviews();
-    currentEditingSpellId = null;
+    resetSpellFormState();
 }
 
 export async function editSpell(spellId) {
@@ -331,8 +356,8 @@ export async function editSpell(spellId) {
     document.getElementById('spellDuration').value = spellData.duration;
     document.getElementById('spellResistencia').value = spellData.resistencia;
     document.getElementById('spellDescription').value = spellData.description;
-    document.getElementById('spellEnhance').value = spellData.enhance;
-    document.getElementById('spellTrue').value = spellData.true;
+    const enhanceInput = document.getElementById('spellEnhanceCardId');
+    const trueInput = document.getElementById('spellTrueCardId');
     
     document.getElementById('spellAcerto').value = spellData.acerto || '';
     document.getElementById('spellDamage').value = spellData.dano || '';
@@ -361,21 +386,9 @@ export async function editSpell(spellId) {
         showImagePreview(spellImagePreview, null, true);
     }
 
-    if (spellData.enhanceImage) {
-        const blob = bufferToBlobUtil(spellData.enhanceImage, spellData.enhanceImageMimeType);
-        document.getElementById('spellEnhanceImagePreview').src = URL.createObjectURL(blob);
-        document.getElementById('spellEnhanceImagePreviewContainer').classList.remove('hidden');
-    } else {
-        document.getElementById('spellEnhanceImagePreviewContainer').classList.add('hidden');
-    }
-
-    if (spellData.trueImage) {
-        const blob = bufferToBlobUtil(spellData.trueImage, spellData.trueImageMimeType);
-        document.getElementById('spellTrueImagePreview').src = URL.createObjectURL(blob);
-        document.getElementById('spellTrueImagePreviewContainer').classList.remove('hidden');
-    } else {
-        document.getElementById('spellTrueImagePreviewContainer').classList.add('hidden');
-    }
+    if (enhanceInput) enhanceInput.value = spellData.enhanceCardId || '';
+    if (trueInput) trueInput.value = spellData.trueCardId || '';
+    await updateSpellRelationLabels();
 }
 
 export async function removeSpell(spellId) {
@@ -464,33 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const setupExtraImageListener = (inputId, previewId, containerId, removeBtnId, fileVarSetter) => {
-        const input = document.getElementById(inputId);
-        const preview = document.getElementById(previewId);
-        const container = document.getElementById(containerId);
-        const removeBtn = document.getElementById(removeBtnId);
-
-        if (input && preview && container && removeBtn) {
-            input.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    fileVarSetter(file);
-                    preview.src = URL.createObjectURL(file);
-                    container.classList.remove('hidden');
-                }
-            });
-
-            removeBtn.addEventListener('click', () => {
-                input.value = '';
-                preview.src = '';
-                container.classList.add('hidden');
-                fileVarSetter(null);
-            });
-        }
-    };
-
-    setupExtraImageListener('spellEnhanceImageUpload', 'spellEnhanceImagePreview', 'spellEnhanceImagePreviewContainer', 'removeEnhanceImageBtn', (file) => { spellEnhanceImageFile = file; });
-    setupExtraImageListener('spellTrueImageUpload', 'spellTrueImagePreview', 'spellTrueImagePreviewContainer', 'removeTrueImageBtn', (file) => { spellTrueImageFile = file; });
+    setupSpellRelationsModal();
 
     const mainUpload = document.getElementById('spellImageUpload');
     if (mainUpload) {
@@ -503,3 +490,86 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+function setActiveSpellRelationType(type) {
+    activeSpellRelationType = type;
+    document.querySelectorAll('.spell-relation-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.relationType === type);
+    });
+}
+
+async function setupSpellRelationsModal() {
+    const openBtn = document.getElementById('open-spell-relations-btn');
+    const modal = document.getElementById('spell-relations-modal');
+    const closeBtn = document.getElementById('close-spell-relations-modal-btn');
+    const list = document.getElementById('spell-relations-list');
+    if (!openBtn || !modal || !closeBtn || !list) return;
+
+    const closeModal = () => modal.classList.add('hidden');
+
+    const renderList = async () => {
+        const currentId = currentEditingSpellId;
+        const currentType = getCurrentSpellFormType();
+        const effects = (await getData('rpgEffects'))
+            .filter(effect => effect.id !== currentId)
+            .filter(effect => normalizeEffectType(effect.type) === currentType);
+
+        const typeMeta = getEffectTypeMeta(currentType);
+
+        if (effects.length === 0) {
+            list.innerHTML = `<p class="text-gray-400 text-sm md:col-span-2">Nenhum card de ${typeMeta.label.toLowerCase()} disponivel para relacionar.</p>`;
+            return;
+        }
+
+        const targetInputId = activeSpellRelationType === 'enhance' ? 'spellEnhanceCardId' : 'spellTrueCardId';
+        const selectedId = document.getElementById(targetInputId)?.value || '';
+        const noneActive = selectedId ? '' : ' active';
+        list.innerHTML = `
+            <button type="button" class="spell-relation-option${noneActive}" data-card-id="">
+                <span class="flex items-center gap-2 font-semibold">
+                    <i class="fas fa-ban text-gray-400"></i>
+                    <span>Nenhum card</span>
+                </span>
+                <small>Remover relacao atual</small>
+            </button>
+            ${effects.map(effect => `
+                <button type="button" class="spell-relation-option${effect.id === selectedId ? ' active' : ''}" data-card-id="${effect.id}">
+                    <span class="flex items-center gap-2 font-semibold">
+                        <i class="fas ${getEffectTypeMeta(effect.type).icon} ${getEffectTypeMeta(effect.type).tone}"></i>
+                        <span>${effect.name || 'Sem nome'}</span>
+                    </span>
+                    <small>${effect.categoryId ? 'Card categorizado' : typeMeta.label}</small>
+                </button>
+            `).join('')}
+        `;
+    };
+
+    openBtn.addEventListener('click', async () => {
+        setActiveSpellRelationType('enhance');
+        await renderList();
+        modal.classList.remove('hidden');
+    });
+
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    modal.querySelectorAll('.spell-relation-tab').forEach(tab => {
+        tab.addEventListener('click', async () => {
+            setActiveSpellRelationType(tab.dataset.relationType);
+            await renderList();
+        });
+    });
+
+    list.addEventListener('click', async (e) => {
+        const option = e.target.closest('.spell-relation-option');
+        if (!option) return;
+
+        const inputId = activeSpellRelationType === 'enhance' ? 'spellEnhanceCardId' : 'spellTrueCardId';
+        const input = document.getElementById(inputId);
+        if (input) input.value = option.dataset.cardId || '';
+        await updateSpellRelationLabels();
+        await renderList();
+    });
+}

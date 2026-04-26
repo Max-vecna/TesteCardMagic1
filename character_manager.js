@@ -22,6 +22,7 @@ let currentEditingCardId = null;
 let characterImageFile = null;
 let backgroundImageFile = null;
 let currentCharacterItems = [];
+let currentCharacterFormType = 'character';
 
 function toInt(value) {
     const n = parseInt(value, 10);
@@ -92,6 +93,7 @@ export function resetCharacterFormState() {
     characterImageFile = null;
     backgroundImageFile = null;
     currentCharacterItems = [];
+    currentCharacterFormType = 'character';
 
     const cardForm = document.getElementById('cardForm');
     if (cardForm) cardForm.reset();
@@ -109,6 +111,27 @@ export function resetCharacterFormState() {
     renderInventoryForForm([], 0);
 
     updateDerivedStatsInForm();
+}
+
+export function setCharacterFormType(type = 'character') {
+    currentCharacterFormType = type === 'creature' ? 'creature' : 'character';
+    const isCreature = currentCharacterFormType === 'creature';
+
+    ['character-lore-section', 'character-pericias-section', 'character-relations-section'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('hidden', isCreature);
+    });
+
+    const rollSection = document.getElementById('character-roll-section');
+    if (rollSection) rollSection.classList.toggle('hidden', !isCreature);
+
+    const inventorySection = document.getElementById('form-inventory-section');
+    if (inventorySection) inventorySection.classList.toggle('hidden', isCreature);
+
+    const titleEl = document.getElementById('form-title');
+    const submitEl = document.getElementById('submitButton');
+    if (!currentEditingCardId && titleEl) titleEl.textContent = isCreature ? 'Nova Criatura' : 'Novo Personagem';
+    if (!currentEditingCardId && submitEl) submitEl.textContent = isCreature ? 'Criar Criatura' : 'Criar Cartão';
 }
 
 export function getCharacterItems() {
@@ -165,7 +188,7 @@ export async function populateCharacterSelect(selectId, includeNoneOption = true
         selectElement.appendChild(noneOption);
     }
 
-    const characters = await getData('rpgCards');
+    const characters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
     if (characters) {
         characters.sort((a, b) => a.title.localeCompare(b.title)).forEach(char => {
             const option = document.createElement('option');
@@ -296,6 +319,7 @@ export function populatePericiasCheckboxes(selectedPericias = []) {
 }
 
 export async function saveCharacterCard(cardForm) {
+    const isCreature = currentCharacterFormType === 'creature';
     const cardTitleInput = document.getElementById('cardTitle');
     const cardSubTitleInput = document.getElementById('cardSubTitle');
     const cardLevelInput = document.getElementById('cardLevel');
@@ -327,15 +351,17 @@ export async function saveCharacterCard(cardForm) {
     updateDerivedStatsInForm();
 
     const selectedPericias = [];
-    document.querySelectorAll('#pericias-checkboxes-container input[type="checkbox"]:checked').forEach(cb => {
-        const periciaName = cb.value;
-        const periciaId = `pericia-${periciaName.replace(/\s+/g, '-')}`;
-        const valueInput = document.getElementById(`${periciaId}-value`);
-        selectedPericias.push({
-            name: periciaName,
-            value: parseInt(valueInput.value) || 0
+    if (!isCreature) {
+        document.querySelectorAll('#pericias-checkboxes-container input[type="checkbox"]:checked').forEach(cb => {
+            const periciaName = cb.value;
+            const periciaId = `pericia-${periciaName.replace(/\s+/g, '-')}`;
+            const valueInput = document.getElementById(`${periciaId}-value`);
+            selectedPericias.push({
+                name: periciaName,
+                value: parseInt(valueInput.value) || 0
+            });
         });
-    });
+    }
 
     const attributes = {
         vida: parseInt(vidaInput.value) || 0,
@@ -353,16 +379,16 @@ export async function saveCharacterCard(cardForm) {
         sabedoria: parseInt(sabedoriaInput.value) || 0,
         vigor: parseInt(vigorInput.value) || 0,
         pericias: selectedPericias,
-        acerto: acertoInput.value,
-        dano: danoInput.value,
-        critico: acertoInputSemMana.value,
-        danoSemMana: danoInputSemMana.value
+        acerto: isCreature ? acertoInput.value : '',
+        dano: isCreature ? danoInput.value : '',
+        critico: isCreature ? acertoInputSemMana.value : '',
+        danoSemMana: isCreature ? danoInputSemMana.value : ''
     };
 
     const lore = {
-        historia: historiaInput.value,
-        personalidade: personalidadeInput.value,
-        motivacao: motivacaoInput.value,
+        historia: isCreature ? '' : historiaInput.value,
+        personalidade: isCreature ? '' : personalidadeInput.value,
+        motivacao: isCreature ? '' : motivacaoInput.value,
     };
 
     let existingData = null;
@@ -376,15 +402,15 @@ export async function saveCharacterCard(cardForm) {
     const backgroundBuffer = backgroundImageFile ? await readFileAsArrayBuffer(backgroundImageFile) : (existingData ? existingData.backgroundImage : null);
     const backgroundMimeType = backgroundImageFile ? backgroundImageFile.type : (existingData ? existingData.backgroundMimeType : null);
 
-    const itemIds = currentCharacterItems.map(item => item.id);
+    const itemIds = isCreature ? [] : currentCharacterItems.map(item => item.id);
 
-    const magicIds = [
+    const magicIds = isCreature ? [] : [
         ...Array.from(document.querySelectorAll('#selected-magics-container [data-id]')),
         ...Array.from(document.querySelectorAll('#selected-skills-container [data-id]'))
     ].map(el => el.dataset.id);
 
-    const attackIds = Array.from(document.querySelectorAll('#selected-attacks-container [data-id]')).map(el => el.dataset.id);
-    const relationshipIds = Array.from(document.querySelectorAll('#selected-relationships-container [data-id]')).map(el => el.dataset.id);
+    const attackIds = isCreature ? [] : Array.from(document.querySelectorAll('#selected-attacks-container [data-id]')).map(el => el.dataset.id);
+    const relationshipIds = isCreature ? [] : Array.from(document.querySelectorAll('#selected-relationships-container [data-id]')).map(el => el.dataset.id);
 
     const classe = cardClassSelect ? cardClassSelect.value : '';
 
@@ -394,6 +420,7 @@ export async function saveCharacterCard(cardForm) {
         Object.assign(cardData, {
             title: cardTitleInput.value,
             subTitle: cardSubTitleInput.value,
+            cardType: currentCharacterFormType,
             level: parseInt(cardLevelInput.value) || 1,
             dinheiro: parseInt(dinheiroInput.value) || 0,
             classe,
@@ -413,6 +440,7 @@ export async function saveCharacterCard(cardForm) {
             id: Date.now().toString(),
             title: cardTitleInput.value,
             subTitle: cardSubTitleInput.value,
+            cardType: currentCharacterFormType,
             level: parseInt(cardLevelInput.value) || 1,
             dinheiro: parseInt(dinheiroInput.value) || 0,
             classe,
@@ -433,7 +461,7 @@ export async function saveCharacterCard(cardForm) {
     cardData.predominantColor = await calculateColor(cardData.image, cardData.imageMimeType);
 
     await saveData('rpgCards', cardData);
-    document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: 'personagem' } }));
+    document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: isCreature ? 'criaturas' : 'personagem' } }));
     resetCharacterFormState();
 }
 
@@ -442,9 +470,11 @@ export async function editCard(cardId) {
     if (!cardData) return;
 
     resetCharacterFormState();
+    currentCharacterFormType = cardData.cardType === 'creature' ? 'creature' : 'character';
+    setCharacterFormType(currentCharacterFormType);
 
-    document.getElementById('form-title').textContent = 'Editando: ' + cardData.title;
-    document.getElementById('submitButton').textContent = 'Salvar Edição';
+    document.getElementById('form-title').textContent = `${currentCharacterFormType === 'creature' ? 'Editando Criatura' : 'Editando'}: ${cardData.title}`;
+    document.getElementById('submitButton').textContent = currentCharacterFormType === 'creature' ? 'Salvar Criatura' : 'Salvar Edição';
     currentEditingCardId = cardId;
 
     document.getElementById('cardTitle').value = cardData.title;
@@ -480,9 +510,9 @@ export async function editCard(cardId) {
     document.getElementById('personalidade').value = cardData.lore?.personalidade || '';
     document.getElementById('motivacao').value = cardData.lore?.motivacao || '';
 
-    populatePericiasCheckboxes(attrs.pericias);
+    populatePericiasCheckboxes(currentCharacterFormType === 'creature' ? [] : attrs.pericias);
 
-    if (cardData.spells) {
+    if (currentCharacterFormType !== 'creature' && cardData.spells) {
         for (const magicId of cardData.spells) {
             const magicData = await getData('rpgEffects', magicId);
             if (magicData) {
@@ -492,14 +522,14 @@ export async function editCard(cardId) {
         }
     }
 
-    if (cardData.attacks) {
+    if (currentCharacterFormType !== 'creature' && cardData.attacks) {
         for (const attackId of cardData.attacks) {
             const attackData = await getData('rpgEffects', attackId);
             if (attackData) createSelectedElement(attackData, 'attack');
         }
     }
 
-    if (cardData.relationships) {
+    if (currentCharacterFormType !== 'creature' && cardData.relationships) {
         for (const charId of cardData.relationships) {
             const relatedCharData = await getData('rpgCards', charId);
             if (relatedCharData) createSelectedElement(relatedCharData, 'relationship');
@@ -517,7 +547,7 @@ export async function editCard(cardId) {
 
     const items = cardData.items ? (await Promise.all(cardData.items.map(id => getData('rpgItems', id)))).filter(Boolean) : [];
     currentCharacterItems = items;
-    document.getElementById('form-inventory-section').classList.remove('hidden');
+    document.getElementById('form-inventory-section').classList.toggle('hidden', currentCharacterFormType === 'creature');
     renderInventoryForForm(currentCharacterItems, attrs.forca || 0);
 
     updateDerivedStatsInForm();

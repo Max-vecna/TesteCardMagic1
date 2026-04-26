@@ -1,12 +1,14 @@
 import { showTopAlert } from './ui_utils.js';
 
 let deferredInstallPrompt = null;
+const SW_VERSION = '3';
 
 async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
 
     try {
-        await navigator.serviceWorker.register('./sw.js?v=2', { scope: './' });
+        const registration = await navigator.serviceWorker.register(`./sw.js?v=${SW_VERSION}`, { scope: './' });
+        await registration.update();
     } catch (error) {
         console.error('Falha ao registrar o service worker:', error);
     }
