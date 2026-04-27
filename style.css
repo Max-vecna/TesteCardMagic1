@@ -1265,7 +1265,6 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     gap: 1rem;
     flex-direction: column;
     padding: 0;
-    height: 100%;
 }
 
 .character-collection-dock {
@@ -1279,6 +1278,19 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     border-radius: 0;
     background: transparent;
     box-shadow: none;
+}
+
+.creature-data-dock {
+    min-width: 3.4rem;
+}
+
+.creature-data-grid {
+    gap: 0.25rem;
+    justify-content: flex-end;
+}
+
+.creature-data-grid > div {
+    margin-top: 0 !important;
 }
 
 .character-collection-trigger {
@@ -1297,7 +1309,6 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     color: #fff;
     background: transparent;
     transition: transform 0.2s ease, background-color 0.2s ease;
-    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
 }
 
 
@@ -1338,7 +1349,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
 }
 
 .character-collection-trigger__glyph > i {
-    font-size: 1.15rem;
+    
     line-height: 1;
 }
 
@@ -1541,6 +1552,128 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     overflow: auto;
 }
 
+.attribute-stat-trigger {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    width: 100%;
+    line-height: 1.15;
+    transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.attribute-stat-trigger:hover {
+    transform: scale(1.08);
+    color: #ffffff;
+}
+
+.attribute-stat-trigger.has-fixed-bonus,
+.stat-bonus-trigger {
+    cursor: pointer;
+}
+
+.attribute-stat-trigger.has-fixed-bonus {
+    color: #dcfce7;
+}
+
+.stat-bonus-trigger {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    width: 100%;
+    transition: transform 0.18s ease, color 0.18s ease, filter 0.18s ease;
+}
+
+.stat-bonus-trigger:hover {
+    transform: scale(1.06);
+    color: #ffffff;
+    filter: drop-shadow(0 4px 10px rgba(34, 197, 94, 0.22));
+}
+
+.attribute-pericia-card {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.85rem 0.95rem;
+}
+
+.attribute-pericia-card__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.attribute-pericia-card__top h4 {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.attribute-pericia-card__top span {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #cbd5e1;
+    white-space: nowrap;
+}
+
+.bonus-source-section {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bonus-source-section__title {
+    margin-bottom: 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #86efac;
+}
+
+.bonus-source-card {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.85rem 0.95rem;
+}
+
+.bonus-source-card + .bonus-source-card {
+    margin-top: 0.75rem;
+}
+
+.bonus-source-card__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.bonus-source-card__top h4 {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.bonus-source-card__top span {
+    font-size: 0.88rem;
+    font-weight: 800;
+    color: #86efac;
+    white-space: nowrap;
+}
+
+.bonus-source-card__meta {
+    margin-top: 0.3rem;
+    font-size: 0.76rem;
+    color: #94a3b8;
+}
+
 .character-collection-panel {
     max-height: 420px;
     overflow-y: auto;
@@ -1603,7 +1736,11 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.42) !important;
 }
 
-.character-collection-modal-grid[data-collection-grid="relationships"] {
+.character-collection-modal-grid[data-collection-grid="relationships"],
+.character-collection-modal-grid[data-collection-grid="spells"],
+.character-collection-modal-grid[data-collection-grid="skills"],
+.character-collection-modal-grid[data-collection-grid="attacks"],
+.character-collection-modal-grid[data-collection-grid="items"] {
     display: flex;
     justify-content: center;
     align-items: flex-end;
@@ -1614,7 +1751,11 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     scroll-padding-inline: 1.25rem;
 }
 
-.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card {
+.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card,
+.character-collection-modal-grid[data-collection-grid="spells"] .character-collection-mini-card,
+.character-collection-modal-grid[data-collection-grid="skills"] .character-collection-mini-card,
+.character-collection-modal-grid[data-collection-grid="attacks"] .character-collection-mini-card,
+.character-collection-modal-grid[data-collection-grid="items"] .character-collection-mini-card {
     width: clamp(156px, 18vw, 220px);
     flex: 0 0 clamp(156px, 18vw, 220px);
     align-self: flex-end;
@@ -1629,16 +1770,28 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     transition: transform 0.22s ease, filter 0.22s ease, z-index 0.22s ease;
 }
 
-.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card:hover {
+.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card:hover,
+.character-collection-modal-grid[data-collection-grid="spells"] .character-collection-mini-card:hover,
+.character-collection-modal-grid[data-collection-grid="skills"] .character-collection-mini-card:hover,
+.character-collection-modal-grid[data-collection-grid="attacks"] .character-collection-mini-card:hover,
+.character-collection-modal-grid[data-collection-grid="items"] .character-collection-mini-card:hover {
     --fan-hover-lift: -16px;
     z-index: 999;
 }
 
-.character-collection-modal-grid[data-collection-grid="relationships"] .related-character-grid-item {
+.character-collection-modal-grid[data-collection-grid="relationships"] .related-character-grid-item,
+.character-collection-modal-grid[data-collection-grid="spells"] .related-spell-grid-item,
+.character-collection-modal-grid[data-collection-grid="skills"] .related-skill-grid-item,
+.character-collection-modal-grid[data-collection-grid="attacks"] .related-attack-grid-item,
+.character-collection-modal-grid[data-collection-grid="items"] .related-item-grid-item {
     margin-left: calc(var(--fan-overlap) * -1);
 }
 
-.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card:first-child {
+.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card:first-child,
+.character-collection-modal-grid[data-collection-grid="spells"] .character-collection-mini-card:first-child,
+.character-collection-modal-grid[data-collection-grid="skills"] .character-collection-mini-card:first-child,
+.character-collection-modal-grid[data-collection-grid="attacks"] .character-collection-mini-card:first-child,
+.character-collection-modal-grid[data-collection-grid="items"] .character-collection-mini-card:first-child {
     margin-left: 0;
 }
 
@@ -1660,12 +1813,20 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
         gap: 1rem;
     }
 
-    .character-collection-modal-grid[data-collection-grid="relationships"] {
+    .character-collection-modal-grid[data-collection-grid="relationships"],
+    .character-collection-modal-grid[data-collection-grid="spells"],
+    .character-collection-modal-grid[data-collection-grid="skills"],
+    .character-collection-modal-grid[data-collection-grid="attacks"],
+    .character-collection-modal-grid[data-collection-grid="items"] {
         justify-content: flex-start;
         padding: 1rem 0.75rem 1.75rem;
     }
 
-    .character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card {
+    .character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card,
+    .character-collection-modal-grid[data-collection-grid="spells"] .character-collection-mini-card,
+    .character-collection-modal-grid[data-collection-grid="skills"] .character-collection-mini-card,
+    .character-collection-modal-grid[data-collection-grid="attacks"] .character-collection-mini-card,
+    .character-collection-modal-grid[data-collection-grid="items"] .character-collection-mini-card {
         width: clamp(132px, 46vw, 176px);
         flex-basis: clamp(132px, 46vw, 176px);
         --fan-overlap: clamp(28px, 7vw, 46px);

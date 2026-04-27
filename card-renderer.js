@@ -20,6 +20,24 @@ for (const attribute in PERICIAS_DATA) {
     });
 }
 
+const ATTRIBUTE_KEY_TO_GROUP = {
+    agilidade: 'AGILIDADE',
+    carisma: 'CARISMA',
+    forca: 'FORÃ‡A',
+    inteligencia: 'INTELIGÃŠNCIA',
+    sabedoria: 'SABEDORIA',
+    vigor: 'VIGOR'
+};
+
+const ATTRIBUTE_KEY_TO_SHORT = {
+    agilidade: 'AGI',
+    carisma: 'CAR',
+    forca: 'FOR',
+    inteligencia: 'INT',
+    sabedoria: 'SAB',
+    vigor: 'VIG'
+};
+
 function normalizeKey(name) {
     return (name || '').toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
@@ -152,6 +170,13 @@ function getCollectionItemLabel(item) {
     return item?.title || item?.name || 'Sem nome';
 }
 
+function getBonusSourceTypeLabel(source, sourceKind) {
+    if (sourceKind === 'item') return 'Item';
+    if (source?.type === 'habilidade') return 'Habilidade';
+    if (source?.type === 'ataque') return 'Ataque';
+    return 'Magia';
+}
+
 function calculateBonuses(characterData, inventoryItems, magicItems) {
     const totalFixedBonuses = {
         vida: 0, mana: 0, armadura: 0, esquiva: 0, bloqueio: 0, deslocamento: 0,
@@ -159,23 +184,44 @@ function calculateBonuses(characterData, inventoryItems, magicItems) {
         agilidade: 0, carisma: 0, forca: 0, inteligencia: 0, sabedoria: 0, vigor: 0,
         pericias: {}
     };
+    const bonusSources = {
+        vida: [], mana: [], armadura: [], esquiva: [], bloqueio: [], deslocamento: [],
+        cd: [],
+        agilidade: [], carisma: [], forca: [], inteligencia: [], sabedoria: [], vigor: [],
+        pericias: {}
+    };
 
-    [...inventoryItems, ...magicItems].filter(Boolean).forEach(source => {
+    const applySourceBonuses = (source, sourceKind) => {
+        if (!source) return;
         if (Array.isArray(source.aumentos)) {
             source.aumentos.forEach(aumento => {
                 if (aumento.tipo === 'fixo') {
                     const statName = normalizeKey(aumento.nome);
+                    const sourceEntry = {
+                        sourceId: source.id,
+                        sourceName: getCollectionItemLabel(source),
+                        sourceType: getBonusSourceTypeLabel(source, sourceKind),
+                        bonusName: aumento.nome,
+                        amount: aumento.valor || 0
+                    };
+
                     if (totalFixedBonuses.hasOwnProperty(statName)) {
                         totalFixedBonuses[statName] += (aumento.valor || 0);
+                        bonusSources[statName].push(sourceEntry);
                     } else {
                         totalFixedBonuses.pericias[aumento.nome] = (totalFixedBonuses.pericias[aumento.nome] || 0) + (aumento.valor || 0);
+                        if (!bonusSources.pericias[aumento.nome]) bonusSources.pericias[aumento.nome] = [];
+                        bonusSources.pericias[aumento.nome].push(sourceEntry);
                     }
                 }
             });
         }
-    });
+    };
 
-    return { totalFixedBonuses };
+    inventoryItems.filter(Boolean).forEach(source => applySourceBonuses(source, 'item'));
+    magicItems.filter(Boolean).forEach(source => applySourceBonuses(source, 'effect'));
+
+    return { totalFixedBonuses, bonusSources };
 }
 
 export async function updateStatDisplay(sheetContainer, characterData) {
@@ -183,7 +229,7 @@ export async function updateStatDisplay(sheetContainer, characterData) {
 
     const inventoryItems = characterData.items ? (await Promise.all(characterData.items.map(id => getData('rpgItems', id)))).filter(Boolean) : [];
     const magicItems = characterData.spells ? (await Promise.all(characterData.spells.map(id => getData('rpgEffects', id)))).filter(Boolean) : [];
-    const { totalFixedBonuses } = calculateBonuses(characterData, inventoryItems, magicItems);
+    const { totalFixedBonuses, bonusSources } = calculateBonuses(characterData, inventoryItems, magicItems);
 
     const { vidaBase, manaBase } = calculateClassStats(characterData);
 
@@ -613,7 +659,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     const magicItems = !isCreature && characterData.spells ? (await Promise.all(characterData.spells.map(id => getData('rpgEffects', id)))).filter(Boolean) : [];
     const attackItems = !isCreature && characterData.attacks ? (await Promise.all(characterData.attacks.map(id => getData('rpgEffects', id)))).filter(Boolean) : [];
     
-    const { totalFixedBonuses } = calculateBonuses(characterData, inventoryItems, magicItems);
+    const { totalFixedBonuses, bonusSources } = calculateBonuses(characterData, inventoryItems, magicItems);
 
     let aspectRatio =  9 / 16;
     const windowWidth = window.innerWidth;
@@ -663,9 +709,10 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     }
 
     const periciasForGrouping = Object.entries(allPericias).map(([name, values]) => ({ name, ...values }));
+    let groupedPericias = {};
 
     if (periciasForGrouping.length > 0) {
-        const groupedPericias = periciasForGrouping.reduce((acc, pericia) => {
+        groupedPericias = periciasForGrouping.reduce((acc, pericia) => {
             const attribute = periciaToAttributeMap[pericia.name] || 'OUTRAS';
             if (!acc[attribute]) acc[attribute] = [];
             acc[attribute].push(pericia);
@@ -682,6 +729,22 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             return `<div class="text-left mt-1"><p class="text-xs font-bold text-gray-200 uppercase" style="font-size: 11px;">${attribute}</p><div class="flex flex-wrap gap-x-2 gap-y-1 mb-1">${periciasList}</div></div>`;
         }).join('');
     }
+
+    const renderBonusSourceList = (sources = []) => {
+        if (!sources.length) {
+            return `<p class="text-sm text-gray-400 italic">Nenhum aumento fixo ativo neste campo.</p>`;
+        }
+
+        return sources.map(source => `
+            <div class="bonus-source-card">
+                <div class="bonus-source-card__top">
+                    <h4>${escapeHtml(source.sourceName || 'Sem nome')}</h4>
+                    <span>${source.amount > 0 ? '+' : ''}${source.amount}</span>
+                </div>
+                <p class="bonus-source-card__meta">${escapeHtml(source.sourceType || 'Card')} · ${escapeHtml(source.bonusName || 'Aumento fixo')}</p>
+            </div>
+        `).join('');
+    };
 
     // --- SEPARAÇÃO DOS STATS EM DOIS GRUPOS ---
     const attackStats = { acerto: 'ATK', critico: 'ATK s/Mana', dano: 'DMG', danoSemMana: 'DMG s/Mana'};
@@ -735,7 +798,12 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             const suffix = stat === 'deslocamento' ? 'm' : '';
             const total = numVal + fixedBonus;
             const content = formatTotal(total, fixedBonus !== 0, suffix);
-            return `<div class="text-center"><span>${label}</span><br>${content}</div>`;
+            const isClickable = fixedBonus !== 0;
+            const contentHtml = `<span>${label}</span><br>${content}`;
+            if (isClickable) {
+                return `<button type="button" class="text-center stat-bonus-trigger" data-action="open-bonus-sources" data-bonus-key="${stat}" data-bonus-label="${label}">${contentHtml}</button>`;
+            }
+            return `<div class="text-center">${contentHtml}</div>`;
         }
 
         // Fallback (não esperado aqui)
@@ -798,7 +866,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     const buttonLabel = `${config.label} (${config.items.length})`;
 
                     return `
-                        <button style="background:  ${predominantColor.colorLight};"
+                        <button
                             type="button"
                             class="character-collection-trigger"
                             data-collection-tone="${config.key}"
@@ -807,7 +875,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                             title="${escapeHtml(buttonLabel)}"
                             aria-label="${escapeHtml(buttonLabel)}">
                             <span class="character-collection-trigger__glyph" aria-hidden="true">
-                                <i class="fas ${config.icon}"></i>
+                                <i class="fas ${config.icon}  text-2xl"></i>
                             </span>
                             <span class="character-collection-trigger__value" aria-hidden="true">${config.items.length}</span>
                         </button>
@@ -895,10 +963,57 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         `
         : '';
 
+    const periciaModalHtml = `
+        <div id="pericia-modal-${uniqueId}" class="hidden absolute inset-0 z-[141] bg-black/80 backdrop-blur-sm p-4" tabindex="-1">
+            <div class="w-full h-full flex items-center justify-center">
+                <div class="w-full max-w-md max-h-[85%] overflow-hidden rounded-3xl border border-white/10 bg-slate-950/95 text-white shadow-2xl">
+                    <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+                        <div>
+                            <p class="text-[11px] uppercase tracking-[0.18em] text-gray-400">Pericias</p>
+                            <h3 id="pericia-modal-title-${uniqueId}" class="text-xl font-bold text-white">AGI</h3>
+                        </div>
+                        <button type="button" id="close-pericia-modal-btn-${uniqueId}" class="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white" aria-label="Fechar pericias">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div id="pericia-modal-body-${uniqueId}" class="max-h-[65vh] overflow-y-auto px-5 py-4 text-sm leading-relaxed text-gray-200 space-y-3"></div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const bonusSourceModalHtml = `
+        <div id="bonus-source-modal-${uniqueId}" class="hidden absolute inset-0 z-[142] bg-black/80 backdrop-blur-sm p-4" tabindex="-1">
+            <div class="w-full h-full flex items-center justify-center">
+                <div class="w-full max-w-md max-h-[85%] overflow-hidden rounded-3xl border border-white/10 bg-slate-950/95 text-white shadow-2xl">
+                    <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+                        <div>
+                            <p class="text-[11px] uppercase tracking-[0.18em] text-gray-400">Origem do bonus</p>
+                            <h3 id="bonus-source-modal-title-${uniqueId}" class="text-xl font-bold text-white">Campo</h3>
+                        </div>
+                        <button type="button" id="close-bonus-source-modal-btn-${uniqueId}" class="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white" aria-label="Fechar bonus">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div id="bonus-source-modal-body-${uniqueId}" class="max-h-[65vh] overflow-y-auto px-5 py-4 text-sm leading-relaxed text-gray-200 space-y-3"></div>
+                </div>
+            </div>
+        </div>
+    `;
+
     const hasVida = isInPlay || (characterData.attributes?.vidaAtual || 0) > 0;
     const hasMana = isInPlay || (characterData.attributes?.manaAtual || 0) > 0;
     const hasMoney = isInPlay || (characterData.dinheiro || 0) > 0;
-    const finalRelationshipsBar = collectionButtonsHtml;
+    const creatureDataDockHtml = isCreature && attackStatsHtml
+        ? `
+            <div class="character-collection-dock creature-data-dock rounded-3xl" style="--collection-dock-accent: ${palette.borderColor};">
+                <div class="character-collection-grid creature-data-grid">
+                    ${attackStatsHtml}
+                </div>
+            </div>
+        `
+        : '';
+    const finalRelationshipsBar = collectionButtonsHtml || creatureDataDockHtml;
     const hasCollectionDock = Boolean(finalRelationshipsBar);
 
     const sheetHtml = `
@@ -909,29 +1024,15 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             <div class="w-full h-full" style="background: linear-gradient(to bottom, #000000a4, transparent, transparent, #0000008f, #0000008f, #000000a4); box-shadow: inset 0px 0px 5px black;">
                 <div class="rounded-lg absolute inset-0" style="width: 94%; height: 96%; border: 3px solid ${predominantColor.colorLight}; margin: auto; box-shadow: inset 0px 0px 5px black, 0px 0px 5px black;">
                     <div class="h-full w-12 left-2 top-2 pb-4 absolute top-0 bottom-0 flex flex-col items-center justify-content" style="justify-content: space-between;">
-                       <div> 
-                            <div class="div-combat-stats grid grid-row-6 gap-y-2 text-xs w-10" style="border-radius: 28px 5px 28px 5px; background: ${predominantColor.colorLight}; padding: 10px; justify-content: space-evenly; box-shadow: 0 0 10px black;">
-                                <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
+                        <div class="div-combat-stats grid grid-row-6 gap-y-2 text-xs w-12" style="border-radius: 28px 5px 28px 5px; background: ${predominantColor.colorLight}; padding: 15px 10px; justify-content: space-evenly; box-shadow: 0 0 10px black;">
+                            <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
                                 ${defenseStatsHtml}
-                                <div class="text-center">CD<br>${formatTotal(cdValue, cdFixed !== 0)}</div>                           
+                                ${cdFixed !== 0
+                                    ? `<button type="button" class="text-center stat-bonus-trigger" data-action="open-bonus-sources" data-bonus-key="cd" data-bonus-label="CD">CD<br>${formatTotal(cdValue, true)}</button>`
+                                    : `<div class="text-center">CD<br>${formatTotal(cdValue, false)}</div>`}                           
                             </div>
-                            <div style="position: relative;" class="mt-8 flex flex-col items-center">
-                                <button id="open-lore-modal-btn-${uniqueId}" class="thumb-btn" style="display: ${hasLore ? 'flex' : 'none'}" type="button" title="Abrir lore" aria-label="Abrir lore do personagem">
-                                    <span class="status-lore-stack text-3xl" aria-hidden="true">
-                                        <i class="fas fa-book-open status-lore-base"></i>
-                                        <span class="status-lore-shine">
-                                            <i class="fas fa-book-open"></i>
-                                        </span>
-                                    </span>
-                                </button>
-                            </div>
+                            ${finalRelationshipsBar}              
                         </div>
-                       ${hasCollectionDock ? `
-                            <div class="character-collection-dock rounded-3xl" style="--collection-dock-accent: ${palette.borderColor};">
-                                ${finalRelationshipsBar}
-                            </div>
-                        ` : ''}
-                    </div>
 
                     <div class="h-full w-12 right-2 top-2 pb-4 absolute top-0 bottom-0 flex flex-col items-center justify-content" style="justify-content: space-between;">
                         <div class="mt-2 flex flex-col items-center">
@@ -973,29 +1074,38 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                                         ${characterData.dinheiro || 0}
                                     </span>
                                 </div>
-                            </div>                             
+                            </div> 
+                            <div style="position: relative;" class="mt-8 flex flex-col items-center">
+                                <button id="open-lore-modal-btn-${uniqueId}" class="thumb-btn" style="display: ${hasLore ? 'flex' : 'none'}" type="button" title="Abrir lore" aria-label="Abrir lore do personagem">
+                                    <span class="status-lore-stack text-3xl" aria-hidden="true">
+                                        <i class="fas fa-book-open status-lore-base"></i>
+                                        <span class="status-lore-shine">
+                                            <i class="fas fa-book-open"></i>
+                                        </span>
+                                    </span>
+                                </button>
+                            </div>                            
                         </div>  
-                        <div class="mb-2 flex flex-col items-center">
+                        <div class="mb-2 flex flex-col items-center" style="display: ${isCreature ? 'none' : 'flex'};">
                             ${attackStatsHtml}
                         </div>
-                        <div class="grid grid-row-6 gap-y-2 text-xs div-Stats w-10" style="border-radius: 28px 5px 28px 5px; background: ${predominantColor.colorLight}; padding: 10px; box-shadow: 0 0 10px black; ">
+                        <div class="grid grid-row-6 gap-y-3 text-xs div-Stats w-12 py-4" style="border-radius: 28px 5px 28px 5px; background: ${predominantColor.colorLight}; padding: 15px 10px; box-shadow: 0 0 10px black; ">
                             ${mainAttributes.map(key => {
                             const baseValue = parseInt(characterData.attributes[key]) || 0;
                             const fixedBonus = totalFixedBonuses[key] || 0;
-                            const fixedBonusHtml = fixedBonus !== 0 ? ` <span class="text-green-400 font-semibold">${fixedBonus > 0 ? '+' : ''}${fixedBonus}</span>` : '';
                             return `
-                                <label class="text-center" title="${key}">${formatTotal(baseValue + fixedBonus, fixedBonus !== 0)}<br>${key.slice(0, 3).toUpperCase()}</label>
+                                <button type="button" class="text-center attribute-stat-trigger${fixedBonus !== 0 ? ' has-fixed-bonus' : ''}" data-action="open-pericias" data-attribute-key="${key}" title="${ATTRIBUTE_KEY_TO_GROUP[key] || key}">
+                                  ${ATTRIBUTE_KEY_TO_SHORT[key] || key.slice(0, 3).toUpperCase()}  <br>${formatTotal(baseValue + fixedBonus, fixedBonus !== 0)}
+                                </button>
                             `;
                             }).join('')}
-                        </div>
+                        </div> 
                     </div>
 
                     <div class="absolute bottom-[-3px] w-full" style="display: ${(isModal || isInPlay || previewFull) ? 'flex' : 'none'}">
                         <div class="scrollable-content text-sm text-left ml-2 div-miniCards${hasCollectionDock ? ' has-collection-dock' : ''}" style="display: flex; flex-direction: row; overflow-y: scroll;gap: 12px; scroll-snap-type: x mandatory; margin-left: 55px;">
                             <div class="pb-4 rounded-3xl w-full character-scroll-panel" style="scroll-snap-align: start;flex-shrink: 0;min-width: 100%; border-color: ${palette.borderColor}; position: relative; z-index: 1; overflow-y: visible; display: flex; flex-direction: column; justify-content: flex-end;">
-                                <div class="pericias-scroll-area flex flex-col gap-2 px-2 h-full" style="overflow-y: auto;">
-                                    ${periciasHtml}
-                                </div>
+                                <div class="pericias-scroll-area flex flex-col gap-2 px-2 h-full" style="overflow-y: auto;"></div>
                             </div>
                         </div>                        
                     </div>
@@ -1005,6 +1115,8 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     <p class="text-md italic text-gray-300">${characterData.subTitle}</p>
                 </div>
                 ${loreModalHtml}
+                ${periciaModalHtml}
+                ${bonusSourceModalHtml}
                 ${collectionModalHtml}
             </div> 
         </div>
@@ -1062,7 +1174,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             miniSheetHtml = await renderFullSpellSheet(item, false);
         }
 
-        if (config.key === 'relationships') {
+        if (['relationships', 'spells', 'skills', 'attacks', 'items'].includes(config.key)) {
             const centerIndex = (totalItems - 1) / 2;
             const distanceFromCenter = index - centerIndex;
             const fanRotation = (distanceFromCenter * 5.5).toFixed(2);
@@ -1456,7 +1568,87 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     const openLoreModalBtn = sheetContainer.querySelector(`#open-lore-modal-btn-${uniqueId}`);
     const loreModal = sheetContainer.querySelector(`#lore-modal-${uniqueId}`);
     const closeLoreModalBtn = sheetContainer.querySelector(`#close-lore-modal-btn-${uniqueId}`);
+    const periciaModal = sheetContainer.querySelector(`#pericia-modal-${uniqueId}`);
+    const periciaModalTitle = sheetContainer.querySelector(`#pericia-modal-title-${uniqueId}`);
+    const periciaModalBody = sheetContainer.querySelector(`#pericia-modal-body-${uniqueId}`);
+    const closePericiaModalBtn = sheetContainer.querySelector(`#close-pericia-modal-btn-${uniqueId}`);
+    const bonusSourceModal = sheetContainer.querySelector(`#bonus-source-modal-${uniqueId}`);
+    const bonusSourceModalTitle = sheetContainer.querySelector(`#bonus-source-modal-title-${uniqueId}`);
+    const bonusSourceModalBody = sheetContainer.querySelector(`#bonus-source-modal-body-${uniqueId}`);
+    const closeBonusSourceModalBtn = sheetContainer.querySelector(`#close-bonus-source-modal-btn-${uniqueId}`);
     const closeSheetBtn = sheetContainer.querySelector(`#close-sheet-btn-${uniqueId}`);
+
+    const getBonusSourcesForKey = (bonusKey) => {
+        if (!bonusKey) return [];
+        if (bonusKey.startsWith('pericia::')) {
+            const periciaName = decodeURIComponent(bonusKey.slice('pericia::'.length));
+            return bonusSources.pericias[periciaName] || [];
+        }
+        return bonusSources[bonusKey] || [];
+    };
+
+    const renderBonusSourceModalContent = (bonusKey, bonusLabel) => {
+        if (bonusSourceModalTitle) {
+            bonusSourceModalTitle.textContent = bonusLabel || bonusKey || 'Bonus';
+        }
+        if (bonusSourceModalBody) {
+            bonusSourceModalBody.innerHTML = renderBonusSourceList(getBonusSourcesForKey(bonusKey));
+        }
+    };
+
+    const renderPericiaModalContent = (attributeKey) => {
+        const attributeGroup = ATTRIBUTE_KEY_TO_GROUP[attributeKey] || attributeKey.toUpperCase();
+        const pericias = (groupedPericias[attributeGroup] || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+        const attributeBonusSources = bonusSources[attributeKey] || [];
+        const attributeBonusTotal = totalFixedBonuses[attributeKey] || 0;
+
+        if (periciaModalTitle) {
+            periciaModalTitle.textContent = ATTRIBUTE_KEY_TO_SHORT[attributeKey] || attributeGroup;
+        }
+
+        if (!periciaModalBody) return;
+
+        if (pericias.length === 0) {
+            periciaModalBody.innerHTML = `
+                ${attributeBonusTotal !== 0 ? `
+                    <div class="bonus-source-section">
+                        <p class="bonus-source-section__title">Origem do bonus fixo ${attributeBonusTotal > 0 ? '+' : ''}${attributeBonusTotal}</p>
+                        ${renderBonusSourceList(attributeBonusSources)}
+                    </div>
+                ` : ''}
+                <p class="text-sm text-gray-400 italic">Nenhuma pericia relacionada a ${attributeGroup}.</p>
+            `;
+            return;
+        }
+
+        periciaModalBody.innerHTML = `
+            ${attributeBonusTotal !== 0 ? `
+                <div class="bonus-source-section">
+                    <p class="bonus-source-section__title">Origem do bonus fixo ${attributeBonusTotal > 0 ? '+' : ''}${attributeBonusTotal}</p>
+                    ${renderBonusSourceList(attributeBonusSources)}
+                </div>
+            ` : ''}
+            ${pericias.map(pericia => {
+            const total = (parseInt(pericia.base) || 0) + (parseInt(pericia.bonus) || 0);
+            const hasPericiaBonus = (parseInt(pericia.bonus) || 0) !== 0;
+            const valueHtml = formatTotal(total, hasPericiaBonus);
+            const contentHtml = `
+                    <div class="attribute-pericia-card__top">
+                        <h4>${pericia.name}</h4>
+                        <span>${valueHtml}</span>
+                    </div>
+            `;
+            if (hasPericiaBonus) {
+                return `
+                    <button type="button" class="attribute-pericia-card stat-bonus-trigger" data-action="open-bonus-sources" data-bonus-key="pericia::${encodeURIComponent(pericia.name)}" data-bonus-label="${escapeHtml(pericia.name)}">
+                        ${contentHtml}
+                    </button>
+                `;
+            }
+            return `<div class="attribute-pericia-card">${contentHtml}</div>`;
+        }).join('')}
+        `;
+    };
 
     const closeSheet = () => {
          // Limpa o observador se existir
@@ -1525,6 +1717,36 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
          });
     }
 
+    if (periciaModal && closePericiaModalBtn) {
+        sheetContainer.querySelectorAll('[data-action="open-pericias"]').forEach(trigger => {
+            trigger.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                renderPericiaModalContent(trigger.dataset.attributeKey);
+                periciaModal.classList.remove('hidden');
+                periciaModal.focus();
+            });
+        });
+
+        closePericiaModalBtn.addEventListener('click', () => periciaModal.classList.add('hidden'));
+        periciaModal.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') periciaModal.classList.add('hidden');
+        });
+        periciaModal.addEventListener('click', (e) => {
+            if (e.target === periciaModal) periciaModal.classList.add('hidden');
+        });
+    }
+
+    if (bonusSourceModal && closeBonusSourceModalBtn) {
+        closeBonusSourceModalBtn.addEventListener('click', () => bonusSourceModal.classList.add('hidden'));
+        bonusSourceModal.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') bonusSourceModal.classList.add('hidden');
+        });
+        bonusSourceModal.addEventListener('click', (e) => {
+            if (e.target === bonusSourceModal) bonusSourceModal.classList.add('hidden');
+        });
+    }
+
     if (closeSheetBtn) {
          const newCloseBtn = closeSheetBtn.cloneNode(true);
          closeSheetBtn.parentNode.replaceChild(newCloseBtn, closeSheetBtn);
@@ -1538,6 +1760,15 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     }
 
      sheetContainer.addEventListener('click', (e) => {
+        const bonusTrigger = e.target.closest('[data-action="open-bonus-sources"]');
+        if (bonusTrigger && bonusSourceModal) {
+            e.preventDefault();
+            e.stopPropagation();
+            renderBonusSourceModalContent(bonusTrigger.dataset.bonusKey, bonusTrigger.dataset.bonusLabel);
+            bonusSourceModal.classList.remove('hidden');
+            bonusSourceModal.focus();
+            return;
+        }
         if (e.target === sheetContainer && sheetContainer.id === 'character-sheet-container') {
             closeSheet();
         }
@@ -1550,6 +1781,14 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                 return modal && modal.classList.contains('visible');
             });
         if (hasExpandedRelatedSheet) return;
+        if (bonusSourceModal && !bonusSourceModal.classList.contains('hidden')) {
+            bonusSourceModal.classList.add('hidden');
+            return;
+        }
+        if (periciaModal && !periciaModal.classList.contains('hidden')) {
+            periciaModal.classList.add('hidden');
+            return;
+        }
         if (collectionModal && !collectionModal.classList.contains('hidden')) {
             closeCollectionModal();
             return;
