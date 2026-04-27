@@ -1603,6 +1603,45 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.42) !important;
 }
 
+.character-collection-modal-grid[data-collection-grid="relationships"] {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 0;
+    padding: 1.35rem 1.25rem 2rem;
+    overflow-x: auto;
+    overflow-y: visible;
+    scroll-padding-inline: 1.25rem;
+}
+
+.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card {
+    width: clamp(156px, 18vw, 220px);
+    flex: 0 0 clamp(156px, 18vw, 220px);
+    align-self: flex-end;
+    position: relative;
+    z-index: var(--fan-z, 1);
+    --fan-rotate: 0deg;
+    --fan-offset-y: 0px;
+    --fan-hover-lift: 0px;
+    --fan-overlap: clamp(40px, 4vw, 60px);
+    transform: translateY(calc(var(--fan-offset-y) + var(--fan-hover-lift))) rotate(var(--fan-rotate));
+    transform-origin: center bottom;
+    transition: transform 0.22s ease, filter 0.22s ease, z-index 0.22s ease;
+}
+
+.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card:hover {
+    --fan-hover-lift: -16px;
+    z-index: 999;
+}
+
+.character-collection-modal-grid[data-collection-grid="relationships"] .related-character-grid-item {
+    margin-left: calc(var(--fan-overlap) * -1);
+}
+
+.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card:first-child {
+    margin-left: 0;
+}
+
 @media (max-width: 480px) {
     .character-collection-grid {
         gap: 1rem;
@@ -1620,22 +1659,84 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 1rem;
     }
+
+    .character-collection-modal-grid[data-collection-grid="relationships"] {
+        justify-content: flex-start;
+        padding: 1rem 0.75rem 1.75rem;
+    }
+
+    .character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card {
+        width: clamp(132px, 46vw, 176px);
+        flex-basis: clamp(132px, 46vw, 176px);
+        --fan-overlap: clamp(28px, 7vw, 46px);
+    }
 }
 
 #selected-relationships-container {
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    display: flex;
+    align-items: flex-end;
+    gap: 0;
+    min-height: 170px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.75rem 0.75rem 1rem;
 }
 
-.relationship-form-thumbnail > div {
-    transform: scale(0.24) !important;
-    transform-origin: top left;
+.relationship-form-thumbnail {
+    position: relative;
+    width: 112px;
+    height: 170px;
+    flex: 0 0 112px;
+    margin-left: -44px;
+    cursor: pointer;
+    border-radius: 18px;
+    overflow: visible;
+    z-index: var(--fan-z, 1);
+    --fan-rotate: 0deg;
+    --fan-offset-y: 0px;
+    --fan-hover-lift: 0px;
+    transform: translateY(calc(var(--fan-offset-y) + var(--fan-hover-lift))) rotate(var(--fan-rotate));
+    transform-origin: center bottom;
+    transition: transform 0.22s ease, filter 0.22s ease, z-index 0.22s ease;
+}
+
+.relationship-form-thumbnail:first-child {
+    margin-left: 0;
+}
+
+.relationship-form-thumbnail:hover {
+    --fan-hover-lift: -12px;
+    z-index: 999;
+    filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.28));
+}
+
+.relationship-form-thumbnail > div[id^="character-sheet-"] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: scale(0.17) !important;
+    transform-origin: top left !important;
+    pointer-events: none;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.34);
 }
 
 #selected-relationships-container .remove-selection-btn {
     opacity: 0;
     transition: opacity 0.2s;
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    z-index: 10;
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    background: rgba(17, 24, 39, 0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-#selected-relationships-container > div:hover .remove-selection-btn {
+
+#selected-relationships-container .relationship-form-thumbnail:hover .remove-selection-btn {
     opacity: 1;
 }
 

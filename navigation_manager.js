@@ -1,5 +1,5 @@
-import { saveCharacterCard, editCard, importCard, getCurrentEditingCardId, exportCard, resetCharacterFormState, setCharacterFormType, populateCharacterSelect, getCharacterItems } from './character_manager.js';
-import { populateSpellAumentosSelect, saveSpellCard, editSpell, importSpell, exportSpell, showImagePreview, resetSpellFormState } from './magic_manager.js';
+import { saveCharacterCard, editCard, importCard, getCurrentEditingCardId, exportCard, resetCharacterFormState, setCharacterFormType, populateCharacterSelect, getCharacterItems, handleCharacterFormCloseRequest } from './character_manager.js';
+import { populateSpellAumentosSelect, saveSpellCard, editSpell, importSpell, exportSpell, showImagePreview, resetSpellFormState, handleSpellFormCloseRequest } from './magic_manager.js';
 import { populateItemAumentosSelect, saveItemCard, editItem, importItem, removeItem, exportItem } from './item_manager.js';
 import { renderCategoryScreen, populateCategorySelect } from './category_manager.js';
 import { renderGrimoireScreen } from './grimoire_manager.js';
@@ -329,9 +329,10 @@ async function createItemGrid(items, type, renderSheetFunction) {
 
     const cardElements = await Promise.all(items.map(async (item) => {
         const sheetHtml = await renderSheetFunction(item, false);
-        const shouldStackRelated = type === 'magias' || type === 'habilidades' || type === 'ataques';
+        const shouldStackRelated = ['magias', 'habilidades', 'ataques', 'itens'].includes(type);
+        const relatedStoreName = type === 'itens' ? 'rpgItems' : 'rpgEffects';
         const relatedIds = shouldStackRelated ? [item.enhanceCardId, item.trueCardId].filter(Boolean) : [];
-        const relatedCards = (await Promise.all(relatedIds.map(id => getData('rpgEffects', id)))).filter(Boolean);
+        const relatedCards = (await Promise.all(relatedIds.map(id => getData(relatedStoreName, id)))).filter(Boolean);
         const hasRelatedStack = shouldStackRelated && relatedCards.length > 0;
         const baseLayerHtml = hasRelatedStack
             ? `<div class="related-card-stack-layer related-card-stack-layer-base">${sheetHtml}</div>`
@@ -382,7 +383,7 @@ function effectBelongsToListType(item, type) {
 }
 
 function filterStandaloneEffectCards(items, type) {
-    if (!['magias', 'habilidades', 'ataques'].includes(type)) return items;
+    if (!['magias', 'habilidades', 'ataques', 'itens'].includes(type)) return items;
 
     const visibleItems = items.filter(item => effectBelongsToListType(item, type));
     const relatedIds = new Set();
@@ -934,10 +935,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e.target.closest('#select-character-btn')) showCharacterSelectionModalForPlay();
     });
 
-    const closeForm = (section) => {
+    const closeForm = async (section) => {
         if (section.id === 'creation-section') {
+            const restoredBaseDraft = await handleCharacterFormCloseRequest();
+            if (restoredBaseDraft) return;
             resetCharacterFormState();
         } else if (section.id === 'spell-creation-section') {
+             const restoredBaseSpellDraft = await handleSpellFormCloseRequest();
+             if (restoredBaseSpellDraft) return;
              resetSpellFormState();
         } else if (section.id === 'item-creation-section') {
              showImagePreview(document.getElementById('itemImagePreview'), null, true);
@@ -966,15 +971,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     cardForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        await saveCharacterCard(cardForm);
-        closeForm(creationSection);
+        const result = await saveCharacterCard(cardForm);
+        if (!result?.keepOpen) {
+            await closeForm(creationSection);
+        }
     });
 
     spellForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const type = e.currentTarget.dataset.type || 'magia';
-        await saveSpellCard(spellForm, type);
-        closeForm(spellCreationSection);
+        const result = await saveSpellCard(spellForm, type);
+        if (!result?.keepOpen) {
+            await closeForm(spellCreationSection);
+        }
     });
 
     itemForm.addEventListener('submit', async (e) => {

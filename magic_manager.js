@@ -18,6 +18,7 @@ export { showImagePreview } from './ui_utils.js';
 let currentEditingSpellId = null;
 let spellImageFile = null;
 let activeSpellRelationType = 'enhance';
+let pendingRelatedSpellCreation = null;
 
 function normalizeEffectType(type) {
     if (type === 'habilidade' || type === 'ataque') return type;
@@ -38,6 +39,53 @@ function getEffectTypeMeta(type) {
         return { label: 'Ataque', icon: 'fa-khanda', tone: 'text-red-400' };
     }
     return { label: 'Magia', icon: 'fa-magic', tone: 'text-teal-300' };
+}
+
+function getSpellFormUiMeta(type, mode = 'create') {
+    const normalizedType = normalizeEffectType(type);
+    const isRelated = mode === 'related';
+    const isEdit = mode === 'edit';
+
+    if (normalizedType === 'habilidade') {
+        return {
+            title: isRelated ? 'Nova Habilidade relacionada' : (isEdit ? 'Editando Habilidade' : 'Nova Habilidade'),
+            submit: isRelated ? 'Criar relacionada' : (isEdit ? 'Salvar Habilidade' : 'Criar Habilidade'),
+            hideMana: true
+        };
+    }
+
+    if (normalizedType === 'ataque') {
+        return {
+            title: isRelated ? 'Novo Ataque relacionado' : (isEdit ? 'Editando Ataque' : 'Novo Ataque'),
+            submit: isRelated ? 'Criar relacionado' : (isEdit ? 'Salvar Ataque' : 'Criar Ataque'),
+            hideMana: true
+        };
+    }
+
+    return {
+        title: isRelated ? 'Nova Magia relacionada' : (isEdit ? 'Editando Magia' : 'Nova Magia'),
+        submit: isRelated ? 'Criar relacionada' : (isEdit ? 'Salvar Magia' : 'Criar Magia'),
+        hideMana: false
+    };
+}
+
+function applySpellFormUi(type, mode = 'create', baseName = '') {
+    const meta = getSpellFormUiMeta(type, mode);
+    const titleEl = document.getElementById('spell-form-title');
+    const submitEl = document.getElementById('spellSubmitButton');
+    const manaWrapper = document.getElementById('mana-cost-wrapper');
+    const relationsWrapper = document.getElementById('spell-related-wrapper');
+    const form = document.getElementById('spellForm');
+
+    if (titleEl) {
+        titleEl.textContent = mode === 'related' && baseName
+            ? `${meta.title}: ${baseName}`
+            : meta.title;
+    }
+    if (submitEl) submitEl.textContent = meta.submit;
+    if (manaWrapper) manaWrapper.classList.toggle('hidden', meta.hideMana);
+    if (relationsWrapper) relationsWrapper.classList.remove('hidden');
+    if (form) form.dataset.type = normalizeEffectType(type);
 }
 
 function normalizeFixedAumentos(aumentos) {
@@ -215,7 +263,195 @@ function renderAumentoNaLista(aumento) {
     list.appendChild(div);
 }
 
-export function resetSpellFormState() {
+function hasBaseSpellImage(snapshot) {
+    return Boolean(snapshot?.spellImageFile || snapshot?.spellImage);
+}
+
+function updateRelatedSpellCreationUi() {
+    const createBtn = document.getElementById('create-related-spell-btn');
+    const panel = document.getElementById('related-spell-creation-panel');
+    const baseNameEl = document.getElementById('related-spell-base-name');
+    const targetSlotEl = document.getElementById('related-spell-target-slot');
+    const sameImageCheckbox = document.getElementById('related-spell-base-image-option');
+    const sameImageWrapper = document.getElementById('related-spell-base-image-option-wrapper');
+    const isEditingSpell = Boolean(currentEditingSpellId) && !pendingRelatedSpellCreation;
+
+    if (createBtn) createBtn.classList.toggle('hidden', !isEditingSpell);
+    if (panel) panel.classList.toggle('hidden', !pendingRelatedSpellCreation);
+
+    if (!pendingRelatedSpellCreation) {
+        if (sameImageCheckbox) {
+            sameImageCheckbox.checked = false;
+            sameImageCheckbox.disabled = false;
+        }
+        if (sameImageWrapper) sameImageWrapper.classList.remove('hidden');
+        return;
+    }
+
+    if (baseNameEl) baseNameEl.textContent = pendingRelatedSpellCreation.baseName || 'card base';
+    if (targetSlotEl) targetSlotEl.textContent = pendingRelatedSpellCreation.targetRelationType === 'true' ? 'Verdadeiro' : 'Aprimorar';
+
+    const canReuseImage = hasBaseSpellImage(pendingRelatedSpellCreation.baseSnapshot);
+    if (sameImageCheckbox) {
+        sameImageCheckbox.checked = canReuseImage && Boolean(pendingRelatedSpellCreation.useBaseImage);
+        sameImageCheckbox.disabled = !canReuseImage;
+    }
+    if (sameImageWrapper) sameImageWrapper.classList.toggle('hidden', !canReuseImage);
+}
+
+async function captureSpellFormSnapshot() {
+    const persistedData = currentEditingSpellId ? await getData('rpgEffects', currentEditingSpellId) : null;
+    const aumentos = [];
+    document.querySelectorAll('#spell-aumentos-list div[data-nome]').forEach(el => {
+        aumentos.push({
+            nome: el.dataset.nome,
+            valor: parseInt(el.dataset.valor, 10) || 0,
+            tipo: el.dataset.tipo || 'fixo'
+        });
+    });
+
+    return {
+        currentEditingSpellId,
+        type: getCurrentSpellFormType(),
+        name: document.getElementById('spellName')?.value || '',
+        circle: document.getElementById('spellCircle')?.value || '',
+        execution: document.getElementById('spellExecution')?.value || '',
+        manaCost: document.getElementById('spellManaCost')?.value || '',
+        range: document.getElementById('spellRange')?.value || '',
+        target: document.getElementById('spellTarget')?.value || '',
+        duration: document.getElementById('spellDuration')?.value || '',
+        resistencia: document.getElementById('spellResistencia')?.value || '',
+        description: document.getElementById('spellDescription')?.value || '',
+        enhanceCardId: document.getElementById('spellEnhanceCardId')?.value || '',
+        trueCardId: document.getElementById('spellTrueCardId')?.value || '',
+        characterId: document.getElementById('spellCharacterOwner')?.value || '',
+        categoryId: document.getElementById('spell-category-select')?.value || '',
+        acerto: document.getElementById('spellAcerto')?.value || '',
+        dano: document.getElementById('spellDamage')?.value || '',
+        critico: document.getElementById('spellcritico')?.value || '',
+        danoSemMana: document.getElementById('spellDanoSemMana')?.value || '',
+        aumentos,
+        spellImageFile,
+        spellImage: persistedData?.image || null,
+        spellImageMimeType: persistedData?.imageMimeType || null
+    };
+}
+
+async function restoreSpellFormSnapshot(snapshot, options = {}) {
+    if (!snapshot) return;
+    const { asNew = false, mode = 'edit' } = options;
+
+    resetSpellFormState(true);
+    applySpellFormUi(snapshot.type, mode, asNew ? (snapshot.name || 'card base') : '');
+    currentEditingSpellId = asNew ? null : (snapshot.currentEditingSpellId || null);
+
+    document.getElementById('spellName').value = snapshot.name || '';
+    document.getElementById('spellCircle').value = snapshot.circle || '';
+    document.getElementById('spellExecution').value = snapshot.execution || '';
+    document.getElementById('spellManaCost').value = snapshot.manaCost || '';
+    document.getElementById('spellRange').value = snapshot.range || '';
+    document.getElementById('spellTarget').value = snapshot.target || '';
+    document.getElementById('spellDuration').value = snapshot.duration || '';
+    document.getElementById('spellResistencia').value = snapshot.resistencia || '';
+    document.getElementById('spellDescription').value = snapshot.description || '';
+    document.getElementById('spellEnhanceCardId').value = asNew ? '' : (snapshot.enhanceCardId || '');
+    document.getElementById('spellTrueCardId').value = asNew ? '' : (snapshot.trueCardId || '');
+    document.getElementById('spellAcerto').value = snapshot.acerto || '';
+    document.getElementById('spellDamage').value = snapshot.dano || '';
+    document.getElementById('spellcritico').value = snapshot.critico || '';
+    document.getElementById('spellDanoSemMana').value = snapshot.danoSemMana || '';
+
+    await populateCharacterSelect('spellCharacterOwner');
+    document.getElementById('spellCharacterOwner').value = snapshot.characterId || '';
+
+    await populateCategorySelect('spell-category-select', snapshot.type);
+    document.getElementById('spell-category-select').value = snapshot.categoryId || '';
+
+    const aumentosList = document.getElementById('spell-aumentos-list');
+    if (aumentosList) {
+        aumentosList.innerHTML = '';
+        normalizeFixedAumentos(snapshot.aumentos).forEach(aumento => renderAumentoNaLista(aumento));
+    }
+
+    spellImageFile = snapshot.spellImageFile || null;
+    if (spellImageFile) {
+        showImagePreview(document.getElementById('spellImagePreview'), URL.createObjectURL(spellImageFile), true);
+    } else if (snapshot.spellImage) {
+        const imageBlob = bufferToBlobUtil(snapshot.spellImage, snapshot.spellImageMimeType);
+        showImagePreview(document.getElementById('spellImagePreview'), URL.createObjectURL(imageBlob), true);
+    } else {
+        showImagePreview(document.getElementById('spellImagePreview'), null, true);
+    }
+
+    if (!asNew) pendingRelatedSpellCreation = null;
+    await updateSpellRelationLabels();
+    updateRelatedSpellCreationUi();
+}
+
+async function restoreBaseSpellDraft(newRelatedId = '') {
+    const snapshot = pendingRelatedSpellCreation?.baseSnapshot;
+    if (!snapshot) return false;
+
+    if (newRelatedId) {
+        if (pendingRelatedSpellCreation.targetRelationType === 'true') snapshot.trueCardId = newRelatedId;
+        else snapshot.enhanceCardId = newRelatedId;
+    }
+
+    await restoreSpellFormSnapshot(snapshot);
+    return true;
+}
+
+function getRelatedSpellBaseImage(snapshot) {
+    if (!snapshot) return { image: null, mimeType: null, isFile: false };
+
+    if (snapshot.spellImageFile) {
+        return {
+            image: snapshot.spellImageFile,
+            mimeType: snapshot.spellImageFile.type || null,
+            isFile: true
+        };
+    }
+
+    return {
+        image: snapshot.spellImage || null,
+        mimeType: snapshot.spellImageMimeType || null,
+        isFile: false
+    };
+}
+
+export async function startRelatedSpellCreation() {
+    if (!currentEditingSpellId) return false;
+
+    const enhanceId = document.getElementById('spellEnhanceCardId')?.value || '';
+    const trueId = document.getElementById('spellTrueCardId')?.value || '';
+    const targetRelationType = !enhanceId ? 'enhance' : (!trueId ? 'true' : '');
+
+    if (!targetRelationType) {
+        showCustomAlert('Os slots Aprimorar e Verdadeiro ja estao ocupados. Remova um ou use Relacionar Cards.');
+        return false;
+    }
+
+    const snapshot = await captureSpellFormSnapshot();
+    pendingRelatedSpellCreation = {
+        baseSpellId: snapshot.currentEditingSpellId,
+        baseName: snapshot.name || 'card base',
+        baseSnapshot: snapshot,
+        targetRelationType,
+        useBaseImage: true
+    };
+
+    await restoreSpellFormSnapshot(snapshot, { asNew: true, mode: 'related' });
+    return true;
+}
+
+export async function handleSpellFormCloseRequest() {
+    if (!pendingRelatedSpellCreation) return false;
+    await restoreBaseSpellDraft();
+    return true;
+}
+
+export function resetSpellFormState(preserveRelatedCreation = false) {
+    if (!preserveRelatedCreation) pendingRelatedSpellCreation = null;
     currentEditingSpellId = null;
     spellImageFile = null;
 
@@ -236,6 +472,7 @@ export function resetSpellFormState() {
     if (trueInput) trueInput.value = '';
     if (enhanceLabel) enhanceLabel.textContent = 'Nenhum card selecionado';
     if (trueLabel) trueLabel.textContent = 'Nenhum card selecionado';
+    updateRelatedSpellCreationUi();
 }
 
 async function updateSpellRelationLabels() {
@@ -255,6 +492,7 @@ async function updateSpellRelationLabels() {
 }
 
 export async function saveSpellCard(spellForm, type) {
+    const relatedCreationContext = pendingRelatedSpellCreation;
     const spellNameInput = document.getElementById('spellName');
     const spellCircleInput = document.getElementById('spellCircle');
     const spellExecutionInput = document.getElementById('spellExecution');
@@ -291,8 +529,17 @@ export async function saveSpellCard(spellForm, type) {
         existingData = await getData('rpgEffects', currentEditingSpellId);
     }
 
-    const imageBuffer = spellImageFile ? await readFileAsArrayBufferUtil(spellImageFile) : (existingData ? existingData.image : null);
-    const imageMimeType = spellImageFile ? spellImageFile.type : (existingData ? existingData.imageMimeType : null);
+    const baseImageSource = relatedCreationContext?.useBaseImage
+        ? getRelatedSpellBaseImage(relatedCreationContext.baseSnapshot)
+        : null;
+    const imageBuffer = spellImageFile
+        ? await readFileAsArrayBufferUtil(spellImageFile)
+        : (baseImageSource?.isFile
+            ? await readFileAsArrayBufferUtil(baseImageSource.image)
+            : (baseImageSource?.image || (existingData ? existingData.image : null)));
+    const imageMimeType = spellImageFile
+        ? spellImageFile.type
+        : (baseImageSource?.mimeType || (existingData ? existingData.imageMimeType : null));
 
     let spellData;
     const baseData = {
@@ -335,17 +582,34 @@ export async function saveSpellCard(spellForm, type) {
         : { color30: 'rgba(13, 148, 136, 0.3)', color100: 'rgb(13, 148, 136)' });
     await saveData('rpgEffects', spellData);
 
+    if (relatedCreationContext?.baseSpellId) {
+        const baseSpellData = await getData('rpgEffects', relatedCreationContext.baseSpellId);
+        if (baseSpellData) {
+            if (relatedCreationContext.targetRelationType === 'true') baseSpellData.trueCardId = spellData.id;
+            else baseSpellData.enhanceCardId = spellData.id;
+            await saveData('rpgEffects', baseSpellData);
+        }
+    }
+
     const eventType = type === 'habilidade' ? 'habilidades' : (type === 'ataque' ? 'ataques' : 'magias');
     document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: eventType } }));
 
+    if (relatedCreationContext) {
+        await restoreBaseSpellDraft(spellData.id);
+        return { keepOpen: true, createdRelatedCardId: spellData.id };
+    }
+
     resetSpellFormState();
+    return { keepOpen: false, createdRelatedCardId: null };
 }
 
 export async function editSpell(spellId) {
     const spellData = await getData('rpgEffects', spellId);
     if (!spellData) return;
 
+    pendingRelatedSpellCreation = null;
     currentEditingSpellId = spellId;
+    applySpellFormUi(spellData.type, 'edit');
 
     document.getElementById('spellName').value = spellData.name;
     document.getElementById('spellCircle').value = spellData.circle || '';
@@ -389,6 +653,7 @@ export async function editSpell(spellId) {
     if (enhanceInput) enhanceInput.value = spellData.enhanceCardId || '';
     if (trueInput) trueInput.value = spellData.trueCardId || '';
     await updateSpellRelationLabels();
+    updateRelatedSpellCreationUi();
 }
 
 export async function removeSpell(spellId) {
@@ -489,6 +754,43 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    const createRelatedBtn = document.getElementById('create-related-spell-btn');
+    if (createRelatedBtn) {
+        createRelatedBtn.addEventListener('click', async () => {
+            await startRelatedSpellCreation();
+        });
+    }
+
+    const sameImageCheckbox = document.getElementById('related-spell-base-image-option');
+    if (sameImageCheckbox) {
+        sameImageCheckbox.addEventListener('change', (e) => {
+            if (!pendingRelatedSpellCreation) {
+                e.currentTarget.checked = false;
+                return;
+            }
+            pendingRelatedSpellCreation.useBaseImage = e.currentTarget.checked;
+            const baseSnapshot = pendingRelatedSpellCreation.baseSnapshot;
+            const isBaseFile = spellImageFile && spellImageFile === baseSnapshot?.spellImageFile;
+
+            if (!e.currentTarget.checked && isBaseFile) {
+                spellImageFile = null;
+                showImagePreview(document.getElementById('spellImagePreview'), null, true);
+            } else if (!e.currentTarget.checked && !spellImageFile) {
+                showImagePreview(document.getElementById('spellImagePreview'), null, true);
+            } else if (e.currentTarget.checked && !spellImageFile) {
+                if (baseSnapshot?.spellImageFile) {
+                    spellImageFile = baseSnapshot.spellImageFile;
+                    showImagePreview(document.getElementById('spellImagePreview'), URL.createObjectURL(baseSnapshot.spellImageFile), true);
+                } else if (baseSnapshot?.spellImage) {
+                    const imageBlob = bufferToBlobUtil(baseSnapshot.spellImage, baseSnapshot.spellImageMimeType);
+                    showImagePreview(document.getElementById('spellImagePreview'), URL.createObjectURL(imageBlob), true);
+                }
+            }
+        });
+    }
+
+    updateRelatedSpellCreationUi();
 });
 
 function setActiveSpellRelationType(type) {

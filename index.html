@@ -359,9 +359,26 @@
                     <div>
                          <div class="flex justify-between items-center mb-1">
                             <h3 class="text-xs font-bold text-purple-400 uppercase">Relações</h3>
-                            <button type="button" id="add-relationship-btn" class="text-purple-400 hover:text-purple-200 text-xs font-bold"><i class="fas fa-plus"></i></button>
+                            <div class="flex items-center gap-2">
+                                <button type="button" id="create-related-character-btn" class="hidden text-[10px] px-2 py-1 rounded-full border border-purple-500/40 text-purple-300 hover:text-white hover:border-purple-300 transition-colors">
+                                    <i class="fas fa-clone mr-1"></i>Criar relacionado
+                                </button>
+                                <button type="button" id="add-relationship-btn" class="text-purple-400 hover:text-purple-200 text-xs font-bold"><i class="fas fa-plus"></i></button>
+                            </div>
                         </div>
                         <div id="selected-relationships-container" class="bg-gray-800/50 p-2 rounded min-h-[40px] max-h-[500px] overflow-y-auto"></div>
+                    </div>
+                </div>
+                <div id="related-creation-panel" class="hidden bg-purple-950/30 border border-purple-500/30 rounded-lg p-3">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wide text-purple-200">Criando card relacionado</p>
+                            <p class="text-sm text-gray-200">Ao salvar, este novo card sera ligado automaticamente a <span id="related-base-card-name" class="font-semibold text-purple-200">card base</span>.</p>
+                        </div>
+                        <label id="related-base-image-option-wrapper" for="related-base-image-option" class="flex items-center gap-2 text-xs text-gray-200">
+                            <input type="checkbox" id="related-base-image-option" class="rounded border-gray-600 bg-gray-800 text-purple-500 focus:ring-purple-500">
+                            <span>Usar mesma imagem do card base</span>
+                        </label>
                     </div>
                 </div>
                 <div class="pt-2">
@@ -465,9 +482,14 @@
                         <input type="hidden" id="spellTrueCardId">
                         <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                             <h3 class="text-xs font-bold text-teal-300 uppercase">Cards relacionados</h3>
-                            <button type="button" id="open-spell-relations-btn" class="bg-teal-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-teal-500">
-                                Relacionar Cards
-                            </button>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button type="button" id="create-related-spell-btn" class="hidden text-[10px] px-2 py-1 rounded-full border border-teal-500/40 text-teal-300 hover:text-white hover:border-teal-300 transition-colors">
+                                    <i class="fas fa-clone mr-1"></i>Criar relacionado
+                                </button>
+                                <button type="button" id="open-spell-relations-btn" class="bg-teal-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-teal-500">
+                                    Relacionar Cards
+                                </button>
+                            </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                             <div class="spell-relation-pill">
@@ -477,6 +499,18 @@
                             <div class="spell-relation-pill">
                                 <span>Verdadeiro</span>
                                 <strong id="spellTrueCardName">Nenhum card selecionado</strong>
+                            </div>
+                        </div>
+                        <div id="related-spell-creation-panel" class="hidden mt-3 bg-teal-950/30 border border-teal-500/30 rounded-lg p-3">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                                <div>
+                                    <p class="text-xs font-bold uppercase tracking-wide text-teal-200">Criando card relacionado</p>
+                                    <p class="text-sm text-gray-200">Ao salvar, este novo card sera ligado automaticamente a <span id="related-spell-base-name" class="font-semibold text-teal-200">card base</span> em <span id="related-spell-target-slot" class="font-semibold text-teal-200">Aprimorar</span>.</p>
+                                </div>
+                                <label id="related-spell-base-image-option-wrapper" for="related-spell-base-image-option" class="flex items-center gap-2 text-xs text-gray-200">
+                                    <input type="checkbox" id="related-spell-base-image-option" class="rounded border-gray-600 bg-gray-800 text-teal-500 focus:ring-teal-500">
+                                    <span>Usar mesma imagem do card base</span>
+                                </label>
                             </div>
                         </div>
                     </div>

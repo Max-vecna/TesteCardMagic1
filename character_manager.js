@@ -1,6 +1,7 @@
 import { saveData, getData } from './local_db.js';
 import { renderInventoryForForm } from './item_manager.js';
 import { openSelectionModal as openItemSelectionModal } from './navigation_manager.js';
+import { renderFullCharacterSheet } from './card-renderer.js';
 import { readFileAsArrayBuffer, bufferToBlob, arrayBufferToBase64, base64ToArrayBuffer, showImagePreview, calculateColor } from './ui_utils.js';
 
 const PERICIAS_DATA = {
@@ -23,6 +24,7 @@ let characterImageFile = null;
 let backgroundImageFile = null;
 let currentCharacterItems = [];
 let currentCharacterFormType = 'character';
+let pendingRelatedCharacterCreation = null;
 
 function toInt(value) {
     const n = parseInt(value, 10);
@@ -88,7 +90,265 @@ function updateDerivedStatsInForm() {
     }
 }
 
-export function resetCharacterFormState() {
+function getSelectedIdsFromContainer(containerId) {
+    return Array.from(document.querySelectorAll(`#${containerId} [data-id]`)).map(el => el.dataset.id);
+}
+
+function hasBaseCharacterImage(snapshot) {
+    return Boolean(snapshot?.characterImageFile || snapshot?.characterImage);
+}
+
+function updateRelatedCreationUi() {
+    const createRelatedBtn = document.getElementById('create-related-character-btn');
+    const relatedPanel = document.getElementById('related-creation-panel');
+    const baseNameEl = document.getElementById('related-base-card-name');
+    const sameImageCheckbox = document.getElementById('related-base-image-option');
+    const sameImageWrapper = document.getElementById('related-base-image-option-wrapper');
+    const isEditingCharacter = Boolean(currentEditingCardId) && currentCharacterFormType !== 'creature' && !pendingRelatedCharacterCreation;
+
+    if (createRelatedBtn) createRelatedBtn.classList.toggle('hidden', !isEditingCharacter);
+    if (relatedPanel) relatedPanel.classList.toggle('hidden', !pendingRelatedCharacterCreation);
+
+    if (!pendingRelatedCharacterCreation) {
+        if (sameImageCheckbox) {
+            sameImageCheckbox.checked = false;
+            sameImageCheckbox.disabled = false;
+        }
+        if (sameImageWrapper) sameImageWrapper.classList.remove('hidden');
+        return;
+    }
+
+    if (baseNameEl) baseNameEl.textContent = pendingRelatedCharacterCreation.baseTitle || 'card base';
+
+    const canReuseImage = hasBaseCharacterImage(pendingRelatedCharacterCreation.baseSnapshot);
+    if (sameImageCheckbox) {
+        sameImageCheckbox.checked = canReuseImage && Boolean(pendingRelatedCharacterCreation.useBaseImage);
+        sameImageCheckbox.disabled = !canReuseImage;
+    }
+    if (sameImageWrapper) sameImageWrapper.classList.toggle('hidden', !canReuseImage);
+}
+
+async function captureCharacterFormSnapshot() {
+    const persistedData = currentEditingCardId ? await getData('rpgCards', currentEditingCardId) : null;
+
+    return {
+        currentEditingCardId,
+        formType: currentCharacterFormType,
+        title: document.getElementById('cardTitle')?.value || '',
+        subTitle: document.getElementById('cardSubTitle')?.value || '',
+        level: document.getElementById('cardLevel')?.value || '',
+        dinheiro: document.getElementById('dinheiro')?.value || '',
+        classe: document.getElementById('cardClass')?.value || '',
+        vida: document.getElementById('vida')?.value || '',
+        mana: document.getElementById('mana')?.value || '',
+        vidaAtual: document.getElementById('vidaAtual')?.value || '',
+        manaAtual: document.getElementById('manaAtual')?.value || '',
+        armadura: document.getElementById('armadura')?.value || '',
+        esquiva: document.getElementById('esquiva')?.value || '',
+        bloqueio: document.getElementById('bloqueio')?.value || '',
+        deslocamento: document.getElementById('deslocamento')?.value || '',
+        agilidade: document.getElementById('agilidade')?.value || '',
+        carisma: document.getElementById('carisma')?.value || '',
+        forca: document.getElementById('forca')?.value || '',
+        inteligencia: document.getElementById('inteligencia')?.value || '',
+        sabedoria: document.getElementById('sabedoria')?.value || '',
+        vigor: document.getElementById('vigor')?.value || '',
+        acerto: document.getElementById('acerto')?.value || '',
+        dano: document.getElementById('dano')?.value || '',
+        critico: document.getElementById('critico')?.value || '',
+        danoSemMana: document.getElementById('danoSemMana')?.value || '',
+        historia: document.getElementById('historia')?.value || '',
+        personalidade: document.getElementById('personalidade')?.value || '',
+        motivacao: document.getElementById('motivacao')?.value || '',
+        selectedPericias: getCurrentlySelectedPericias(),
+        selectedMagicIds: getSelectedIdsFromContainer('selected-magics-container'),
+        selectedSkillIds: getSelectedIdsFromContainer('selected-skills-container'),
+        selectedAttackIds: getSelectedIdsFromContainer('selected-attacks-container'),
+        selectedRelationshipIds: getSelectedIdsFromContainer('selected-relationships-container'),
+        items: currentCharacterItems.slice(),
+        characterImageFile,
+        backgroundImageFile,
+        characterImage: persistedData?.image || null,
+        characterImageMimeType: persistedData?.imageMimeType || null,
+        backgroundImage: persistedData?.backgroundImage || null,
+        backgroundImageMimeType: persistedData?.backgroundMimeType || null
+    };
+}
+
+async function restoreCharacterFormSnapshot(snapshot, options = {}) {
+    if (!snapshot) return;
+    const { asNew = false, titleOverride = '', submitOverride = '' } = options;
+
+    resetCharacterFormState(true);
+    currentCharacterFormType = snapshot.formType === 'creature' ? 'creature' : 'character';
+    setCharacterFormType(currentCharacterFormType);
+    currentEditingCardId = asNew ? null : (snapshot.currentEditingCardId || null);
+
+    document.getElementById('cardTitle').value = snapshot.title || '';
+    document.getElementById('cardSubTitle').value = snapshot.subTitle || '';
+    document.getElementById('cardLevel').value = snapshot.level || '';
+    document.getElementById('dinheiro').value = snapshot.dinheiro || '';
+    document.getElementById('cardClass').value = snapshot.classe || '';
+
+    document.getElementById('vida').value = snapshot.vida || '';
+    document.getElementById('mana').value = snapshot.mana || '';
+    document.getElementById('vidaAtual').value = snapshot.vidaAtual || '';
+    document.getElementById('manaAtual').value = snapshot.manaAtual || '';
+    document.getElementById('armadura').value = snapshot.armadura || '';
+    document.getElementById('esquiva').value = snapshot.esquiva || '';
+    document.getElementById('bloqueio').value = snapshot.bloqueio || '';
+    document.getElementById('deslocamento').value = snapshot.deslocamento || '';
+    document.getElementById('agilidade').value = snapshot.agilidade || '';
+    document.getElementById('carisma').value = snapshot.carisma || '';
+    document.getElementById('forca').value = snapshot.forca || '';
+    document.getElementById('inteligencia').value = snapshot.inteligencia || '';
+    document.getElementById('sabedoria').value = snapshot.sabedoria || '';
+    document.getElementById('vigor').value = snapshot.vigor || '';
+    document.getElementById('acerto').value = snapshot.acerto || '';
+    document.getElementById('dano').value = snapshot.dano || '';
+    document.getElementById('critico').value = snapshot.critico || '';
+    document.getElementById('danoSemMana').value = snapshot.danoSemMana || '';
+
+    document.getElementById('historia').value = snapshot.historia || '';
+    document.getElementById('personalidade').value = snapshot.personalidade || '';
+    document.getElementById('motivacao').value = snapshot.motivacao || '';
+
+    populatePericiasCheckboxes(currentCharacterFormType === 'creature' ? [] : (snapshot.selectedPericias || []));
+
+    for (const magicId of snapshot.selectedMagicIds || []) {
+        const magicData = await getData('rpgEffects', magicId);
+        if (magicData) createSelectedElement(magicData, magicData.type === 'habilidade' ? 'skill' : 'magic');
+    }
+
+    for (const skillId of snapshot.selectedSkillIds || []) {
+        const skillData = await getData('rpgEffects', skillId);
+        if (skillData) createSelectedElement(skillData, 'skill');
+    }
+
+    for (const attackId of snapshot.selectedAttackIds || []) {
+        const attackData = await getData('rpgEffects', attackId);
+        if (attackData) createSelectedElement(attackData, 'attack');
+    }
+
+    for (const relationshipId of snapshot.selectedRelationshipIds || []) {
+        const relatedCharData = await getData('rpgCards', relationshipId);
+        if (relatedCharData) createSelectedElement(relatedCharData, 'relationship');
+    }
+
+    currentCharacterItems = (snapshot.items || []).slice();
+    document.getElementById('form-inventory-section').classList.toggle('hidden', currentCharacterFormType === 'creature');
+    renderInventoryForForm(currentCharacterItems, parseInt(snapshot.forca, 10) || 0);
+
+    characterImageFile = snapshot.characterImageFile || null;
+    backgroundImageFile = snapshot.backgroundImageFile || null;
+
+    if (characterImageFile) {
+        showImagePreview(document.getElementById('characterImagePreview'), URL.createObjectURL(characterImageFile), true);
+    } else if (snapshot.characterImage) {
+        const imageBlob = bufferToBlob(snapshot.characterImage, snapshot.characterImageMimeType);
+        showImagePreview(document.getElementById('characterImagePreview'), URL.createObjectURL(imageBlob), true);
+    }
+
+    if (backgroundImageFile) {
+        showImagePreview(document.getElementById('backgroundImagePreview'), URL.createObjectURL(backgroundImageFile), false);
+    } else if (snapshot.backgroundImage) {
+        const backgroundBlob = bufferToBlob(snapshot.backgroundImage, snapshot.backgroundImageMimeType);
+        showImagePreview(document.getElementById('backgroundImagePreview'), URL.createObjectURL(backgroundBlob), false);
+    }
+
+    if (titleOverride) {
+        document.getElementById('form-title').textContent = titleOverride;
+    } else if (currentEditingCardId) {
+        document.getElementById('form-title').textContent = `${currentCharacterFormType === 'creature' ? 'Editando Criatura' : 'Editando'}: ${snapshot.title || ''}`;
+    }
+    if (submitOverride) {
+        document.getElementById('submitButton').textContent = submitOverride;
+    } else if (currentEditingCardId) {
+        document.getElementById('submitButton').textContent = currentCharacterFormType === 'creature' ? 'Salvar Criatura' : 'Salvar Edicao';
+    }
+
+    updateRelatedCreationUi();
+    updateDerivedStatsInForm();
+}
+
+async function restoreBaseCharacterDraft(additionalRelationshipId = null) {
+    const snapshot = pendingRelatedCharacterCreation?.baseSnapshot;
+    if (!snapshot) return false;
+
+    if (additionalRelationshipId) {
+        const relationshipIds = new Set(snapshot.selectedRelationshipIds || []);
+        relationshipIds.add(additionalRelationshipId);
+        snapshot.selectedRelationshipIds = Array.from(relationshipIds);
+    }
+
+    pendingRelatedCharacterCreation = null;
+    await restoreCharacterFormSnapshot(snapshot);
+    return true;
+}
+
+function getRelatedCreationBaseImage(snapshot) {
+    if (!snapshot) return { image: null, mimeType: null, isFile: false };
+
+    if (snapshot.characterImageFile) {
+        return {
+            image: snapshot.characterImageFile,
+            mimeType: snapshot.characterImageFile.type || null,
+            isFile: true
+        };
+    }
+
+    return {
+        image: snapshot.characterImage || null,
+        mimeType: snapshot.characterImageMimeType || null,
+        isFile: false
+    };
+}
+
+function getRelatedCreationBaseBackground(snapshot) {
+    if (!snapshot) return { image: null, mimeType: null, isFile: false };
+
+    if (snapshot.backgroundImageFile) {
+        return {
+            image: snapshot.backgroundImageFile,
+            mimeType: snapshot.backgroundImageFile.type || null,
+            isFile: true
+        };
+    }
+
+    return {
+        image: snapshot.backgroundImage || null,
+        mimeType: snapshot.backgroundImageMimeType || null,
+        isFile: false
+    };
+}
+
+export async function startRelatedCharacterCreation() {
+    if (!currentEditingCardId || currentCharacterFormType === 'creature') return false;
+
+    const snapshot = await captureCharacterFormSnapshot();
+    pendingRelatedCharacterCreation = {
+        baseCardId: snapshot.currentEditingCardId,
+        baseTitle: snapshot.title || 'card base',
+        baseSnapshot: snapshot,
+        useBaseImage: true
+    };
+
+    await restoreCharacterFormSnapshot(snapshot, {
+        asNew: true,
+        titleOverride: `Novo relacionado de: ${snapshot.title || 'card base'}`,
+        submitOverride: 'Criar relacionado'
+    });
+    return true;
+}
+
+export async function handleCharacterFormCloseRequest() {
+    if (!pendingRelatedCharacterCreation) return false;
+    await restoreBaseCharacterDraft();
+    return true;
+}
+
+export function resetCharacterFormState(preserveRelatedCreation = false) {
+    if (!preserveRelatedCreation) pendingRelatedCharacterCreation = null;
     currentEditingCardId = null;
     characterImageFile = null;
     backgroundImageFile = null;
@@ -110,6 +370,7 @@ export function resetCharacterFormState() {
     populatePericiasCheckboxes();
     renderInventoryForForm([], 0);
 
+    updateRelatedCreationUi();
     updateDerivedStatsInForm();
 }
 
@@ -132,6 +393,7 @@ export function setCharacterFormType(type = 'character') {
     const submitEl = document.getElementById('submitButton');
     if (!currentEditingCardId && titleEl) titleEl.textContent = isCreature ? 'Nova Criatura' : 'Novo Personagem';
     if (!currentEditingCardId && submitEl) submitEl.textContent = isCreature ? 'Criar Criatura' : 'Criar Cartão';
+    updateRelatedCreationUi();
 }
 
 export function getCharacterItems() {
@@ -199,7 +461,26 @@ export async function populateCharacterSelect(selectId, includeNoneOption = true
     }
 }
 
-function createSelectedElement(data, type) {
+function updateRelationshipFanLayout() {
+    const container = document.getElementById('selected-relationships-container');
+    if (!container) return;
+
+    const cards = Array.from(container.querySelectorAll('.relationship-form-thumbnail'));
+    const centerIndex = (cards.length - 1) / 2;
+
+    cards.forEach((card, index) => {
+        const distanceFromCenter = index - centerIndex;
+        const rotation = distanceFromCenter * 5.5;
+        const offsetY = Math.abs(distanceFromCenter) * 8;
+        const layer = Math.max(1, Math.round((cards.length - Math.abs(distanceFromCenter)) * 10));
+
+        card.style.setProperty('--fan-rotate', `${rotation}deg`);
+        card.style.setProperty('--fan-offset-y', `${offsetY}px`);
+        card.style.setProperty('--fan-z', String(layer));
+    });
+}
+
+async function createSelectedElement(data, type) {
     let containerId;
     let iconClass;
     let isImageRound = false;
@@ -231,8 +512,25 @@ function createSelectedElement(data, type) {
     if (!container || container.querySelector(`[data-id="${data.id}"]`)) return;
 
     const itemElement = document.createElement('div');
-    itemElement.className = 'flex items-center justify-between bg-gray-800 p-2 rounded mt-1 mb-1';
     itemElement.dataset.id = data.id;
+
+    if (type === 'relationship') {
+        const miniSheetHtml = await renderFullCharacterSheet(data, false, false, null, { staticHtmlOnly: true });
+        itemElement.className = 'relationship-form-thumbnail related-character-grid-item';
+        itemElement.innerHTML = `
+            ${miniSheetHtml}
+            <button type="button" class="text-red-500 hover:text-red-400 remove-selection-btn text-xl leading-none" aria-label="Remover relacionamento">&times;</button>
+        `;
+        itemElement.querySelector('.remove-selection-btn').addEventListener('click', () => {
+            itemElement.remove();
+            updateRelationshipFanLayout();
+        });
+        container.appendChild(itemElement);
+        updateRelationshipFanLayout();
+        return;
+    }
+
+    itemElement.className = 'flex items-center justify-between bg-gray-800 p-2 rounded mt-1 mb-1';
 
     let iconHtml = '';
     if (data.image) {
@@ -320,6 +618,7 @@ export function populatePericiasCheckboxes(selectedPericias = []) {
 
 export async function saveCharacterCard(cardForm) {
     const isCreature = currentCharacterFormType === 'creature';
+    const relatedCreationContext = pendingRelatedCharacterCreation;
     const cardTitleInput = document.getElementById('cardTitle');
     const cardSubTitleInput = document.getElementById('cardSubTitle');
     const cardLevelInput = document.getElementById('cardLevel');
@@ -396,11 +695,29 @@ export async function saveCharacterCard(cardForm) {
         existingData = await getData('rpgCards', currentEditingCardId);
     }
 
-    const imageBuffer = characterImageFile ? await readFileAsArrayBuffer(characterImageFile) : (existingData ? existingData.image : null);
-    const imageMimeType = characterImageFile ? characterImageFile.type : (existingData ? existingData.imageMimeType : null);
+    const baseImageSource = relatedCreationContext?.useBaseImage
+        ? getRelatedCreationBaseImage(relatedCreationContext.baseSnapshot)
+        : null;
+    const imageBuffer = characterImageFile
+        ? await readFileAsArrayBuffer(characterImageFile)
+        : (baseImageSource?.isFile
+            ? await readFileAsArrayBuffer(baseImageSource.image)
+            : (baseImageSource?.image || (existingData ? existingData.image : null)));
+    const imageMimeType = characterImageFile
+        ? characterImageFile.type
+        : (baseImageSource?.mimeType || (existingData ? existingData.imageMimeType : null));
 
-    const backgroundBuffer = backgroundImageFile ? await readFileAsArrayBuffer(backgroundImageFile) : (existingData ? existingData.backgroundImage : null);
-    const backgroundMimeType = backgroundImageFile ? backgroundImageFile.type : (existingData ? existingData.backgroundMimeType : null);
+    const baseBackgroundSource = relatedCreationContext?.baseSnapshot
+        ? getRelatedCreationBaseBackground(relatedCreationContext.baseSnapshot)
+        : null;
+    const backgroundBuffer = backgroundImageFile
+        ? await readFileAsArrayBuffer(backgroundImageFile)
+        : (baseBackgroundSource?.isFile
+            ? await readFileAsArrayBuffer(baseBackgroundSource.image)
+            : (baseBackgroundSource?.image || (existingData ? existingData.backgroundImage : null)));
+    const backgroundMimeType = backgroundImageFile
+        ? backgroundImageFile.type
+        : (baseBackgroundSource?.mimeType || (existingData ? existingData.backgroundMimeType : null));
 
     const itemIds = isCreature ? [] : currentCharacterItems.map(item => item.id);
 
@@ -410,7 +727,12 @@ export async function saveCharacterCard(cardForm) {
     ].map(el => el.dataset.id);
 
     const attackIds = isCreature ? [] : Array.from(document.querySelectorAll('#selected-attacks-container [data-id]')).map(el => el.dataset.id);
-    const relationshipIds = isCreature ? [] : Array.from(document.querySelectorAll('#selected-relationships-container [data-id]')).map(el => el.dataset.id);
+    const relationshipIds = isCreature
+        ? []
+        : Array.from(new Set([
+            ...Array.from(document.querySelectorAll('#selected-relationships-container [data-id]')).map(el => el.dataset.id),
+            ...(relatedCreationContext?.baseCardId ? [relatedCreationContext.baseCardId] : [])
+        ]));
 
     const classe = cardClassSelect ? cardClassSelect.value : '';
 
@@ -461,8 +783,25 @@ export async function saveCharacterCard(cardForm) {
     cardData.predominantColor = await calculateColor(cardData.image, cardData.imageMimeType);
 
     await saveData('rpgCards', cardData);
+    if (relatedCreationContext?.baseCardId) {
+        const baseCardData = await getData('rpgCards', relatedCreationContext.baseCardId);
+        if (baseCardData && baseCardData.cardType !== 'creature') {
+            const baseRelationships = Array.isArray(baseCardData.relationships) ? baseCardData.relationships : [];
+            if (!baseRelationships.includes(cardData.id)) {
+                baseCardData.relationships = [...baseRelationships, cardData.id];
+                await saveData('rpgCards', baseCardData);
+            }
+        }
+    }
     document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: isCreature ? 'criaturas' : 'personagem' } }));
+
+    if (relatedCreationContext) {
+        await restoreBaseCharacterDraft(cardData.id);
+        return { keepOpen: true, createdRelatedCardId: cardData.id };
+    }
+
     resetCharacterFormState();
+    return { keepOpen: false, createdRelatedCardId: null };
 }
 
 export async function editCard(cardId) {
@@ -474,8 +813,9 @@ export async function editCard(cardId) {
     setCharacterFormType(currentCharacterFormType);
 
     document.getElementById('form-title').textContent = `${currentCharacterFormType === 'creature' ? 'Editando Criatura' : 'Editando'}: ${cardData.title}`;
-    document.getElementById('submitButton').textContent = currentCharacterFormType === 'creature' ? 'Salvar Criatura' : 'Salvar Edição';
+    document.getElementById('submitButton').textContent = currentCharacterFormType === 'creature' ? 'Salvar Criatura' : 'Salvar Edicao';
     currentEditingCardId = cardId;
+    pendingRelatedCharacterCreation = null;
 
     document.getElementById('cardTitle').value = cardData.title;
     document.getElementById('cardSubTitle').value = cardData.subTitle;
@@ -550,6 +890,7 @@ export async function editCard(cardId) {
     document.getElementById('form-inventory-section').classList.toggle('hidden', currentCharacterFormType === 'creature');
     renderInventoryForForm(currentCharacterItems, attrs.forca || 0);
 
+    updateRelatedCreationUi();
     updateDerivedStatsInForm();
 }
 
@@ -656,6 +997,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('addRelationshipToCharacter', (e) => createSelectedElement(e.detail.data, 'relationship'));
 
+    const createRelatedBtn = document.getElementById('create-related-character-btn');
+    if (createRelatedBtn) {
+        createRelatedBtn.addEventListener('click', async () => {
+            await startRelatedCharacterCreation();
+        });
+    }
+
+    const sameImageCheckbox = document.getElementById('related-base-image-option');
+    if (sameImageCheckbox) {
+        sameImageCheckbox.addEventListener('change', (e) => {
+            if (!pendingRelatedCharacterCreation) {
+                e.currentTarget.checked = false;
+                return;
+            }
+            pendingRelatedCharacterCreation.useBaseImage = e.currentTarget.checked;
+            const baseSnapshot = pendingRelatedCharacterCreation.baseSnapshot;
+            const isBaseFile = characterImageFile && characterImageFile === baseSnapshot?.characterImageFile;
+
+            if (!e.currentTarget.checked && isBaseFile) {
+                characterImageFile = null;
+                showImagePreview(document.getElementById('characterImagePreview'), null, true);
+            } else if (!e.currentTarget.checked && !characterImageFile) {
+                showImagePreview(document.getElementById('characterImagePreview'), null, true);
+            } else if (e.currentTarget.checked && !characterImageFile) {
+                if (baseSnapshot?.characterImageFile) {
+                    characterImageFile = baseSnapshot.characterImageFile;
+                    showImagePreview(document.getElementById('characterImagePreview'), URL.createObjectURL(baseSnapshot.characterImageFile), true);
+                } else if (baseSnapshot?.characterImage) {
+                    const imageBlob = bufferToBlob(baseSnapshot.characterImage, baseSnapshot.characterImageMimeType);
+                    showImagePreview(document.getElementById('characterImagePreview'), URL.createObjectURL(imageBlob), true);
+                }
+            }
+        });
+    }
+
     document.addEventListener('requestItemRemoval', (e) => {
         const { itemIndex } = e.detail;
         if (itemIndex > -1 && itemIndex < currentCharacterItems.length) {
@@ -712,5 +1088,6 @@ document.addEventListener('DOMContentLoaded', () => {
         el.addEventListener('change', updateDerivedStatsInForm);
     });
 
+    updateRelatedCreationUi();
     updateDerivedStatsInForm();
 });

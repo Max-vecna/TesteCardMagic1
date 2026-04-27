@@ -189,6 +189,15 @@ export async function updateStatDisplay(sheetContainer, characterData) {
 
     const permanentMaxVida = vidaBase + (totalFixedBonuses.vida || 0);
     const permanentMaxMana = manaBase + (totalFixedBonuses.mana || 0);
+    const keepResourcesVisible = sheetContainer.dataset.inPlay === 'true' || sheetContainer.classList.contains('in-play-animation');
+    const hasVida = keepResourcesVisible || (characterData.attributes?.vidaAtual || 0) > 0;
+    const hasMana = keepResourcesVisible || (characterData.attributes?.manaAtual || 0) > 0;
+    const hasMoney = keepResourcesVisible || (characterData.dinheiro || 0) > 0;
+
+    const updateResourceVisibility = (statType, isVisible) => {
+        const statContainer = sheetContainer.querySelector(`[data-stat-type="${statType}"]`);
+        if (statContainer) statContainer.style.display = isVisible ? '' : 'none';
+    };
 
     const vidaEl = sheetContainer.querySelector('[data-stat-current="vida"]');
     if (vidaEl) vidaEl.textContent = characterData.attributes.vidaAtual || 0;
@@ -199,6 +208,7 @@ export async function updateStatDisplay(sheetContainer, characterData) {
         const vidaMaxEl = vidaMaxContainer.querySelector('[data-stat-max-display="vida"]');
         if (vidaMaxEl) vidaMaxEl.textContent = permanentMaxVida;
     }
+    updateResourceVisibility('vida', hasVida);
     applyStatIconVisualState(sheetContainer, 'vida', characterData.attributes.vidaAtual, permanentMaxVida);
 
     const manaEl = sheetContainer.querySelector('[data-stat-current="mana"]');
@@ -210,10 +220,12 @@ export async function updateStatDisplay(sheetContainer, characterData) {
         const manaMaxEl = manaMaxContainer.querySelector('[data-stat-max-display="mana"]');
         if (manaMaxEl) manaMaxEl.textContent = permanentMaxMana;
     }
+    updateResourceVisibility('mana', hasMana);
     applyStatIconVisualState(sheetContainer, 'mana', characterData.attributes.manaAtual, permanentMaxMana);
 
     const dinheiroEl = sheetContainer.querySelector('[data-stat-current="dinheiro"]');
     if (dinheiroEl) dinheiroEl.textContent = characterData.dinheiro || 0;
+    updateResourceVisibility('dinheiro', hasMoney);
     
     // --- ATUALIZADO: Separação de Stats ---
     // Definição das duas listas de stats para busca
@@ -883,8 +895,9 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         `
         : '';
 
-    const hasMoney = (characterData.dinheiro || 0) > 0;
-    const moneyContainerStyle = hasMoney ? "writing-mode: vertical-rl; text-orientation: upright; top: 141px;" : "display: none;";
+    const hasVida = isInPlay || (characterData.attributes?.vidaAtual || 0) > 0;
+    const hasMana = isInPlay || (characterData.attributes?.manaAtual || 0) > 0;
+    const hasMoney = isInPlay || (characterData.dinheiro || 0) > 0;
     const finalRelationshipsBar = collectionButtonsHtml;
     const hasCollectionDock = Boolean(finalRelationshipsBar);
 
@@ -897,7 +910,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                 <div class="rounded-lg absolute inset-0" style="width: 94%; height: 96%; border: 3px solid ${predominantColor.colorLight}; margin: auto; box-shadow: inset 0px 0px 5px black, 0px 0px 5px black;">
                     <div class="h-full w-12 left-2 top-2 pb-4 absolute top-0 bottom-0 flex flex-col items-center justify-content" style="justify-content: space-between;">
                        <div> 
-                            <div class="div-combat-stats grid grid-row-6 gap-y-2 text-xs w-12" style="border-radius: 28px 5px 28px 5px; background: ${predominantColor.colorLight}; padding: 10px; justify-content: space-evenly; box-shadow: 0 0 10px black;">
+                            <div class="div-combat-stats grid grid-row-6 gap-y-2 text-xs w-10" style="border-radius: 28px 5px 28px 5px; background: ${predominantColor.colorLight}; padding: 10px; justify-content: space-evenly; box-shadow: 0 0 10px black;">
                                 <div class="text-center font-bold" style="color: rgb(0 247 85);">LV<br>${characterData.level || 0}</div>
                                 ${defenseStatsHtml}
                                 <div class="text-center">CD<br>${formatTotal(cdValue, cdFixed !== 0)}</div>                           
@@ -922,7 +935,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
 
                     <div class="h-full w-12 right-2 top-2 pb-4 absolute top-0 bottom-0 flex flex-col items-center justify-content" style="justify-content: space-between;">
                         <div class="mt-2 flex flex-col items-center">
-                            <div style="position: relative;" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}">
+                            <div style="position: relative; display: ${hasVida ? 'block' : 'none'};" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}">
                                 <i class="fa-solid fa-heart text-5xl status-resource-icon status-heart-icon" data-stat-icon="vida" style="${heartIconStyle}"></i>
                                 <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto; z-index: 2;">
                                     <span data-stat-current="vida">
@@ -935,7 +948,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                                 </div>
                             </div>
                             
-                            <div style="position: relative;" data-action="edit-stat" data-stat-type="mana" data-stat-max="${permanentMaxMana}" class="mt-4 flex flex-col items-center">
+                            <div style="position: relative; display: ${hasMana ? 'flex' : 'none'};" data-action="edit-stat" data-stat-type="mana" data-stat-max="${permanentMaxMana}" class="mt-4 flex flex-col items-center">
                                  <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none pt-2" style="margin: auto; z-index: 2;">
                                     <span data-stat-current="mana">
                                         ${characterData.attributes.manaAtual || 0}
@@ -948,7 +961,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                                 <i class="fas fa-fire text-5xl status-resource-icon status-fire-icon" data-stat-icon="mana" style="${manaIconStyle}"></i>                               
                             </div> 
 
-                            <div style="position: relative;" data-action="edit-stat" data-stat-type="dinheiro" data-stat-max="${characterData.dinheiro || 0}" class="mt-4 flex flex-col items-center">
+                            <div style="position: relative; display: ${hasMoney ? 'flex' : 'none'};" data-action="edit-stat" data-stat-type="dinheiro" data-stat-max="${characterData.dinheiro || 0}" class="mt-4 flex flex-col items-center">
                                 <span class="status-coins-stack text-4xl" aria-hidden="true">
                                     <i class="fas fa-coins status-coins-base"></i>
                                     <span class="status-coins-shine">
@@ -965,7 +978,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                         <div class="mb-2 flex flex-col items-center">
                             ${attackStatsHtml}
                         </div>
-                        <div class="grid grid-row-6 gap-y-2 text-xs div-Stats w-12" style="border-radius: 28px 5px 28px 5px; background: ${predominantColor.colorLight}; padding: 10px; box-shadow: 0 0 10px black; ">
+                        <div class="grid grid-row-6 gap-y-2 text-xs div-Stats w-10" style="border-radius: 28px 5px 28px 5px; background: ${predominantColor.colorLight}; padding: 10px; box-shadow: 0 0 10px black; ">
                             ${mainAttributes.map(key => {
                             const baseValue = parseInt(characterData.attributes[key]) || 0;
                             const fixedBonus = totalFixedBonuses[key] || 0;
@@ -1007,6 +1020,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     sheetContainer.style.backgroundSize = 'cover';
     sheetContainer.style.backgroundPosition = 'center';
     sheetContainer.style.boxShadow = 'inset 0px 0px 10px 0px black';
+    sheetContainer.dataset.inPlay = isInPlay ? 'true' : 'false';
     sheetContainer.innerHTML = finalHtml;
     applyStatIconVisualState(sheetContainer, 'vida', characterData.attributes.vidaAtual, permanentMaxVida);
     applyStatIconVisualState(sheetContainer, 'mana', characterData.attributes.manaAtual, permanentMaxMana);
@@ -1027,9 +1041,10 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     const collectionTabs = Array.from(sheetContainer.querySelectorAll('.character-collection-tab'));
     const collectionTriggers = Array.from(sheetContainer.querySelectorAll('.character-collection-trigger'));
 
-    const renderCollectionMiniCard = async (config, item) => {
+    const renderCollectionMiniCard = async (config, item, index, totalItems) => {
         let miniSheetHtml = '';
         let wrapperClass = 'related-spell-grid-item';
+        let fanStyle = '';
 
         if (config.type === 'character') {
             wrapperClass = 'related-character-grid-item';
@@ -1047,11 +1062,20 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             miniSheetHtml = await renderFullSpellSheet(item, false);
         }
 
+        if (config.key === 'relationships') {
+            const centerIndex = (totalItems - 1) / 2;
+            const distanceFromCenter = index - centerIndex;
+            const fanRotation = (distanceFromCenter * 5.5).toFixed(2);
+            const fanOffsetY = (Math.abs(distanceFromCenter) * 8).toFixed(2);
+            const fanLayer = Math.max(1, Math.round((totalItems - Math.abs(distanceFromCenter)) * 10));
+            fanStyle = ` style="--fan-rotate: ${fanRotation}deg; --fan-offset-y: ${fanOffsetY}px; --fan-z: ${fanLayer};"`;
+        }
+
         return `
             <div
                 class="character-collection-mini-card ${wrapperClass}"
                 data-collection-key="${config.key}"
-                data-item-id="${item.id}">
+                data-item-id="${item.id}"${fanStyle}>
                 ${miniSheetHtml}
             </div>
         `;
@@ -1098,7 +1122,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         }
 
         try {
-            const cardsHtml = await Promise.all(config.items.map(item => renderCollectionMiniCard(config, item)));
+            const cardsHtml = await Promise.all(config.items.map((item, index) => renderCollectionMiniCard(config, item, index, config.items.length)));
             grid.innerHTML = cardsHtml.join('');
             grid.classList.remove('hidden');
             panel.dataset.rendered = 'true';
