@@ -1736,11 +1736,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.42) !important;
 }
 
-.character-collection-modal-grid[data-collection-grid="relationships"],
-.character-collection-modal-grid[data-collection-grid="spells"],
-.character-collection-modal-grid[data-collection-grid="skills"],
-.character-collection-modal-grid[data-collection-grid="attacks"],
-.character-collection-modal-grid[data-collection-grid="items"] {
+.character-collection-modal-grid[data-collection-grid="relationships"] {
     display: flex;
     justify-content: center;
     align-items: flex-end;
@@ -1751,11 +1747,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     scroll-padding-inline: 1.25rem;
 }
 
-.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card,
-.character-collection-modal-grid[data-collection-grid="spells"] .character-collection-mini-card,
-.character-collection-modal-grid[data-collection-grid="skills"] .character-collection-mini-card,
-.character-collection-modal-grid[data-collection-grid="attacks"] .character-collection-mini-card,
-.character-collection-modal-grid[data-collection-grid="items"] .character-collection-mini-card {
+.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card {
     width: clamp(156px, 18vw, 220px);
     flex: 0 0 clamp(156px, 18vw, 220px);
     align-self: flex-end;
@@ -1770,29 +1762,21 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     transition: transform 0.22s ease, filter 0.22s ease, z-index 0.22s ease;
 }
 
-.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card:hover,
-.character-collection-modal-grid[data-collection-grid="spells"] .character-collection-mini-card:hover,
-.character-collection-modal-grid[data-collection-grid="skills"] .character-collection-mini-card:hover,
-.character-collection-modal-grid[data-collection-grid="attacks"] .character-collection-mini-card:hover,
-.character-collection-modal-grid[data-collection-grid="items"] .character-collection-mini-card:hover {
+.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card:hover {
     --fan-hover-lift: -16px;
     z-index: 999;
 }
 
-.character-collection-modal-grid[data-collection-grid="relationships"] .related-character-grid-item,
-.character-collection-modal-grid[data-collection-grid="spells"] .related-spell-grid-item,
-.character-collection-modal-grid[data-collection-grid="skills"] .related-skill-grid-item,
-.character-collection-modal-grid[data-collection-grid="attacks"] .related-attack-grid-item,
-.character-collection-modal-grid[data-collection-grid="items"] .related-item-grid-item {
+.character-collection-modal-grid[data-collection-grid="relationships"] .related-character-grid-item {
     margin-left: calc(var(--fan-overlap) * -1);
 }
 
-.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card:first-child,
-.character-collection-modal-grid[data-collection-grid="spells"] .character-collection-mini-card:first-child,
-.character-collection-modal-grid[data-collection-grid="skills"] .character-collection-mini-card:first-child,
-.character-collection-modal-grid[data-collection-grid="attacks"] .character-collection-mini-card:first-child,
-.character-collection-modal-grid[data-collection-grid="items"] .character-collection-mini-card:first-child {
+.character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card:first-child {
     margin-left: 0;
+}
+
+.character-collection-modal-grid .character-collection-mini-card.has-related-stack {
+    overflow: visible;
 }
 
 @media (max-width: 480px) {
@@ -1813,20 +1797,12 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
         gap: 1rem;
     }
 
-    .character-collection-modal-grid[data-collection-grid="relationships"],
-    .character-collection-modal-grid[data-collection-grid="spells"],
-    .character-collection-modal-grid[data-collection-grid="skills"],
-    .character-collection-modal-grid[data-collection-grid="attacks"],
-    .character-collection-modal-grid[data-collection-grid="items"] {
+    .character-collection-modal-grid[data-collection-grid="relationships"] {
         justify-content: flex-start;
         padding: 1rem 0.75rem 1.75rem;
     }
 
-    .character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card,
-    .character-collection-modal-grid[data-collection-grid="spells"] .character-collection-mini-card,
-    .character-collection-modal-grid[data-collection-grid="skills"] .character-collection-mini-card,
-    .character-collection-modal-grid[data-collection-grid="attacks"] .character-collection-mini-card,
-    .character-collection-modal-grid[data-collection-grid="items"] .character-collection-mini-card {
+    .character-collection-modal-grid[data-collection-grid="relationships"] .character-collection-mini-card {
         width: clamp(132px, 46vw, 176px);
         flex-basis: clamp(132px, 46vw, 176px);
         --fan-overlap: clamp(28px, 7vw, 46px);
