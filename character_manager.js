@@ -2,7 +2,9 @@ import { saveData, getData } from './local_db.js';
 import { renderInventoryForForm } from './item_manager.js';
 import { openSelectionModal as openItemSelectionModal } from './navigation_manager.js';
 import { renderFullCharacterSheet } from './card-renderer.js';
-import { readFileAsArrayBuffer, bufferToBlob, arrayBufferToBase64, base64ToArrayBuffer, showImagePreview, calculateColor } from './ui_utils.js';
+import { renderFullSpellSheet } from './magic_renderer.js';
+import { renderFullAttackSheet } from './attack_renderer.js';
+import { readFileAsArrayBuffer, bufferToBlob, arrayBufferToBase64, base64ToArrayBuffer, showImagePreview, calculateColor, showCustomConfirm } from './ui_utils.js';
 
 const PERICIAS_DATA = {
     "AGILIDADE": { "Acrobacia": "...", "Iniciativa": "...", "Montaria": "...", "Furtividade": "...", "Pontaria": "...", "Ladinagem": "...", "Reflexos": "..." },
@@ -232,7 +234,7 @@ async function restoreCharacterFormSnapshot(snapshot, options = {}) {
 
     for (const relationshipId of snapshot.selectedRelationshipIds || []) {
         const relatedCharData = await getData('rpgCards', relationshipId);
-        if (relatedCharData) createSelectedElement(relatedCharData, 'relationship');
+        if (relatedCharData?.cardType === 'creature') createSelectedElement(relatedCharData, 'relationship');
     }
 
     currentCharacterItems = (snapshot.items || []).slice();
@@ -335,9 +337,12 @@ export async function startRelatedCharacterCreation() {
 
     await restoreCharacterFormSnapshot(snapshot, {
         asNew: true,
-        titleOverride: `Novo relacionado de: ${snapshot.title || 'card base'}`,
-        submitOverride: 'Criar relacionado'
+        titleOverride: `Nova criatura de: ${snapshot.title || 'card base'}`,
+        submitOverride: 'Criar criatura'
     });
+    setCharacterFormType('creature');
+    document.getElementById('form-title').textContent = `Nova criatura de: ${snapshot.title || 'card base'}`;
+    document.getElementById('submitButton').textContent = 'Criar criatura';
     return true;
 }
 
@@ -465,7 +470,7 @@ function updateRelationshipFanLayout() {
     const container = document.getElementById('selected-relationships-container');
     if (!container) return;
 
-    const cards = Array.from(container.querySelectorAll('.relationship-form-thumbnail'));
+    const cards = Array.from(container.querySelectorAll('.character-form-mini-card.related-character-grid-item'));
     const centerIndex = (cards.length - 1) / 2;
 
     cards.forEach((card, index) => {
@@ -484,23 +489,32 @@ async function createSelectedElement(data, type) {
     let containerId;
     let iconClass;
     let isImageRound = false;
+    let gridItemClass = '';
+    let miniSheetHtml = '';
 
     if (type === 'magic') {
         containerId = 'selected-magics-container';
         iconClass = 'fa-magic';
         isImageRound = true;
+        gridItemClass = 'related-spell-grid-item';
+        miniSheetHtml = await renderFullSpellSheet(data, false);
     } else if (type === 'skill') {
         containerId = 'selected-skills-container';
         iconClass = 'fa-fist-raised';
         isImageRound = true;
+        gridItemClass = 'related-skill-grid-item';
+        miniSheetHtml = await renderFullSpellSheet(data, false);
     } else if (type === 'attack') {
         containerId = 'selected-attacks-container';
         iconClass = 'fa-khanda';
         isImageRound = true;
+        gridItemClass = 'related-attack-grid-item';
+        miniSheetHtml = await renderFullAttackSheet(data, false);
     } else if (type === 'relationship') {
         containerId = 'selected-relationships-container';
-        iconClass = 'fa-user';
+        iconClass = 'fa-dragon';
         isImageRound = true;
+        gridItemClass = 'related-character-grid-item';
     } else if (type === 'item') {
         containerId = 'selected-items-container';
         iconClass = 'fa-box';
@@ -515,18 +529,23 @@ async function createSelectedElement(data, type) {
     itemElement.dataset.id = data.id;
 
     if (type === 'relationship') {
-        const miniSheetHtml = await renderFullCharacterSheet(data, false, false, null, { staticHtmlOnly: true });
-        itemElement.className = 'relationship-form-thumbnail related-character-grid-item';
+        miniSheetHtml = await renderFullCharacterSheet(data, false, false, null, { staticHtmlOnly: true });
+    }
+
+    if (type === 'relationship' || type === 'magic' || type === 'skill' || type === 'attack') {
+        itemElement.className = `character-form-mini-card ${gridItemClass}`;
         itemElement.innerHTML = `
             ${miniSheetHtml}
-            <button type="button" class="text-red-500 hover:text-red-400 remove-selection-btn text-xl leading-none" aria-label="Remover relacionamento">&times;</button>
+            <button type="button" class="text-red-500 hover:text-red-400 remove-selection-btn text-xl leading-none" aria-label="Remover card relacionado">&times;</button>
         `;
-        itemElement.querySelector('.remove-selection-btn').addEventListener('click', () => {
+        itemElement.querySelector('.remove-selection-btn').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (!await showCustomConfirm('Remover este card do personagem?')) return;
             itemElement.remove();
-            updateRelationshipFanLayout();
+            if (type === 'relationship') updateRelationshipFanLayout();
         });
         container.appendChild(itemElement);
-        updateRelationshipFanLayout();
+        if (type === 'relationship') updateRelationshipFanLayout();
         return;
     }
 
@@ -550,7 +569,11 @@ async function createSelectedElement(data, type) {
         <button type="button" class="text-red-500 hover:text-red-400 remove-selection-btn text-xl leading-none">&times;</button>
     `;
 
-    itemElement.querySelector('.remove-selection-btn').addEventListener('click', () => itemElement.remove());
+    itemElement.querySelector('.remove-selection-btn').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!await showCustomConfirm('Remover este card do personagem?')) return;
+        itemElement.remove();
+    });
     container.appendChild(itemElement);
 }
 
@@ -785,7 +808,7 @@ export async function saveCharacterCard(cardForm) {
     await saveData('rpgCards', cardData);
     if (relatedCreationContext?.baseCardId) {
         const baseCardData = await getData('rpgCards', relatedCreationContext.baseCardId);
-        if (baseCardData && baseCardData.cardType !== 'creature') {
+        if (baseCardData && baseCardData.cardType !== 'creature' && cardData.cardType === 'creature') {
             const baseRelationships = Array.isArray(baseCardData.relationships) ? baseCardData.relationships : [];
             if (!baseRelationships.includes(cardData.id)) {
                 baseCardData.relationships = [...baseRelationships, cardData.id];
@@ -872,7 +895,7 @@ export async function editCard(cardId) {
     if (currentCharacterFormType !== 'creature' && cardData.relationships) {
         for (const charId of cardData.relationships) {
             const relatedCharData = await getData('rpgCards', charId);
-            if (relatedCharData) createSelectedElement(relatedCharData, 'relationship');
+            if (relatedCharData?.cardType === 'creature') createSelectedElement(relatedCharData, 'relationship');
         }
     }
 
@@ -1032,9 +1055,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    document.addEventListener('requestItemRemoval', (e) => {
+    document.addEventListener('requestItemRemoval', async (e) => {
         const { itemIndex } = e.detail;
         if (itemIndex > -1 && itemIndex < currentCharacterItems.length) {
+            if (!await showCustomConfirm('Remover este item do inventario?')) return;
             currentCharacterItems.splice(itemIndex, 1);
             renderInventoryForForm(currentCharacterItems, parseInt(document.getElementById('forca').value) || 0);
         }

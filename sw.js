@@ -1,9 +1,14 @@
-const CACHE_NAME = 'magic-cards-shell-v3';
+const CACHE_NAME = 'magic-cards-shell-v6';
 
 const LOCAL_ASSETS = [
     './',
     './index.html',
     './style.css',
+    './vendor/rpg-awesome/css/rpg-awesome.min.css',
+    './vendor/rpg-awesome/fonts/rpgawesome-webfont.eot',
+    './vendor/rpg-awesome/fonts/rpgawesome-webfont.svg',
+    './vendor/rpg-awesome/fonts/rpgawesome-webfont.ttf',
+    './vendor/rpg-awesome/fonts/rpgawesome-webfont.woff',
     './splash_screen.js',
     './settings_manager.js',
     './pwa_manager.js',
@@ -18,7 +23,6 @@ const LOCAL_ASSETS = [
     './item_renderer.js',
     './item_manager.js',
     './attack_renderer.js',
-    './attack_manager.js',
     './grimoire_manager.js',
     './navigation_manager.js',
     './manifest.webmanifest',
@@ -32,10 +36,8 @@ const LOCAL_ASSETS = [
 
 const EXTERNAL_STATIC_ASSETS = [
     'https://cdn.tailwindcss.com',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css',
     'https://apis.google.com/js/api.js',
     'https://accounts.google.com/gsi/client',
-    'https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm',
     'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm'
 ];
 

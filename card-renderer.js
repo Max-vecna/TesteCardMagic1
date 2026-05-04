@@ -71,6 +71,27 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+function getCollectionBaseCards(cards) {
+    const enhanceIds = new Set();
+    const trueIds = new Set();
+
+    cards.forEach(card => {
+        if (card?.enhanceCardId) enhanceIds.add(card.enhanceCardId);
+        if (card?.trueCardId) trueIds.add(card.trueCardId);
+    });
+
+    const existingIds = new Set(cards.map(card => card?.id).filter(Boolean));
+
+    return cards.filter(card => {
+        if (!card?.id) return false;
+        if (enhanceIds.has(card.id) || trueIds.has(card.id)) return false;
+        if ((card.cardVariant === 'enhance' || card.cardVariant === 'true') && card.baseCardId && existingIds.has(card.baseCardId)) {
+            return false;
+        }
+        return true;
+    });
+}
+
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
 }
@@ -504,7 +525,7 @@ async function populateInventory(container, characterData, uniqueId) {
     let inventoryHtml = `<div><h4 class="font-bold text-amber-300 border-b border-amber-300/30 pb-1 mb-2 px-2">Inventário</h4>`;
     if (characterData.items && characterData.items.length > 0) {
         const itemPromises = characterData.items.map(id => getData('rpgItems', id));
-        const items = (await Promise.all(itemPromises)).filter(Boolean);
+        const items = getCollectionBaseCards((await Promise.all(itemPromises)).filter(Boolean));
         if (items.length > 0) {
             inventoryHtml += '<div class="grid grid-cols-2 gap-x-4 gap-y-1 px-2">';
             items.forEach(item => {
@@ -535,7 +556,7 @@ async function populateInventory(container, characterData, uniqueId) {
 
     if (characterData.spells && characterData.spells.length > 0) {
         const magicPromises = characterData.spells.map(id => getData('rpgEffects', id));
-        const magicsAndSkills = (await Promise.all(magicPromises)).filter(Boolean);
+        const magicsAndSkills = getCollectionBaseCards((await Promise.all(magicPromises)).filter(Boolean));
 
         const spells = magicsAndSkills.filter(ms => ms.type === 'magia' || !ms.type);
         const skills = magicsAndSkills.filter(ms => ms.type === 'habilidade');
@@ -594,7 +615,7 @@ async function populateInventory(container, characterData, uniqueId) {
     let attacksHtml = '';
     if (characterData.attacks && characterData.attacks.length > 0) {
         const attackPromises = characterData.attacks.map(id => getData('rpgEffects', id));
-        const attacks = (await Promise.all(attackPromises)).filter(Boolean);
+        const attacks = getCollectionBaseCards((await Promise.all(attackPromises)).filter(Boolean));
 
         attacksHtml = `<div><h4 class="font-bold text-red-400 border-b border-red-400/30 pb-1 mb-2 px-2">Ataques</h4>`;
         if (attacks.length > 0) {
@@ -658,6 +679,9 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     const inventoryItems = !isCreature && characterData.items ? (await Promise.all(characterData.items.map(id => getData('rpgItems', id)))).filter(Boolean) : [];
     const magicItems = !isCreature && characterData.spells ? (await Promise.all(characterData.spells.map(id => getData('rpgEffects', id)))).filter(Boolean) : [];
     const attackItems = !isCreature && characterData.attacks ? (await Promise.all(characterData.attacks.map(id => getData('rpgEffects', id)))).filter(Boolean) : [];
+    const collectionInventoryItems = getCollectionBaseCards(inventoryItems);
+    const collectionMagicItems = getCollectionBaseCards(magicItems);
+    const collectionAttackItems = getCollectionBaseCards(attackItems);
     
     const { totalFixedBonuses, bonusSources } = calculateBonuses(characterData, inventoryItems, magicItems);
 
@@ -766,10 +790,10 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         const colorStyle =  predominantColor.colorLight ; //dano em criatura sem mana
 
 
-        const icon = stat === 'acerto' ? 'fa-dice-d20' : //dado
-                     stat === 'dano' ? 'fas fa-fire' :  //dano em criatura com mana
-                     stat === 'critico' ? 'fa-crosshairs' : //critico
-                     stat === 'danoSemMana' ? 'fa-skull' : ""; //dano em criatura sem mana
+        const icon = stat === 'acerto' ? 'fa-dice-d20' :
+                     stat === 'dano' ? 'fa-fire' :
+                     stat === 'critico' ? 'fa-crosshairs' :
+                     stat === 'danoSemMana' ? 'fa-skull' : "";
 
         const parsed = parseAdditiveString(baseValue);
         const showValue = (parsed.total !== null)
@@ -813,17 +837,17 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
     }).join('');
 
      // Separate spells and skills
-    const spellsOnly = magicItems.filter(item => item.type === 'magia' || !item.type);
-    const skillsOnly = magicItems.filter(item => item.type === 'habilidade');
+    const spellsOnly = collectionMagicItems.filter(item => item.type === 'magia' || !item.type);
+    const skillsOnly = collectionMagicItems.filter(item => item.type === 'habilidade');
     const relatedCharsData = !isCreature && characterData.relationships
-        ? (await Promise.all(characterData.relationships.map(id => getData('rpgCards', id)))).filter(Boolean)
+        ? (await Promise.all(characterData.relationships.map(id => getData('rpgCards', id)))).filter(card => card?.cardType === 'creature')
         : [];
 
     const collectionConfigs = [
         {
             key: 'relationships',
-            label: 'Relacionamentos',
-            icon: 'fa-users',
+            label: 'Criaturas',
+            icon: 'fa-dragon',
             type: 'character',
             items: relatedCharsData
         },
@@ -846,14 +870,14 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
             label: 'Ataques',
             icon: 'fa-khanda',
             type: 'attack',
-            items: attackItems
+            items: collectionAttackItems
         },
         {
             key: 'items',
             label: 'Itens',
             icon: 'fa-box',
             type: 'item',
-            items: inventoryItems
+            items: collectionInventoryItems
         }
     ].filter(config => config.items.length > 0);
 
@@ -1037,7 +1061,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     <div class="h-full w-12 right-2 top-2 pb-4 absolute top-0 bottom-0 flex flex-col items-center justify-content" style="justify-content: space-between;">
                         <div class="mt-2 flex flex-col items-center">
                             <div style="position: relative; display: ${hasVida ? 'block' : 'none'};" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}">
-                                <i class="fa-solid fa-heart text-5xl status-resource-icon status-heart-icon" data-stat-icon="vida" style="${heartIconStyle}"></i>
+                                <i class="fa-solid fa-heart text-6xl status-resource-icon status-heart-icon" data-stat-icon="vida" style="${heartIconStyle}"></i>
                                 <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto; z-index: 2;">
                                     <span data-stat-current="vida">
                                         ${characterData.attributes.vidaAtual || 0}

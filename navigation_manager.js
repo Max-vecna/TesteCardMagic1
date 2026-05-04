@@ -1,6 +1,6 @@
 import { saveCharacterCard, editCard, importCard, getCurrentEditingCardId, exportCard, resetCharacterFormState, setCharacterFormType, populateCharacterSelect, getCharacterItems, handleCharacterFormCloseRequest } from './character_manager.js';
 import { populateSpellAumentosSelect, saveSpellCard, editSpell, importSpell, exportSpell, showImagePreview, resetSpellFormState, handleSpellFormCloseRequest } from './magic_manager.js';
-import { populateItemAumentosSelect, saveItemCard, editItem, importItem, removeItem, exportItem } from './item_manager.js';
+import { populateItemAumentosSelect, saveItemCard, editItem, importItem, removeItem, exportItem, resetItemFormState, handleItemFormCloseRequest } from './item_manager.js';
 import { renderCategoryScreen, populateCategorySelect } from './category_manager.js';
 import { renderGrimoireScreen } from './grimoire_manager.js';
 import { openDatabase, removeData, getData, saveData, exportDatabase, importDatabase, exportImagesAsPng, showProgressModal, hideProgressModal, updateProgress, manualSaveToDrive, manualLoadFromDrive } from './local_db.js';
@@ -17,6 +17,525 @@ let mainContainer;
 
 export function isCombatActive() {
     return false;
+}
+
+const RELATED_GRID_TYPES = new Set(['magias', 'habilidades', 'ataques', 'itens']);
+const RELATED_CARD_TYPES = new Set(['spell', 'attack', 'item']);
+const ROLE_LABELS = {
+    base: 'Base',
+    enhance: 'Aprimorar',
+    true: 'Verdadeiro'
+};
+const MENU_ACTION_LABELS = {
+    edit: 'editar',
+    remove: 'excluir',
+    delete: 'excluir',
+    'export-json': 'exportar'
+};
+
+function escapeHtml(value = '') {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function getCardDisplayName(card) {
+    return card?.name || card?.title || 'Card sem nome';
+}
+
+function getStoreNameForCardType(cardType) {
+    if (cardType === 'character' || cardType === 'creature') return 'rpgCards';
+    if (cardType === 'item') return 'rpgItems';
+    if (cardType === 'spell' || cardType === 'attack') return 'rpgEffects';
+    return '';
+}
+
+function buildRelatedCardIdSets(items) {
+    const enhanceIds = new Set();
+    const trueIds = new Set();
+
+    items.forEach(item => {
+        if (item?.enhanceCardId) enhanceIds.add(item.enhanceCardId);
+        if (item?.trueCardId) trueIds.add(item.trueCardId);
+    });
+
+    return { enhanceIds, trueIds };
+}
+
+function getGridBaseCards(items) {
+    const { enhanceIds, trueIds } = buildRelatedCardIdSets(items);
+    const existingIds = new Set(items.map(item => item?.id).filter(Boolean));
+
+    return items.filter(item => {
+        if (!item?.id) return false;
+        if (enhanceIds.has(item.id) || trueIds.has(item.id)) return false;
+        if ((item.cardVariant === 'enhance' || item.cardVariant === 'true') && item.baseCardId && existingIds.has(item.baseCardId)) {
+            return false;
+        }
+        return true;
+    });
+}
+
+function getEventTypeForEffect(effectData) {
+    if (effectData?.type === 'habilidade') return 'habilidades';
+    if (effectData?.type === 'ataque') return 'ataques';
+    return 'magias';
+}
+
+async function unlinkCardsFromRelatedBases(storeName, cardIds) {
+    if (!storeName || !Array.isArray(cardIds) || cardIds.length === 0) return;
+
+    const targetIds = new Set(cardIds.map(id => String(id)).filter(Boolean));
+    if (targetIds.size === 0) return;
+
+    const cards = (await getData(storeName)) || [];
+    const parentsToUpdate = cards.filter(card => {
+        if (targetIds.has(String(card?.id || ''))) return false;
+        return targetIds.has(String(card?.enhanceCardId || '')) || targetIds.has(String(card?.trueCardId || ''));
+    });
+
+    await Promise.all(parentsToUpdate.map(parent => {
+        if (targetIds.has(String(parent.enhanceCardId || ''))) parent.enhanceCardId = '';
+        if (targetIds.has(String(parent.trueCardId || ''))) parent.trueCardId = '';
+        return saveData(storeName, parent);
+    }));
+}
+
+function normalizeRelatedRole(role) {
+    return role === 'enhance' || role === 'true' ? role : 'base';
+}
+
+function getReferencedRelation(cards, cardId) {
+    const targetId = String(cardId || '');
+    const parent = cards.find(card => String(card?.enhanceCardId || '') === targetId || String(card?.trueCardId || '') === targetId);
+    if (!parent) return { role: 'base', baseCardId: '' };
+    return {
+        role: String(parent.trueCardId || '') === targetId ? 'true' : 'enhance',
+        baseCardId: parent.id
+    };
+}
+
+function getBaseChildRole(baseCard, childCard) {
+    const childId = String(childCard?.id || '');
+    if (String(baseCard?.trueCardId || '') === childId) return 'true';
+    if (String(baseCard?.enhanceCardId || '') === childId) return 'enhance';
+
+    const explicitRole = normalizeRelatedRole(childCard?.cardVariant);
+    return explicitRole === 'base' ? 'enhance' : explicitRole;
+}
+
+async function getRelatedDeleteTargets(storeName, cardId) {
+    if (!storeName || !cardId) return [];
+
+    const selectedCard = await getData(storeName, cardId);
+    if (!selectedCard) return [];
+
+    const cards = (await getData(storeName)) || [];
+    const cardsById = new Map(cards.map(card => [String(card?.id || ''), card]).filter(([id]) => id));
+    const selectedId = String(selectedCard.id || cardId);
+    const referencedRelation = getReferencedRelation(cards, selectedId);
+    const selectedRole = normalizeRelatedRole(selectedCard.cardVariant);
+    const isRelatedCard = selectedRole !== 'base' || referencedRelation.role !== 'base';
+    const targets = [];
+    const seenIds = new Set();
+
+    const addTarget = (role, id) => {
+        const normalizedId = String(id || '');
+        if (!normalizedId || seenIds.has(normalizedId)) return;
+        const card = normalizedId === selectedId ? selectedCard : cardsById.get(normalizedId);
+        if (!card) return;
+        seenIds.add(normalizedId);
+        targets.push({
+            role: normalizeRelatedRole(role),
+            id: normalizedId,
+            card
+        });
+    };
+
+    if (isRelatedCard) {
+        addTarget(selectedRole !== 'base' ? selectedRole : referencedRelation.role, selectedId);
+        return targets;
+    }
+
+    addTarget('base', selectedId);
+    addTarget('enhance', selectedCard.enhanceCardId);
+    addTarget('true', selectedCard.trueCardId);
+
+    cards.forEach(card => {
+        if (String(card?.baseCardId || '') !== selectedId) return;
+        addTarget(getBaseChildRole(selectedCard, card), card.id);
+    });
+
+    return targets;
+}
+
+function buildDeleteConfirmMessage(deleteTargets) {
+    if (!Array.isArray(deleteTargets) || deleteTargets.length <= 1) {
+        return 'Tem certeza que deseja excluir?';
+    }
+
+    const relatedTargets = deleteTargets.filter(target => target.role !== 'base');
+    const relatedList = relatedTargets
+        .map(target => `${ROLE_LABELS[target.role] || 'Relacionado'}: ${getCardDisplayName(target.card)}`)
+        .join(', ');
+
+    return `Excluir este card base tambem exclui ${relatedTargets.length === 1 ? 'o card relacionado' : 'os cards relacionados'}: ${relatedList}. Deseja continuar?`;
+}
+
+function getCardCountLabel(count) {
+    return count === 1 ? 'card' : 'cards';
+}
+
+function buildBulkDeleteConfirmMessage(selectedCount, deleteTargetCount) {
+    if (selectedCount <= 1) {
+        return null;
+    }
+
+    const relatedCount = Math.max(0, deleteTargetCount - selectedCount);
+    if (relatedCount > 0) {
+        return `Apagar ${selectedCount} ${getCardCountLabel(selectedCount)} selecionados tambem apagara ${relatedCount} ${getCardCountLabel(relatedCount)} relacionados. No total, ${deleteTargetCount} ${getCardCountLabel(deleteTargetCount)} serao apagados. Deseja continuar?`;
+    }
+
+    return `Tem certeza que deseja apagar ${selectedCount} ${getCardCountLabel(selectedCount)} selecionados?`;
+}
+
+async function removeRelatedDeleteTargets(storeName, deleteTargets) {
+    const targetIds = deleteTargets.map(target => target.id).filter(Boolean);
+    await unlinkCardsFromRelatedBases(storeName, targetIds);
+
+    for (const targetId of targetIds) {
+        await removeData(storeName, targetId);
+    }
+}
+
+async function collectBulkDeleteTargets(selectedCards) {
+    const groupsByStore = new Map();
+    const selectedKeys = new Set();
+
+    for (const card of selectedCards) {
+        const cardId = card.dataset.id;
+        const cardType = card.dataset.type;
+        const storeName = getStoreNameForCardType(cardType);
+        if (!storeName || !cardId) continue;
+
+        const deleteTargets = await getRelatedDeleteTargets(storeName, cardId);
+        if (deleteTargets.length === 0) continue;
+
+        selectedKeys.add(`${storeName}:${cardId}`);
+
+        if (!groupsByStore.has(storeName)) {
+            groupsByStore.set(storeName, new Map());
+        }
+
+        const targetsById = groupsByStore.get(storeName);
+        deleteTargets.forEach(target => {
+            if (!target?.id) return;
+            targetsById.set(String(target.id), target);
+        });
+    }
+
+    const groups = Array.from(groupsByStore, ([storeName, targetsById]) => ({
+        storeName,
+        deleteTargets: Array.from(targetsById.values())
+    }));
+
+    const deleteTargetCount = groups.reduce((total, group) => total + group.deleteTargets.length, 0);
+
+    return {
+        groups,
+        selectedCount: selectedKeys.size,
+        deleteTargetCount
+    };
+}
+
+async function removeBulkDeleteTargets(groups) {
+    for (const group of groups) {
+        await removeRelatedDeleteTargets(group.storeName, group.deleteTargets);
+    }
+}
+
+async function getMenuActionTargets(cardType, cardId) {
+    if (!RELATED_CARD_TYPES.has(cardType)) return [];
+
+    const storeName = getStoreNameForCardType(cardType);
+    const selectedCard = await getData(storeName, cardId);
+    if (!selectedCard) return [];
+
+    let baseCard = selectedCard;
+    if (selectedCard.baseCardId && selectedCard.cardVariant !== 'base') {
+        baseCard = await getData(storeName, selectedCard.baseCardId) || selectedCard;
+    }
+
+    const targetSpecs = [
+        { role: 'base', id: baseCard.id },
+        { role: 'enhance', id: baseCard.enhanceCardId },
+        { role: 'true', id: baseCard.trueCardId }
+    ];
+
+    const seenIds = new Set();
+    const targets = [];
+
+    for (const spec of targetSpecs) {
+        if (!spec.id || seenIds.has(spec.id)) continue;
+        const card = spec.id === selectedCard.id ? selectedCard : await getData(storeName, spec.id);
+        if (!card) continue;
+        seenIds.add(spec.id);
+        targets.push({
+            ...spec,
+            card,
+            cardType
+        });
+    }
+
+    return targets;
+}
+
+function showRelatedCardActionModal(targets, action) {
+    return new Promise(resolve => {
+        const modalId = `related-card-action-modal-${Date.now()}`;
+        const actionLabel = MENU_ACTION_LABELS[action] || 'usar';
+        const optionsHtml = targets.map(target => {
+            const roleLabel = ROLE_LABELS[target.role] || 'Card';
+            const cardName = getCardDisplayName(target.card);
+            const typeLabel = target.card?.type === 'ataque'
+                ? 'Ataque'
+                : (target.card?.type === 'habilidade' ? 'Habilidade' : (target.cardType === 'item' ? 'Item' : 'Magia'));
+
+            return `
+                <button type="button" class="related-card-action-option" data-target-id="${escapeHtml(String(target.id))}">
+                    <span class="related-card-action-option__role">${escapeHtml(roleLabel)}</span>
+                    <span class="related-card-action-option__name">${escapeHtml(cardName)}</span>
+                    <span class="related-card-action-option__type">${escapeHtml(typeLabel)}</span>
+                </button>
+            `;
+        }).join('');
+
+        document.body.insertAdjacentHTML('beforeend', `
+            <div id="${modalId}" class="related-card-action-modal" role="dialog" aria-modal="true">
+                <div class="related-card-action-modal__dialog">
+                    <div class="related-card-action-modal__header">
+                        <div>
+                            <p class="related-card-action-modal__eyebrow">Escolher alvo</p>
+                            <h3 class="related-card-action-modal__title">Qual card voce quer ${escapeHtml(actionLabel)}?</h3>
+                        </div>
+                        <button type="button" class="related-card-action-modal__close" data-related-action-cancel aria-label="Fechar">&times;</button>
+                    </div>
+                    <div class="related-card-action-modal__list">
+                        ${optionsHtml}
+                    </div>
+                    <button type="button" class="related-card-action-modal__cancel" data-related-action-cancel>Cancelar</button>
+                </div>
+            </div>
+        `);
+
+        const modal = document.getElementById(modalId);
+        const cleanup = (target = null) => {
+            modal.remove();
+            resolve(target);
+        };
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal || e.target.closest('[data-related-action-cancel]')) {
+                cleanup(null);
+                return;
+            }
+
+            const optionBtn = e.target.closest('.related-card-action-option');
+            if (!optionBtn) return;
+            cleanup(targets.find(target => String(target.id) === optionBtn.dataset.targetId) || null);
+        });
+    });
+}
+
+async function resolveMenuActionTarget(cardType, cardId, action) {
+    if (!RELATED_CARD_TYPES.has(cardType)) {
+        return { cardType, id: cardId };
+    }
+
+    const targets = await getMenuActionTargets(cardType, cardId);
+    if (targets.length <= 1) {
+        return { cardType, id: cardId };
+    }
+
+    const selectedTarget = await showRelatedCardActionModal(targets, action);
+    if (!selectedTarget) return null;
+
+    return {
+        cardType: selectedTarget.cardType,
+        id: selectedTarget.id
+    };
+}
+
+function createBulkDeleteToolbar() {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'bulk-delete-toolbar';
+    toolbar.dataset.bulkDeleteToolbar = 'true';
+    toolbar.innerHTML = `
+        <button type="button" class="bulk-delete-toolbar__button bulk-delete-toolbar__button--select" data-bulk-action="start" title="Selecionar cards">
+            <i class="fas fa-bullseye"></i>
+            <span>Selecionar</span>
+        </button>
+        <span class="bulk-delete-toolbar__status" data-bulk-status>0 selecionados</span>
+        <button type="button" class="bulk-delete-toolbar__button bulk-delete-toolbar__button--danger" data-bulk-action="delete" disabled title="Apagar selecionados">
+            <i class="fas fa-trash-alt"></i>
+            <span>Apagar</span>
+        </button>
+        <button type="button" class="bulk-delete-toolbar__button bulk-delete-toolbar__button--ghost" data-bulk-action="cancel" title="Cancelar selecao">
+            <i class="fa-solid fa-xmark"></i>
+            <span>Cancelar</span>
+        </button>
+    `;
+    return toolbar;
+}
+
+function addBulkSelectorToCard(cardWrapper, cardData) {
+    const cardName = getCardDisplayName(cardData);
+    cardWrapper.classList.add('bulk-selectable-card');
+    cardWrapper.dataset.bulkSelectable = 'true';
+    cardWrapper.dataset.cardName = cardName;
+    cardWrapper.insertAdjacentHTML('beforeend', `
+        <button type="button" class="bulk-card-selector" data-bulk-selector aria-label="Selecionar ${escapeHtml(cardName)}" aria-pressed="false">
+            <span class="bulk-card-selector__mark">&#10003;</span>
+        </button>
+    `);
+}
+
+function setupBulkDeleteControls(container, eventType) {
+    const toolbar = container.querySelector('[data-bulk-delete-toolbar]');
+    if (!toolbar || toolbar.dataset.bulkReady === 'true') return;
+
+    toolbar.dataset.bulkReady = 'true';
+
+    const startBtn = toolbar.querySelector('[data-bulk-action="start"]');
+    const deleteBtn = toolbar.querySelector('[data-bulk-action="delete"]');
+    const cancelBtn = toolbar.querySelector('[data-bulk-action="cancel"]');
+    const statusEl = toolbar.querySelector('[data-bulk-status]');
+    const selectedKeys = new Set();
+    let selectionActive = false;
+    let isDeleting = false;
+
+    const getSelectableCards = () => Array.from(container.querySelectorAll('.rpg-thumbnail[data-bulk-selectable="true"]'));
+    const getCardKey = card => `${card.dataset.type || ''}:${card.dataset.id || ''}`;
+
+    const updateToolbar = () => {
+        const selectedCount = selectedKeys.size;
+        if (statusEl) {
+            statusEl.textContent = `${selectedCount} ${selectedCount === 1 ? 'selecionado' : 'selecionados'}`;
+        }
+        if (deleteBtn) {
+            deleteBtn.disabled = selectedCount === 0 || isDeleting;
+        }
+    };
+
+    const setCardSelected = (card, selected) => {
+        const key = getCardKey(card);
+        if (!key.includes(':') || key.endsWith(':')) return;
+
+        card.classList.toggle('bulk-selected', selected);
+        const selector = card.querySelector('[data-bulk-selector]');
+        if (selector) {
+            selector.setAttribute('aria-pressed', selected ? 'true' : 'false');
+            selector.title = selected ? 'Remover da selecao' : 'Selecionar card';
+        }
+
+        if (selected) {
+            selectedKeys.add(key);
+        } else {
+            selectedKeys.delete(key);
+        }
+        updateToolbar();
+    };
+
+    const clearSelection = () => {
+        getSelectableCards().forEach(card => setCardSelected(card, false));
+        selectedKeys.clear();
+        updateToolbar();
+    };
+
+    const closeThumbnailMenus = () => {
+        container.querySelectorAll('.rpg-thumbnail.menu-active').forEach(activeThumb => {
+            activeThumb.classList.remove('menu-active');
+            activeThumb.style.zIndex = '';
+            activeThumb.querySelector('.thumbnail-menu')?.classList.remove('active', 'menu-left');
+        });
+    };
+
+    const setSelectionActive = (active) => {
+        selectionActive = active;
+        container.classList.toggle('bulk-delete-active', active);
+        toolbar.classList.toggle('bulk-delete-toolbar--active', active);
+        closeThumbnailMenus();
+
+        if (!active) {
+            clearSelection();
+        } else {
+            updateToolbar();
+        }
+    };
+
+    const deleteSelectedCards = async () => {
+        if (isDeleting || selectedKeys.size === 0) return;
+
+        const selectedCards = getSelectableCards().filter(card => selectedKeys.has(getCardKey(card)));
+        const { groups, selectedCount, deleteTargetCount } = await collectBulkDeleteTargets(selectedCards);
+
+        if (deleteTargetCount === 0) {
+            showCustomAlert('Nenhum card selecionado foi encontrado.');
+            setSelectionActive(false);
+            return;
+        }
+
+        const confirmMessage = selectedCount === 1
+            ? buildDeleteConfirmMessage(groups[0]?.deleteTargets || [])
+            : buildBulkDeleteConfirmMessage(selectedCount, deleteTargetCount);
+
+        if (!(await showCustomConfirm(confirmMessage))) return;
+
+        isDeleting = true;
+        updateToolbar();
+
+        try {
+            await removeBulkDeleteTargets(groups);
+            setSelectionActive(false);
+            document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: eventType } }));
+        } finally {
+            isDeleting = false;
+            updateToolbar();
+        }
+    };
+
+    toolbar.hidden = getSelectableCards().length === 0;
+
+    toolbar.addEventListener('click', async (e) => {
+        const actionBtn = e.target.closest('[data-bulk-action]');
+        if (!actionBtn) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const action = actionBtn.dataset.bulkAction;
+        if (action === 'start') {
+            setSelectionActive(true);
+        } else if (action === 'cancel') {
+            setSelectionActive(false);
+        } else if (action === 'delete') {
+            await deleteSelectedCards();
+        }
+    });
+
+    container.addEventListener('click', (e) => {
+        if (!selectionActive) return;
+
+        const card = e.target.closest('.rpg-thumbnail[data-bulk-selectable="true"]');
+        if (!card || !container.contains(card)) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        setCardSelected(card, !selectedKeys.has(getCardKey(card)));
+    });
 }
 
 // ... (renderCharacterInGame function remains unchanged) ...
@@ -96,31 +615,28 @@ export async function openCharacterSelectionForRelationship() {
     const selectCharacterList = document.getElementById('select-character-list');
     const modalTitleEl = selectCharacterModal.querySelector('h3');
 
-    modalTitleEl.textContent = 'Adicionar Relacionamento';
+    modalTitleEl.textContent = 'Adicionar Criatura';
     selectCharacterList.innerHTML = '';
-    const allCharacters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
-    const currentCharacterId = getCurrentEditingCardId();
-
-    const charactersToShow = allCharacters.filter(c => c.id !== currentCharacterId);
+    const creaturesToShow = (await getData('rpgCards')).filter(char => char.cardType === 'creature');
     
     // Obter relacionamentos já selecionados
     const selectedIds = new Set();
     document.querySelectorAll('#selected-relationships-container [data-id]').forEach(el => selectedIds.add(el.dataset.id));
 
 
-    if (charactersToShow.length === 0) {
-        selectCharacterList.innerHTML = '<p class="text-gray-400 text-center p-4">Não há outros personagens para relacionar.</p>';
+    if (creaturesToShow.length === 0) {
+        selectCharacterList.innerHTML = '<p class="text-gray-400 text-center p-4">Nao ha criaturas para relacionar.</p>';
     } else {
-        charactersToShow.forEach(char => {
+        creaturesToShow.forEach(char => {
             const charItem = document.createElement('button');
             charItem.className = 'w-full text-left p-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-3 justify-between';
 
             let iconHtml = '';
-             if (char.image) {
+            if (char.image) {
                 const imageUrl = URL.createObjectURL(bufferToBlob(char.image, char.imageMimeType));
                 iconHtml = `<img src="${imageUrl}" class="w-8 h-8 rounded-full object-cover flex-shrink-0">`;
             } else {
-                iconHtml = `<div class="w-8 h-8 rounded-full bg-gray-600 flex-shrink-0 flex items-center justify-center"><i class="fas fa-user"></i></div>`;
+                iconHtml = `<div class="w-8 h-8 rounded-full bg-gray-600 flex-shrink-0 flex items-center justify-center"><i class="fas fa-dragon"></i></div>`;
             }
 
             const isSelected = selectedIds.has(char.id);
@@ -170,7 +686,7 @@ export async function openSelectionModal(type) {
         default: storeName = 'rpgEffects';
     }
 
-    const title = isItem ? 'Selecionar Item' : (type === 'magic' ? 'Selecionar Magia/Habilidade' : (type === 'attack' ? 'Selecionar Ataque' : 'Selecionar Relacionamento'));
+    const title = isItem ? 'Selecionar Item' : (type === 'magic' ? 'Selecionar Magia/Habilidade' : (type === 'attack' ? 'Selecionar Ataque' : 'Selecionar Criatura'));
     let color = 'text-gray-300';
     if (isItem) color = 'text-amber-300';
     if (type === 'magic') color = 'text-teal-300';
@@ -203,6 +719,7 @@ export async function openSelectionModal(type) {
 
         // Identificar IDs já selecionados no formulário
         const selectedIds = new Set();
+        const selectedItemCounts = new Map();
         if (type === 'magic') {
             document.querySelectorAll('#selected-magics-container [data-id]').forEach(el => selectedIds.add(el.dataset.id));
             // CORREÇÃO: Verificar também o container de habilidades
@@ -213,13 +730,15 @@ export async function openSelectionModal(type) {
             document.querySelectorAll('#selected-relationships-container [data-id]').forEach(el => selectedIds.add(el.dataset.id));
         } else if (type === 'item') {
             const currentItems = getCharacterItems();
-            currentItems.forEach(item => selectedIds.add(item.id));
+            currentItems.forEach(item => {
+                selectedIds.add(item.id);
+                selectedItemCounts.set(item.id, (selectedItemCounts.get(item.id) || 0) + 1);
+            });
         }
 
         if (type === 'relationship') {
-            const currentCharacterId = getCurrentEditingCardId();
             if (data && Array.isArray(data)) {
-                data = data.filter(c => c.id !== currentCharacterId && c.cardType !== 'creature');
+                data = data.filter(c => c.cardType === 'creature');
             }
         } else if (characterId && characterId !== 'all') {
             data = data.filter(item => item.characterId === characterId);
@@ -240,7 +759,7 @@ export async function openSelectionModal(type) {
             let contentType = 'conteúdo';
             if(isItem) contentType = 'item';
             else if (type === 'magic') contentType = 'magia/habilidade';
-            else if (type === 'relationship') contentType = 'personagem';
+            else if (type === 'relationship') contentType = 'criatura';
             else if (type === 'attack') contentType = 'ataque';
             listContainer.innerHTML = `<p class="text-gray-400 text-center p-4">Nenhum ${contentType} encontrado.</p>`;
             return;
@@ -259,14 +778,15 @@ export async function openSelectionModal(type) {
                 switch(type) {
                     case 'item': iconClass = 'fa-box'; break;
                     case 'magic': iconClass = item.type === 'habilidade' ? 'fa-fist-raised' : 'fa-magic'; break;
-                    case 'relationship': iconClass = 'fa-user'; break;
+                    case 'relationship': iconClass = 'fa-dragon'; break;
                     case 'attack': iconClass = 'fa-khanda'; break;
                     default: iconClass = 'fa-question-circle';
                 }
                 iconHtml = `<i class="fas ${iconClass} w-8 text-center text-xl text-gray-400"></i>`;
             }
 
-            const isSelected = selectedIds.has(item.id);
+            const currentItemCount = isItem ? (selectedItemCounts.get(item.id) || 0) : 0;
+            const isSelected = isItem ? currentItemCount > 0 : selectedIds.has(item.id);
             if (isSelected) {
                 // Estilo para item já selecionado
                 el.classList.add('bg-indigo-900', 'border', 'border-indigo-500');
@@ -278,9 +798,10 @@ export async function openSelectionModal(type) {
                     <div>
                         <p class="font-semibold">${item.name || item.title}</p>
                         ${(type === 'magic' && item.type) ? `<p class="text-xs text-gray-400 capitalize">${item.type}</p>` : ''}
+                        ${isItem ? `<p class="text-xs ${currentItemCount > 0 ? 'text-amber-200' : 'text-gray-500'}">${currentItemCount} no inventario</p>` : ''}
                     </div>
                 </div>
-                ${isSelected ? '<span class="text-xs text-indigo-300 font-bold px-2 py-1 bg-black/30 rounded">Selecionado</span>' : ''}
+                ${isItem ? `<span class="text-xs ${currentItemCount > 0 ? 'text-amber-200' : 'text-gray-400'} font-bold px-2 py-1 bg-black/30 rounded">x${currentItemCount}</span>` : (isSelected ? '<span class="text-xs text-indigo-300 font-bold px-2 py-1 bg-black/30 rounded">Selecionado</span>' : '')}
             `;
 
             el.addEventListener('click', () => {
@@ -367,6 +888,7 @@ async function createItemGrid(items, type, renderSheetFunction) {
                 </div>
             </div>
         `;
+        addBulkSelectorToCard(cardWrapper, item);
         return cardWrapper;
     }));
 
@@ -382,26 +904,38 @@ function effectBelongsToListType(item, type) {
     return true;
 }
 
-function filterStandaloneEffectCards(items, type) {
-    if (!['magias', 'habilidades', 'ataques', 'itens'].includes(type)) return items;
+function normalizeCardListRole(item, enhanceIds, trueIds) {
+    if (item?.cardVariant === 'enhance' || enhanceIds.has(item?.id)) return 'enhance';
+    if (item?.cardVariant === 'true' || trueIds.has(item?.id)) return 'true';
+    return 'base';
+}
 
-    const visibleItems = items.filter(item => effectBelongsToListType(item, type));
-    const relatedIds = new Set();
+function sortCardsByRelationRole(items) {
+    const enhanceIds = new Set();
+    const trueIds = new Set();
 
-    visibleItems.forEach(item => {
-        [item.enhanceCardId, item.trueCardId]
-            .filter(Boolean)
-            .forEach(id => relatedIds.add(id));
+    items.forEach(item => {
+        if (item?.enhanceCardId) enhanceIds.add(item.enhanceCardId);
+        if (item?.trueCardId) trueIds.add(item.trueCardId);
     });
 
-    return visibleItems.filter(item => !relatedIds.has(item.id));
+    const order = { base: 0, enhance: 1, true: 2 };
+
+    return [...items].sort((a, b) => {
+        const roleA = normalizeCardListRole(a, enhanceIds, trueIds);
+        const roleB = normalizeCardListRole(b, enhanceIds, trueIds);
+        if (order[roleA] !== order[roleB]) return order[roleA] - order[roleB];
+        return (a?.name || a?.title || '').localeCompare(b?.name || b?.title || '');
+    });
 }
 
 
 async function renderGroupedList({ type, storeName, buttonText, buttonAction, importBtnId, importInputId, importTitle, importFunction, themeColor, renderSheetFunction, unassignedTitle }, container) {
     container.innerHTML = '';
 
-    const allItems = filterStandaloneEffectCards(await getData(storeName), type);
+    const rawItems = (await getData(storeName)) || [];
+    const listItems = rawItems.filter(item => effectBelongsToListType(item, type));
+    const allItems = sortCardsByRelationRole(RELATED_GRID_TYPES.has(type) ? getGridBaseCards(listItems) : listItems);
     const allCharacters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
     const allCategories = (await getData('rpgCategories')) || [];
 
@@ -433,6 +967,7 @@ async function renderGroupedList({ type, storeName, buttonText, buttonAction, im
 
     const pageContainer = document.createElement('div');
     pageContainer.className = 'w-full p-6 space-y-8';
+    pageContainer.appendChild(createBulkDeleteToolbar());
 
     const addGrid = document.createElement('div');
     addGrid.className = 'grid gap-4 w-full justify-items-center grid-cols-3 md:grid-cols-4 lg:grid-cols-5';
@@ -490,7 +1025,7 @@ async function renderGroupedList({ type, storeName, buttonText, buttonAction, im
                                         ${categoryName}
                                      </h3>`;
 
-            const grid = await createItemGrid(itemsByCategory[catId], type, renderSheetFunction);
+            const grid = await createItemGrid(sortCardsByRelationRole(itemsByCategory[catId]), type, renderSheetFunction);
             subSection.appendChild(grid);
             section.appendChild(subSection);
         }
@@ -509,6 +1044,7 @@ async function renderGroupedList({ type, storeName, buttonText, buttonAction, im
     }
 
     container.appendChild(pageContainer);
+    setupBulkDeleteControls(pageContainer, type);
 
     pageContainer.querySelectorAll('.category-title[data-tooltip]').forEach(title => {
         let tooltipElement = null;
@@ -561,6 +1097,8 @@ async function renderCharacterList(container, listType = 'character') {
     const gridContainer = document.createElement('div');
     gridContainer.className = 'grid gap-4 w-full justify-items-center grid-cols-3 md:grid-cols-4 lg:grid-cols-5 p-6';
 
+    container.appendChild(createBulkDeleteToolbar());
+
     const addButtonWrapper = document.createElement('div');
     addButtonWrapper.className = 'relative w-full h-full aspect-square';
     addButtonWrapper.style.aspectRatio = '120 / 160';
@@ -594,7 +1132,7 @@ async function renderCharacterList(container, listType = 'character') {
                 <button class="thumb-btn thumb-btn-menu">
                     <i class="fas fa-ellipsis-v"></i>
                 </button>
-                <div class="thumbnail-menu" data-type="character">
+                <div class="thumbnail-menu" data-type="${isCreatureList ? 'creature' : 'character'}">
                     <button class="menu-item" data-action="edit" data-id="${char.id}"><i class="fas fa-edit"></i></button>
                     <button class="menu-item" data-action="remove" data-id="${char.id}"><i class="fas fa-trash-alt"></i></button>
                     <button class="menu-item" data-action="export-json" data-id="${char.id}"><i class="fas fa-file-download"></i></button>
@@ -604,11 +1142,13 @@ async function renderCharacterList(container, listType = 'character') {
                 </div>
             </div>
         `;
+        addBulkSelectorToCard(cardWrapper, char);
         return cardWrapper;
     }));
 
     cardElements.forEach(el => gridContainer.appendChild(el));
     container.appendChild(gridContainer);
+    setupBulkDeleteControls(container, isCreatureList ? 'criaturas' : 'personagem');
 
     const importBtnId = isCreatureList ? 'import-creatures-btn' : 'import-cards-btn';
     const importInputId = isCreatureList ? 'import-creature-json-input' : 'import-json-input';
@@ -703,14 +1243,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const creationSection = document.getElementById('creation-section');
     const spellCreationSection = document.getElementById('spell-creation-section');
     const itemCreationSection = document.getElementById('item-creation-section');
-    const attackCreationSection = document.getElementById('attack-creation-section');
     const selectCharacterModal = document.getElementById('select-character-modal');
 
     const selectCharacterCloseBtn = document.getElementById('select-character-close-btn');
     const closeFormBtn = document.getElementById('close-form-btn');
     const closeSpellFormBtn = document.getElementById('close-spell-form-btn');
     const closeItemFormBtn = document.getElementById('close-item-form-btn');
-    const closeAttackFormBtn = document.getElementById('close-attack-form-btn');
 
     const cardForm = document.getElementById('cardForm');
     const formTitle = document.getElementById('form-title');
@@ -725,9 +1263,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const itemFormTitle = document.getElementById('item-form-title');
     const itemSubmitButton = document.getElementById('itemSubmitButton');
 
-    const attackForm = document.getElementById('attackForm');
-    const attackFormTitle = document.getElementById('attack-form-title');
-    const attackSubmitButton = document.getElementById('attackSubmitButton');
 
     const selectionModal = document.getElementById('selection-modal');
     const selectionModalCloseBtn = document.getElementById('selection-modal-close-btn');
@@ -746,7 +1281,103 @@ document.addEventListener('DOMContentLoaded', async () => {
     const driveUploadBtnMobile = document.getElementById('drive-upload-btn-mobile');
     const driveDownloadBtnMobile = document.getElementById('drive-download-btn-mobile');
 
+    const executeCardMenuAction = async (action, cardId, cardType, activeNav) => {
+        if (action === 'edit') {
+            if (cardType === 'character' || cardType === 'creature') {
+                showView(creationSection, true);
+                await editCard(cardId);
+            } else if (cardType === 'spell') {
+                const spellData = await getData('rpgEffects', cardId);
+                if (spellData) {
+                    const isHabilidade = spellData.type === 'habilidade';
+                    const isAtaque = spellData.type === 'ataque';
+                    spellForm.dataset.type = spellData.type || 'magia';
+                    if (isAtaque) {
+                        spellFormTitle.textContent = 'Editando Ataque';
+                        spellSubmitButton.textContent = 'Salvar Ataque';
+                        document.getElementById('mana-cost-wrapper').classList.add('hidden');
+                    } else {
+                        spellFormTitle.textContent = isHabilidade ? 'Editando Habilidade' : 'Editando Magia';
+                        spellSubmitButton.textContent = isHabilidade ? 'Salvar Habilidade' : 'Salvar Magia';
+                        document.getElementById('mana-cost-wrapper').classList.toggle('hidden', isHabilidade);
+                    }
+
+                    spellRelatedWrapper?.classList.remove('hidden');
+                    showView(spellCreationSection, true);
+                    resetSpellFormState();
+                    await editSpell(cardId);
+                }
+            } else if (cardType === 'item') {
+                itemFormTitle.textContent = 'Editando Item';
+                itemSubmitButton.textContent = 'Salvar Item';
+                showView(itemCreationSection, true);
+                await editItem(cardId);
+            } else if (cardType === 'attack') {
+                spellForm.dataset.type = 'ataque';
+                spellFormTitle.textContent = 'Editando Ataque';
+                spellSubmitButton.textContent = 'Salvar Ataque';
+                document.getElementById('mana-cost-wrapper').classList.add('hidden');
+                spellRelatedWrapper?.classList.remove('hidden');
+                showView(spellCreationSection, true);
+                resetSpellFormState();
+                await editSpell(cardId);
+            }
+        } else if (action === 'remove' || action === 'delete') {
+            let storeName;
+            let eventType = activeNav;
+
+            if (cardType === 'character' || cardType === 'creature') {
+                storeName = 'rpgCards';
+                eventType = cardType === 'creature' ? 'criaturas' : 'personagem';
+            } else if (cardType === 'spell') {
+                storeName = 'rpgEffects';
+                eventType = getEventTypeForEffect(await getData('rpgEffects', cardId));
+            } else if (cardType === 'item') {
+                storeName = 'rpgItems';
+                eventType = 'itens';
+            } else if (cardType === 'attack') {
+                storeName = 'rpgEffects';
+                eventType = 'ataques';
+            }
+
+            if (storeName) {
+                const deleteTargets = await getRelatedDeleteTargets(storeName, cardId);
+                if (deleteTargets.length === 0) return;
+
+                if (await showCustomConfirm(buildDeleteConfirmMessage(deleteTargets))) {
+                    await removeRelatedDeleteTargets(storeName, deleteTargets);
+                    document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: eventType } }));
+                }
+            }
+        } else if (action === 'export-json') {
+            if (cardType === 'character' || cardType === 'creature') await exportCard(cardId);
+            if (cardType === 'spell') await exportSpell(cardId);
+            if (cardType === 'item') await exportItem(cardId);
+            if (cardType === 'attack') await exportSpell(cardId);
+        } else if (action === 'set-in-play' || action === 'remove-from-play') {
+            const isSettingInPlay = action === 'set-in-play';
+            const allCharacters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
+            if (isSettingInPlay) {
+                await Promise.all(allCharacters.map(c => {
+                    if (c.inPlay) {
+                        c.inPlay = false;
+                        return saveData('rpgCards', c);
+                    }
+                    return null;
+                }));
+            }
+            const charToUpdate = allCharacters.find(c => c.id === cardId);
+            if (charToUpdate) {
+                charToUpdate.inPlay = isSettingInPlay;
+                await saveData('rpgCards', charToUpdate);
+            }
+            document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: 'personagem' } }));
+        }
+    };
+
     renderContent = async (target, force = false) => {
+        if (target === 'personagem-em-jogo') force = true;
+
         contentDisplay.classList.remove('justify-center');
         contentDisplay.removeAttribute('style');
 
@@ -771,7 +1402,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         creationSection.classList.add('hidden');
         spellCreationSection.classList.add('hidden');
         itemCreationSection.classList.add('hidden');
-        attackCreationSection.classList.add('hidden');
 
         if (target !== 'personagem-em-jogo') {
             if (mainContainer) mainContainer.style.overflowY = 'auto';
@@ -912,12 +1542,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             await populateCategorySelect('spell-category-select', isHabilidade ? 'habilidade' : 'magia');
         });
         if (action === "add-item") showView(itemCreationSection, false, async () => {
-            itemForm.reset();
+            resetItemFormState();
             itemFormTitle.textContent = 'Novo Item';
             itemSubmitButton.textContent = 'Criar Item';
             populateItemAumentosSelect();
-            document.getElementById('item-aumentos-list').innerHTML = '';
-            showImagePreview(document.getElementById('itemImagePreview'), null, true);
             await populateCharacterSelect('itemCharacterOwner');
             await populateCategorySelect('item-category-select', 'item');
         });
@@ -945,10 +1573,9 @@ document.addEventListener('DOMContentLoaded', async () => {
              if (restoredBaseSpellDraft) return;
              resetSpellFormState();
         } else if (section.id === 'item-creation-section') {
-             showImagePreview(document.getElementById('itemImagePreview'), null, true);
-             document.getElementById('item-aumentos-list').innerHTML = '';
-        } else if (section.id === 'attack-creation-section') {
-             showImagePreview(document.getElementById('attackImagePreview'), null, true);
+             const restoredBaseItemDraft = await handleItemFormCloseRequest();
+             if (restoredBaseItemDraft) return;
+             resetItemFormState();
         }
 
         section.classList.add('hidden');
@@ -959,7 +1586,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     closeFormBtn.addEventListener('click', () => closeForm(creationSection));
     closeSpellFormBtn.addEventListener('click', () => closeForm(spellCreationSection));
     closeItemFormBtn.addEventListener('click', () => closeForm(itemCreationSection));
-    closeAttackFormBtn.addEventListener('click', () => closeForm(attackCreationSection));
 
     selectCharacterCloseBtn.addEventListener('click', () => selectCharacterModal.classList.add('hidden'));
     selectCharacterModal.addEventListener('click', (e) => {
@@ -988,14 +1614,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     itemForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        await saveItemCard(itemForm);
-        closeForm(itemCreationSection);
-    });
-
-    attackForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await saveSpellCard(attackForm, 'ataque');
-        closeForm(attackCreationSection);
+        const result = await saveItemCard(itemForm);
+        if (!result?.keepOpen) {
+            await closeForm(itemCreationSection);
+        }
     });
 
     document.getElementById('add-relationship-btn').addEventListener('click', () => {
@@ -1118,10 +1740,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const cachedView = document.getElementById(`view-${targetView}`);
             if (cachedView) cachedView.remove();
         }
+        if (['personagem', 'itens', 'magias', 'habilidades', 'ataques'].includes(type)) {
+            const cachedInPlayView = document.getElementById('view-personagem-em-jogo');
+            if (cachedInPlayView) cachedInPlayView.remove();
+        }
         
         // Se a navegação ativa for a que mudou, recarrega
         const activeNav = document.querySelector('.nav-button.active, .desktop-nav-button.active')?.dataset.target;
-        if (activeNav === targetView) {
+        if (activeNav === targetView || activeNav === 'personagem-em-jogo') {
             renderContent(activeNav, true);
         }
     });
@@ -1171,7 +1797,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const action = menuItem.dataset.action;
             const cardId = menuItem.dataset.id;
             const cardType = menuItem.closest('[data-type]').dataset.type;
-            const activeNav = document.querySelector('.nav-button.active, .desktop-nav-button.active').dataset.target;
+            const activeNav = document.querySelector('.nav-button.active, .desktop-nav-button.active')?.dataset.target;
 
             const parentThumbnail = menuItem.closest('.rpg-thumbnail');
             if(parentThumbnail){
@@ -1183,89 +1809,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 parentMenu.classList.remove('active', 'menu-left');
             }
 
-            if (action === 'edit') {
-                if (cardType === 'character' || cardType === 'creature') {
-                    showView(creationSection, true);
-                    await editCard(cardId);
-                } else if (cardType === 'spell') {
-                    const spellData = await getData('rpgEffects', cardId);
-                    if (spellData) {
-                        const isHabilidade = spellData.type === 'habilidade';
-                        const isAtaque = spellData.type === 'ataque';
-                        spellForm.dataset.type = spellData.type || 'magia';
-                        if (isAtaque) {
-                            spellFormTitle.textContent = 'Editando Ataque';
-                            spellSubmitButton.textContent = 'Salvar Ataque';
-                            document.getElementById('mana-cost-wrapper').classList.add('hidden');
-                        } else {
-                            spellFormTitle.textContent = isHabilidade ? 'Editando Habilidade' : 'Editando Magia';
-                            spellSubmitButton.textContent = isHabilidade ? 'Salvar Habilidade' : 'Salvar Magia';
-                            document.getElementById('mana-cost-wrapper').classList.toggle('hidden', isHabilidade);
-                        }
+            const target = await resolveMenuActionTarget(cardType, cardId, action);
+            if (!target) return;
 
-                        spellRelatedWrapper?.classList.remove('hidden');
-                        showView(spellCreationSection, true);
-                        resetSpellFormState();
-                        await editSpell(cardId);
-                    }
-                } else if (cardType === 'item') {
-                    itemFormTitle.textContent = 'Editando Item';
-                    itemSubmitButton.textContent = 'Salvar Item';
-                    showView(itemCreationSection, true);
-                    await editItem(cardId);
-                } else if (cardType === 'attack') {
-                    spellForm.dataset.type = 'ataque';
-                    spellFormTitle.textContent = 'Editando Ataque';
-                    spellSubmitButton.textContent = 'Salvar Ataque';
-                    document.getElementById('mana-cost-wrapper').classList.add('hidden');
-                    spellRelatedWrapper?.classList.remove('hidden');
-                    showView(spellCreationSection, true);
-                    resetSpellFormState();
-                    await editSpell(cardId);
-                }
-            } else if (action === 'remove' || action === 'delete') {
-                if (await showCustomConfirm('Tem certeza que deseja excluir?')) {
-                    let storeName;
-                    let eventType = activeNav;
-
-                    if(cardType === 'character' || cardType === 'creature') { storeName = 'rpgCards'; eventType = cardType === 'creature' ? 'criaturas' : 'personagem'; }
-                    else if (cardType === 'spell') {
-                        storeName = 'rpgEffects';
-                        const t = (await getData('rpgEffects', cardId))?.type;
-                        eventType = t === 'habilidade' ? 'habilidades' : (t === 'ataque' ? 'ataques' : 'magias');
-                    }
-                    else if (cardType === 'item') { storeName = 'rpgItems'; eventType = 'itens'; }
-                    else if (cardType === 'attack') { storeName = 'rpgEffects'; eventType = 'ataques'; }
-
-                    if(storeName) {
-                        await removeData(storeName, cardId);
-                        document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: eventType } }));
-                    }
-                }
-            } else if (action === 'export-json') {
-                 if (cardType === 'character' || cardType === 'creature') await exportCard(cardId);
-                 if (cardType === 'spell') await exportSpell(cardId);
-                 if (cardType === 'item') await exportItem(cardId);
-                 if (cardType === 'attack') await exportSpell(cardId);
-            } else if (action === 'set-in-play' || action === 'remove-from-play') {
-                const isSettingInPlay = action === 'set-in-play';
-                const allCharacters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
-                if (isSettingInPlay) {
-                    await Promise.all(allCharacters.map(c => {
-                        if (c.inPlay) {
-                            c.inPlay = false;
-                            return saveData('rpgCards', c);
-                        }
-                        return null;
-                    }));
-                }
-                const charToUpdate = allCharacters.find(c => c.id === cardId);
-                if (charToUpdate) {
-                    charToUpdate.inPlay = isSettingInPlay;
-                    await saveData('rpgCards', charToUpdate);
-                }
-                document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: 'personagem' } }));
-            }
+            await executeCardMenuAction(action, target.id, target.cardType, activeNav);
 
             return;
         }

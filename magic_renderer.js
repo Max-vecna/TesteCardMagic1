@@ -18,7 +18,56 @@ async function getRelatedSpellCards(spellData) {
     return cards.filter(Boolean);
 }
 
-export async function renderFullSpellSheet(spellData, isModal) {
+function resolveSpellCardSize(aspectRatio, options = {}) {
+    if (Number(options.cardWidth) > 0 && Number(options.cardHeight) > 0) {
+        return {
+            finalWidth: Number(options.cardWidth),
+            finalHeight: Number(options.cardHeight)
+        };
+    }
+
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+
+    if ((windowWidth / aspectRatio) > windowHeight) {
+        const finalHeight = windowHeight * 0.9;
+        return {
+            finalWidth: finalHeight * aspectRatio,
+            finalHeight
+        };
+    }
+
+    const finalWidth = windowWidth * 0.9;
+    return {
+        finalWidth,
+        finalHeight: finalWidth / aspectRatio
+    };
+}
+
+function getInlineRelatedLayout(cardCount, aspectRatio) {
+    if (cardCount <= 1 || window.innerWidth < 900) return null;
+
+    const gap = 18;
+    const maxWidth = window.innerWidth * 0.94;
+    const maxHeight = window.innerHeight * 0.86;
+    let cardWidth = (maxWidth - (gap * (cardCount - 1))) / cardCount;
+    let cardHeight = cardWidth / aspectRatio;
+
+    if (cardHeight > maxHeight) {
+        cardHeight = maxHeight;
+        cardWidth = cardHeight * aspectRatio;
+    }
+
+    if (cardWidth < 300) return null;
+
+    return {
+        cardWidth: Math.floor(cardWidth),
+        cardHeight: Math.floor(cardHeight),
+        gap
+    };
+}
+
+export async function renderFullSpellSheet(spellData, isModal, options = {}) {
     const sheetContainer = document.getElementById('spell-sheet-container');
     if (!sheetContainer) return;
 
@@ -28,17 +77,7 @@ export async function renderFullSpellSheet(spellData, isModal) {
     }
 
     const aspectRatio = 9 / 16;
-    const windowWidth = window.innerWidth;
-    const windowHeight = window.innerHeight;
-    let finalWidth, finalHeight;
-
-    if ((windowWidth / aspectRatio) > windowHeight) {
-        finalHeight = windowHeight * 0.9;
-        finalWidth = finalHeight * aspectRatio;
-    } else {
-        finalWidth = windowWidth * 0.9;
-        finalHeight = finalWidth / aspectRatio;
-    }
+    const { finalWidth, finalHeight } = resolveSpellCardSize(aspectRatio, options);
 
     let mainImageUrl;
     let createdMainObjectUrl = null;
@@ -112,22 +151,28 @@ export async function renderFullSpellSheet(spellData, isModal) {
         `;
     }
 
-    const topBarHtml = (spellData.circle > 0 || spellData.manaCost > 0) 
-        ? `<p style="font-size: 10px;">${spellData.circle > 0 ? `${spellData.circle}º Círculo` : ''}${spellData.circle > 0 && spellData.manaCost > 0 ? ' - ' : ''}${spellData.manaCost > 0 ? `${spellData.manaCost} PM` : ''}</p>`
+    const topBarParts = [];
+    if (spellData.circle > 0 || spellData.manaCost > 0) {
+        topBarParts.push(`${spellData.circle > 0 ? `${spellData.circle}º Círculo` : ''}${spellData.circle > 0 && spellData.manaCost > 0 ? ' - ' : ''}${spellData.manaCost > 0 ? `${spellData.manaCost} PM` : ''}`);
+    }
+    const topBarHtml = topBarParts.length > 0
+        ? `<p style="font-size: 10px;">${topBarParts.join(' - ')}</p>`
         : '';
 
     // Modificado para suportar Acerto/Dano Sem Mana
-    const attackStats = { acerto: 'ATK', critico: 'ATK s/Mana', dano: 'DMG', danoSemMana: 'DMG s/Mana'};
+    const attackStats = { acerto: 'ATK', critico: 'ATK s/Mana', dano: 'DMG', danoSemMana: 'DMG s/Mana', vidaDado: 'PV', manaDado: 'PM'};
     // Gera HTML para Acerto e Dano (Novo Card)
     const attackStatsHtml = Object.entries(attackStats).map(([stat, label]) => 
     {
         const baseValue = spellData[stat] || 0;
         const content = baseValue || '-';
 
-        const icon = stat === 'acerto' ? 'fa-dice-d20' : //dado
-                     stat === 'dano' ? 'fas fa-fire' :  //dano em criatura com mana
-                     stat === 'critico' ? 'fa-crosshairs' : //critico
-                     stat === 'danoSemMana' ? 'fa-skull' : ""; //dano em criatura sem mana
+        const icon = stat === 'acerto' ? 'fa-dice-d20' :
+                     stat === 'dano' ? 'fa-fire' :
+                     stat === 'critico' ? 'fa-crosshairs' :
+                     stat === 'danoSemMana' ? 'fa-skull' :
+                     stat === 'vidaDado' ? 'fa-heart' :
+                     stat === 'manaDado' ? 'fa-fire' : "";
 
         return `
             <div style="position: relative; transform: scale(.8); display: ${content === "-" ? 'none' : 'block'}" class="flex flex-col items-center flex">
@@ -146,11 +191,14 @@ export async function renderFullSpellSheet(spellData, isModal) {
             </div> `;
     }).join('');
 
-    const textLabel = { description: 'Descrição'};
-    const textLabelHtml = Object.entries(textLabel).map(([stat, label]) => 
+    const textSections = [
+        { label: 'Descrição', value: spellData.description },
+        { label: 'Aprimorar', value: spellData.enhance, hidden: Boolean(spellData.enhanceCardId) },
+        { label: 'Verdadeiro', value: spellData.true, hidden: Boolean(spellData.trueCardId) }
+    ];
+    const textLabelHtml = textSections.map(({ label, value, hidden }) => 
     {
-        const baseValue = spellData[stat] || 0;
-        const content = baseValue || '-';
+        const content = hidden ? '-' : (value || '-');
 
         return `
             <div class="scroll-section" data-bg-type="main" style="${content === '-' ? 'display: none;' : ''}"}>
@@ -198,8 +246,19 @@ export async function renderFullSpellSheet(spellData, isModal) {
 
     const relatedCards = await getRelatedSpellCards(spellData);
     if (relatedCards.length > 1) {
+        const inlineLayout = getInlineRelatedLayout(relatedCards.length, aspectRatio);
+        const relatedCardWidth = inlineLayout?.cardWidth || finalWidth;
+        const relatedCardHeight = inlineLayout?.cardHeight || finalHeight;
+        const carouselClass = `spell-carousel-shell${inlineLayout ? ' spell-carousel-shell--inline' : ''}`;
+        const carouselStyle = inlineLayout
+            ? `width: ${relatedCardWidth * relatedCards.length + inlineLayout.gap * (relatedCards.length - 1)}px; height: ${relatedCardHeight}px; --spell-carousel-gap: ${inlineLayout.gap}px; --spell-related-card-width: ${relatedCardWidth}px;`
+            : `width: ${finalWidth}px; height: ${finalHeight}px;`;
+
         const slidesHtml = (await Promise.all(relatedCards.map(async (relation, index) => {
-            const cardHtml = await renderFullSpellSheet(relation.card, false);
+            const cardHtml = await renderFullSpellSheet(relation.card, false, {
+                cardWidth: relatedCardWidth,
+                cardHeight: relatedCardHeight
+            });
             return `
                 <div class="spell-carousel-slide${index === 0 ? ' active' : ''}" data-slide-index="${index}">
                     <div class="spell-carousel-label">${relation.label}</div>
@@ -212,15 +271,15 @@ export async function renderFullSpellSheet(spellData, isModal) {
             <button id="close-spell-sheet-btn-${uniqueId}" class="absolute top-4 right-4 bg-red-600 hover:text-white z-50 thumb-btn" style="display:block;">
                 <i class="fa-solid fa-xmark"></i>
             </button>
-            <div class="spell-carousel-shell" style="width: ${finalWidth}px; height: ${finalHeight}px;">
-                <button type="button" class="spell-carousel-nav prev" aria-label="Card anterior"><i class="fas fa-chevron-left"></i></button>
+            <div class="${carouselClass}" style="${carouselStyle}">
+                ${inlineLayout ? '' : '<button type="button" class="spell-carousel-nav prev" aria-label="Card anterior"><i class="fas fa-chevron-left"></i></button>'}
                 <div class="spell-carousel-track">
                     ${slidesHtml}
                 </div>
-                <button type="button" class="spell-carousel-nav next" aria-label="Proximo card"><i class="fas fa-chevron-right"></i></button>
-                <div class="spell-carousel-dots">
+                ${inlineLayout ? '' : '<button type="button" class="spell-carousel-nav next" aria-label="Proximo card"><i class="fas fa-chevron-right"></i></button>'}
+                ${inlineLayout ? '' : `<div class="spell-carousel-dots">
                     ${relatedCards.map((relation, index) => `<button type="button" class="spell-carousel-dot${index === 0 ? ' active' : ''}" data-slide-index="${index}" aria-label="${relation.label}"></button>`).join('')}
-                </div>
+                </div>`}
             </div>
         `;
     } else {

@@ -461,13 +461,13 @@ async function loadAndDisplayGrimoires() {
                             <i class="fas fa-book-reader"></i>
                         </button>
                         <button class="w-10 h-10 text-sm rounded-md bg-green-600 hover:bg-green-700 flex items-center justify-center" data-action="edit-content" data-id="${grimoire.id}" title="Editar capitulos">
-                            <i class="fas fa-pen"></i>
+                            <i class="fas fa-edit"></i>
                         </button>
                         <button class="w-10 h-10 text-sm rounded-md bg-blue-600 hover:bg-blue-700 flex items-center justify-center" data-action="export-txt" data-id="${grimoire.id}" title="Baixar .txt">
                             <i class="fas fa-file-alt"></i>
                         </button>
                         <button class="w-10 h-10 text-sm rounded-md bg-sky-700 hover:bg-sky-800 flex items-center justify-center" data-action="export-doc" data-id="${grimoire.id}" title="Baixar .doc para Word">
-                            <i class="fas fa-file-word"></i>
+                            <i class="fas fa-book-open"></i>
                         </button>
                         <button class="w-10 h-10 text-sm rounded-md bg-red-700 hover:bg-red-800 flex items-center justify-center" data-action="delete" data-id="${grimoire.id}" title="Excluir livro">
                             <i class="fas fa-trash-alt"></i>
@@ -599,10 +599,10 @@ async function openGrimoireViewer(grimoireData, options = {}) {
                     <h3 class="font-bold text-yellow-200">Capitulos</h3>
                     <div class="flex items-center gap-2">
                         <button id="create-new-chapter-btn" class="w-10 h-10 rounded-lg bg-green-600 hover:bg-green-700 flex items-center justify-center" title="Novo capitulo">
-                            <i class="fas fa-plus"></i>
+                            <i class="fas fa-expand-arrows-alt"></i>
                         </button>
                         <button id="edit-grimoire-details-btn" class="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center" title="Editar detalhes do livro">
-                            <i class="fas fa-cog"></i>
+                            <i class="fas fa-undo"></i>
                         </button>
                     </div>
                 </div>
@@ -654,10 +654,10 @@ async function openGrimoireViewer(grimoireData, options = {}) {
                     </div>
                     <div class="flex items-center gap-2">
                         <button id="export-grimoire-txt-btn" class="w-10 h-10 rounded-md bg-blue-600 hover:bg-blue-700 flex items-center justify-center" title="Baixar .txt">
-                            <i class="fas fa-file-alt"></i>
+                            <i class="fas fa-scroll"></i>
                         </button>
                         <button id="export-grimoire-doc-btn" class="w-10 h-10 rounded-md bg-sky-700 hover:bg-sky-800 flex items-center justify-center" title="Baixar .doc para Word">
-                            <i class="fas fa-file-word"></i>
+                            <i class="fas fa-book-open"></i>
                         </button>
                         <button id="close-grimoire-btn" class="text-gray-400 hover:text-white text-2xl w-8 h-8 rounded-full hover:bg-gray-700">&times;</button>
                     </div>

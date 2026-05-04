@@ -30,6 +30,179 @@ const DB_CONFIG = {
 
 const STORES_WITH_AUMENTOS = new Set(['rpgItems', 'rpgEffects', 'rpgSpells', 'rpgAttacks']);
 
+const zipTextEncoder = new TextEncoder();
+let crc32Table = null;
+
+function getCrc32Table() {
+    if (crc32Table) return crc32Table;
+
+    crc32Table = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+        let value = i;
+        for (let bit = 0; bit < 8; bit++) {
+            value = (value & 1) ? (0xEDB88320 ^ (value >>> 1)) : (value >>> 1);
+        }
+        crc32Table[i] = value >>> 0;
+    }
+    return crc32Table;
+}
+
+function calculateCrc32(bytes) {
+    const table = getCrc32Table();
+    let crc = 0xFFFFFFFF;
+
+    for (let i = 0; i < bytes.length; i++) {
+        crc = table[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    }
+
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function normalizeZipPath(path) {
+    return String(path || '')
+        .replace(/\\/g, '/')
+        .replace(/^\/+/, '')
+        .split('/')
+        .filter(part => part && part !== '.' && part !== '..')
+        .join('/');
+}
+
+function createZipHeader(size) {
+    const bytes = new Uint8Array(size);
+    return {
+        bytes,
+        view: new DataView(bytes.buffer)
+    };
+}
+
+function getZipDateParts(date = new Date()) {
+    const year = Math.max(date.getFullYear(), 1980);
+    const dosTime = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+    const dosDate = ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
+    return { dosTime, dosDate };
+}
+
+function concatUint8Arrays(parts) {
+    const totalLength = parts.reduce((total, part) => total + part.length, 0);
+    const output = new Uint8Array(totalLength);
+    let offset = 0;
+
+    for (const part of parts) {
+        output.set(part, offset);
+        offset += part.length;
+    }
+
+    return output;
+}
+
+async function toUint8Array(data) {
+    if (data instanceof Uint8Array) return data;
+    if (data instanceof ArrayBuffer) return new Uint8Array(data);
+    if (data instanceof Blob) return new Uint8Array(await data.arrayBuffer());
+    if (typeof data === 'string') return zipTextEncoder.encode(data);
+    return new Uint8Array(await new Blob([data]).arrayBuffer());
+}
+
+class LocalZipFolder {
+    constructor(zip, prefix = '') {
+        this.zip = zip;
+        this.prefix = prefix;
+    }
+
+    folder(name) {
+        const safeName = normalizeZipPath(name);
+        return new LocalZipFolder(this.zip, safeName ? `${this.prefix}${safeName}/` : this.prefix);
+    }
+
+    file(name, data) {
+        this.zip.file(`${this.prefix}${name}`, data);
+        return this;
+    }
+}
+
+class LocalZip extends LocalZipFolder {
+    constructor() {
+        super(null, '');
+        this.zip = this;
+        this.entries = [];
+    }
+
+    file(name, data) {
+        const safeName = normalizeZipPath(name);
+        if (!safeName) return this;
+
+        this.entries = this.entries.filter(entry => entry.name !== safeName);
+        this.entries.push({ name: safeName, data, date: new Date() });
+        return this;
+    }
+
+    async generateAsync({ type = 'blob' } = {}) {
+        const localParts = [];
+        const centralDirectoryParts = [];
+        let offset = 0;
+
+        for (const entry of this.entries) {
+            const fileBytes = await toUint8Array(entry.data);
+            const nameBytes = zipTextEncoder.encode(entry.name);
+            const crc32 = calculateCrc32(fileBytes);
+            const { dosTime, dosDate } = getZipDateParts(entry.date);
+
+            const localHeader = createZipHeader(30 + nameBytes.length);
+            localHeader.view.setUint32(0, 0x04034b50, true);
+            localHeader.view.setUint16(4, 20, true);
+            localHeader.view.setUint16(6, 0x0800, true);
+            localHeader.view.setUint16(8, 0, true);
+            localHeader.view.setUint16(10, dosTime, true);
+            localHeader.view.setUint16(12, dosDate, true);
+            localHeader.view.setUint32(14, crc32, true);
+            localHeader.view.setUint32(18, fileBytes.length, true);
+            localHeader.view.setUint32(22, fileBytes.length, true);
+            localHeader.view.setUint16(26, nameBytes.length, true);
+            localHeader.view.setUint16(28, 0, true);
+            localHeader.bytes.set(nameBytes, 30);
+            localParts.push(localHeader.bytes, fileBytes);
+
+            const centralHeader = createZipHeader(46 + nameBytes.length);
+            centralHeader.view.setUint32(0, 0x02014b50, true);
+            centralHeader.view.setUint16(4, 20, true);
+            centralHeader.view.setUint16(6, 20, true);
+            centralHeader.view.setUint16(8, 0x0800, true);
+            centralHeader.view.setUint16(10, 0, true);
+            centralHeader.view.setUint16(12, dosTime, true);
+            centralHeader.view.setUint16(14, dosDate, true);
+            centralHeader.view.setUint32(16, crc32, true);
+            centralHeader.view.setUint32(20, fileBytes.length, true);
+            centralHeader.view.setUint32(24, fileBytes.length, true);
+            centralHeader.view.setUint16(28, nameBytes.length, true);
+            centralHeader.view.setUint16(30, 0, true);
+            centralHeader.view.setUint16(32, 0, true);
+            centralHeader.view.setUint16(34, 0, true);
+            centralHeader.view.setUint16(36, 0, true);
+            centralHeader.view.setUint32(38, 0, true);
+            centralHeader.view.setUint32(42, offset, true);
+            centralHeader.bytes.set(nameBytes, 46);
+            centralDirectoryParts.push(centralHeader.bytes);
+
+            offset += localHeader.bytes.length + fileBytes.length;
+        }
+
+        const centralDirectory = concatUint8Arrays(centralDirectoryParts);
+        const localData = concatUint8Arrays(localParts);
+        const endOfCentralDirectory = createZipHeader(22);
+        endOfCentralDirectory.view.setUint32(0, 0x06054b50, true);
+        endOfCentralDirectory.view.setUint16(8, this.entries.length, true);
+        endOfCentralDirectory.view.setUint16(10, this.entries.length, true);
+        endOfCentralDirectory.view.setUint32(12, centralDirectory.length, true);
+        endOfCentralDirectory.view.setUint32(16, localData.length, true);
+        endOfCentralDirectory.view.setUint16(20, 0, true);
+
+        const zipBytes = concatUint8Arrays([localData, centralDirectory, endOfCentralDirectory.bytes]);
+        if (type === 'uint8array') return zipBytes;
+        if (type === 'arraybuffer') return zipBytes.buffer;
+        return new Blob([zipBytes], { type: 'application/zip' });
+    }
+}
+
 function normalizeAumentos(aumentos) {
     if (!Array.isArray(aumentos)) return [];
 
@@ -632,8 +805,7 @@ export async function exportImagesAsPng(onProgress = () => {}) {
     const localOnProgress = (msg) => updateProgress(msg, -1);
     
     try {
-        const { default: JSZip } = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
-        const zip = new JSZip();
+        const zip = new LocalZip();
 
         const processRawImages = async (storeName, mainFolderName) => {
             localOnProgress(`A carregar imagens de ${mainFolderName}...`);
@@ -728,6 +900,7 @@ export async function exportImagesAsPng(onProgress = () => {}) {
         setTimeout(hideProgressModal, 500);
     } catch (e) {
         hideProgressModal();
+        console.error("Erro na exportação de imagens:", e);
         showTopAlert("Erro na exportação de imagens.", 3000, "error");
     }
 }

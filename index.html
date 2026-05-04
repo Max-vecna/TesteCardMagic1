@@ -12,6 +12,7 @@
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.svg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./vendor/rpg-awesome/css/rpg-awesome.min.css">
 
     <link rel="stylesheet" href="./style.css">
 </head>
@@ -142,7 +143,6 @@
      <!-- Sliding Actions Sidebar for Mobile (Right) -->
     <div id="actions-sidebar-1" class="fixed top-1/2 -translate-y-1/2 z-50 flex items-center md:hidden">
         <div id="sidebar-buttons" class="flex flex-col gap-3 p-2 rounded-r-lg shadow-lg">
-<hr>
             <button  class=" sidebar-btn w-8 h-8 rounded-full font-bold flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform" title="Exportar Banco de Dados"  data-target="grimorio" title="Grimório">
                <i class="fas fa-book-open"></i>
             </button>
@@ -177,7 +177,7 @@
         <div class="form-container" style="max-width: 1000px;">
             <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
                 <h2 id="form-title" class="text-2xl font-bold text-indigo-300">Novo Personagem</h2>
-                <button id="close-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+                <button id="close-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold" type="button">Fechar</button>
             </div>
             <form id="cardForm" class="space-y-3">
                  <div class="flex flex-col md:flex-row gap-4">
@@ -252,7 +252,6 @@
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">PV Atual</label><input type="number" id="vidaAtual" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">PM Máx</label><input type="number" id="mana" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600" readonly></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">PM Atual</label><input type="number" id="manaAtual" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
-                                 
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">Armadura</label><input type="number" id="armadura" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">Esquiva</label><input type="number" id="esquiva" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate">Bloqueio</label><input type="number" id="bloqueio" placeholder="0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
@@ -358,10 +357,10 @@
                     </div>
                     <div>
                          <div class="flex justify-between items-center mb-1">
-                            <h3 class="text-xs font-bold text-purple-400 uppercase">Relações</h3>
+                            <h3 class="text-xs font-bold text-purple-400 uppercase">Criaturas</h3>
                             <div class="flex items-center gap-2">
                                 <button type="button" id="create-related-character-btn" class="hidden text-[10px] px-2 py-1 rounded-full border border-purple-500/40 text-purple-300 hover:text-white hover:border-purple-300 transition-colors">
-                                    <i class="fas fa-clone mr-1"></i>Criar relacionado
+                                    <i class="fas fa-dragon mr-1"></i>Criar criatura
                                 </button>
                                 <button type="button" id="add-relationship-btn" class="text-purple-400 hover:text-purple-200 text-xs font-bold"><i class="fas fa-plus"></i></button>
                             </div>
@@ -372,8 +371,8 @@
                 <div id="related-creation-panel" class="hidden bg-purple-950/30 border border-purple-500/30 rounded-lg p-3">
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                         <div>
-                            <p class="text-xs font-bold uppercase tracking-wide text-purple-200">Criando card relacionado</p>
-                            <p class="text-sm text-gray-200">Ao salvar, este novo card sera ligado automaticamente a <span id="related-base-card-name" class="font-semibold text-purple-200">card base</span>.</p>
+                            <p class="text-xs font-bold uppercase tracking-wide text-purple-200">Criando criatura relacionada</p>
+                            <p class="text-sm text-gray-200">Ao salvar, esta criatura sera ligada automaticamente a <span id="related-base-card-name" class="font-semibold text-purple-200">card base</span>.</p>
                         </div>
                         <label id="related-base-image-option-wrapper" for="related-base-image-option" class="flex items-center gap-2 text-xs text-gray-200">
                             <input type="checkbox" id="related-base-image-option" class="rounded border-gray-600 bg-gray-800 text-purple-500 focus:ring-purple-500">
@@ -396,19 +395,23 @@
         <div class="form-container" style="max-width: 1000px;">
             <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
                 <h2 id="spell-form-title" class="text-2xl font-bold text-teal-300">Nova Magia</h2>
-                <button id="close-spell-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+                <button id="close-spell-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold" type="button">Fechar</button>
             </div>
             <form id="spellForm" class="space-y-3">
                  <div class="flex flex-col md:flex-row gap-4">
-                    <div class="w-full md:w-1/5 flex flex-col items-center gap-2 bg-gray-900/50 p-3 rounded-lg border border-gray-700 h-fit">
+                    <div class="image-picker-panel image-picker-panel--spell w-full md:w-1/5 flex flex-col items-center gap-2 bg-gray-900/50 p-3 rounded-lg border border-gray-700 h-fit">
                         <label for="spellImageUpload" class="block text-xs font-bold text-teal-300 uppercase cursor-pointer hover:text-white">Ícone</label>
-                        <div class="relative group cursor-pointer w-24 h-24">
+                        <div class="image-picker-box image-picker-box--spell relative group cursor-pointer w-24 h-24" onclick="document.getElementById('spellImageUpload').click()">
                             <input type="file" id="spellImageUpload" accept="image/*" class="hidden">
-                             <img id="spellImagePreview" class="w-full h-full object-cover rounded-full border-4 border-teal-900/50 group-hover:border-teal-500 transition-colors hidden" onclick="document.getElementById('spellImageUpload').click()">
-                             <div id="spellImagePlaceholder" class="w-full h-full rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center text-gray-500 group-hover:border-teal-500 group-hover:text-teal-400 transition-colors" onclick="document.getElementById('spellImageUpload').click()">
+                             <img id="spellImagePreview" class="w-full h-full object-cover rounded-full border-4 border-teal-900/50 group-hover:border-teal-500 transition-colors hidden">
+                             <div id="spellImagePlaceholder" class="w-full h-full rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center text-gray-500 group-hover:border-teal-500 group-hover:text-teal-400 transition-colors">
                                  <i class="fas fa-magic text-3xl"></i>
                              </div>
                         </div>
+                        <label id="related-spell-base-image-option-wrapper" for="related-spell-base-image-option" class="related-base-image-toggle related-base-image-toggle--spell hidden">
+                            <input type="checkbox" id="related-spell-base-image-option" class="rounded border-gray-600 bg-gray-800 text-teal-500 focus:ring-teal-500">
+                            <span>Usar imagem do card base</span>
+                        </label>
                     </div>
                     <div class="w-full md:w-4/5 space-y-3">
                          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -468,6 +471,8 @@
                                 <!-- NOVOS CAMPOS INSERIDOS -->
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano</label><input type="text" id="spellDamage" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano Sem Mana</label><input type="text" id="spellDanoSemMana" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-300">Dado Vida</label><input type="text" id="spellVidaDado" placeholder="1d8" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-blue-300">Dado Mana</label><input type="text" id="spellManaDado" placeholder="1d6" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                             </div>
                         </div>
                     </div>
@@ -477,40 +482,56 @@
                         <label for="spellDescription" class="block text-xs font-semibold text-gray-400 mb-1">Descrição</label>
                         <textarea id="spellDescription" rows="3" class="w-full h-64 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
                     </div>
-                    <div id="spell-related-wrapper" class="bg-gray-800/50 p-3 rounded border border-gray-700/50">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-gray-800/50 p-3 rounded border border-gray-700/50">
+                        <div>
+                            <label for="spell-card-role" class="block text-xs font-semibold text-gray-400 mb-1">Tipo do card</label>
+                            <select id="spell-card-role" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none">
+                                <option value="base">Base</option>
+                                <option value="enhance">Aprimorar</option>
+                                <option value="true">Verdadeiro</option>
+                            </select>
+                        </div>
+                        <div id="spell-base-card-wrapper" class="hidden">
+                            <label for="spell-base-card-select" class="block text-xs font-semibold text-gray-400 mb-1">Card base</label>
+                            <select id="spell-base-card-select" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></select>
+                        </div>
+                        <!-- <div id="spell-true-school-wrapper" class="hidden">
+                            <label for="spell-true-school-select" class="block text-xs font-semibold text-gray-400 mb-1">Escola</label>
+                            <select id="spell-true-school-select" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none">
+                                <option value="">Selecione a escola</option>
+                                <option value="ADIVINHAÇÃO">ADIVINHAÇÃO</option>
+                                <option value="CONJURAÇÃO">CONJURAÇÃO</option>
+                                <option value="ENCANTAMENTO">ENCANTAMENTO</option>
+                                <option value="ILUSÃO">ILUSÃO</option>
+                                <option value="NECROMANCIA">NECROMANCIA</option>
+                                <option value="PROTEÇÃO">PROTEÇÃO</option>
+                                <option value="TRANSMUTAÇÃO">TRANSMUTAÇÃO</option>
+                            </select>
+                        </div> -->
+                    </div>
+                    <div id="spell-inline-related-options" class="bg-gray-800/50 p-3 rounded border border-teal-500/30">
                         <input type="hidden" id="spellEnhanceCardId">
                         <input type="hidden" id="spellTrueCardId">
-                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-                            <h3 class="text-xs font-bold text-teal-300 uppercase">Cards relacionados</h3>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <button type="button" id="create-related-spell-btn" class="hidden text-[10px] px-2 py-1 rounded-full border border-teal-500/40 text-teal-300 hover:text-white hover:border-teal-300 transition-colors">
-                                    <i class="fas fa-clone mr-1"></i>Criar relacionado
-                                </button>
-                                <button type="button" id="open-spell-relations-btn" class="bg-teal-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-teal-500">
-                                    Relacionar Cards
-                                </button>
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <h3 class="text-xs font-bold text-teal-300 uppercase">Criar relacionado</h3>
+                        </div>
+                        <div id="spell-base-text-fields" class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                            <div id="spell-enhance-text-wrapper">
+                                <label for="spellEnhanceText" class="block text-xs font-semibold text-gray-400 mb-1">Aprimorar</label>
+                                <textarea id="spellEnhanceText" rows="3" class="w-full h-36 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
+                            </div>
+                            <div id="spell-true-text-wrapper">
+                                <label for="spellTrueText" class="block text-xs font-semibold text-gray-400 mb-1">Verdadeiro</label>
+                                <textarea id="spellTrueText" rows="3" class="w-full h-36 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></textarea>
                             </div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                            <div class="spell-relation-pill">
-                                <span>Aprimorar</span>
-                                <strong id="spellEnhanceCardName">Nenhum card selecionado</strong>
-                            </div>
-                            <div class="spell-relation-pill">
-                                <span>Verdadeiro</span>
-                                <strong id="spellTrueCardName">Nenhum card selecionado</strong>
-                            </div>
-                        </div>
+                        <div id="spell-inline-related-sections" class="space-y-3 mt-3"></div>
                         <div id="related-spell-creation-panel" class="hidden mt-3 bg-teal-950/30 border border-teal-500/30 rounded-lg p-3">
                             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                                 <div>
                                     <p class="text-xs font-bold uppercase tracking-wide text-teal-200">Criando card relacionado</p>
                                     <p class="text-sm text-gray-200">Ao salvar, este novo card sera ligado automaticamente a <span id="related-spell-base-name" class="font-semibold text-teal-200">card base</span> em <span id="related-spell-target-slot" class="font-semibold text-teal-200">Aprimorar</span>.</p>
                                 </div>
-                                <label id="related-spell-base-image-option-wrapper" for="related-spell-base-image-option" class="flex items-center gap-2 text-xs text-gray-200">
-                                    <input type="checkbox" id="related-spell-base-image-option" class="rounded border-gray-600 bg-gray-800 text-teal-500 focus:ring-teal-500">
-                                    <span>Usar mesma imagem do card base</span>
-                                </label>
                             </div>
                         </div>
                     </div>
@@ -553,24 +574,47 @@
         </div>
     </div>
 
+    <div id="related-action-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
+        <div class="form-container w-full max-w-xl">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                <h2 id="related-action-title" class="text-xl font-bold text-teal-300">Card relacionado</h2>
+                <button type="button" id="close-related-action-modal-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button type="button" id="related-action-create-btn" class="related-action-choice">
+                    <strong>Criar formulario em branco</strong>
+                    <span>Novo card relacionado neste conjunto.</span>
+                </button>
+                <button type="button" id="related-action-link-btn" class="related-action-choice">
+                    <strong>Relacionar card existente</strong>
+                    <span>Escolher um card ja criado.</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="item-creation-section" class="hidden">
         <!-- Conteúdo do form de item -->
          <div class="form-container" style="max-width: 1000px;">
             <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
                 <h2 id="item-form-title" class="text-2xl font-bold text-amber-300">Novo Item</h2>
-                <button id="close-item-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+                <button id="close-item-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold" type="button">Fechar</button>
             </div>
             <form id="itemForm" class="space-y-3">
                  <div class="flex flex-col md:flex-row gap-4">
-                    <div class="w-full md:w-1/5 flex flex-col items-center gap-2 bg-gray-900/50 p-3 rounded-lg border border-gray-700 h-fit">
+                    <div class="image-picker-panel image-picker-panel--item w-full md:w-1/5 flex flex-col items-center gap-2 bg-gray-900/50 p-3 rounded-lg border border-gray-700 h-fit">
                         <label for="itemImageUpload" class="block text-xs font-bold text-amber-300 uppercase cursor-pointer hover:text-white">Ícone</label>
-                        <div class="relative group cursor-pointer w-24 h-24">
+                        <div class="image-picker-box image-picker-box--item relative group cursor-pointer w-24 h-24" onclick="document.getElementById('itemImageUpload').click()">
                              <input type="file" id="itemImageUpload" accept="image/*" class="hidden">
-                             <img id="itemImagePreview" class="w-full h-full object-cover rounded-full border-4 border-amber-900/50 group-hover:border-amber-500 transition-colors hidden" onclick="document.getElementById('itemImageUpload').click()">
-                             <div id="itemImagePlaceholder" class="w-full h-full rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center text-gray-500 group-hover:border-amber-500 group-hover:text-amber-400 transition-colors" onclick="document.getElementById('itemImageUpload').click()">
+                             <img id="itemImagePreview" class="w-full h-full object-cover rounded-full border-4 border-amber-900/50 group-hover:border-amber-500 transition-colors hidden">
+                             <div id="itemImagePlaceholder" class="w-full h-full rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center text-gray-500 group-hover:border-amber-500 group-hover:text-amber-400 transition-colors">
                                  <i class="fas fa-box text-3xl"></i>
                              </div>
                         </div>
+                        <label id="related-item-base-image-option-wrapper" for="related-item-base-image-option" class="related-base-image-toggle related-base-image-toggle--item hidden">
+                            <input type="checkbox" id="related-item-base-image-option" class="rounded border-gray-600 bg-gray-800 text-amber-500 focus:ring-amber-500">
+                            <span>Usar imagem do card base</span>
+                        </label>
                     </div>
                      <div class="w-full md:w-4/5 space-y-3">
                          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -586,6 +630,59 @@
                         <div>
                             <label for="itemCharacterOwner" class="block text-xs font-semibold text-gray-400 mb-1">Dono (Opcional)</label>
                             <select id="itemCharacterOwner" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-amber-500 focus:outline-none"></select>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-gray-800/50 p-3 rounded border border-gray-700/50">
+                            <div>
+                                <label for="item-card-role" class="block text-xs font-semibold text-gray-400 mb-1">Tipo do card</label>
+                                <select id="item-card-role" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-amber-500 focus:outline-none">
+                                    <option value="base">Base</option>
+                                    <option value="enhance">Aprimorar</option>
+                                    <option value="true">Verdadeiro</option>
+                                </select>
+                            </div>
+                            <div id="item-base-card-wrapper" class="hidden">
+                                <label for="item-base-card-select" class="block text-xs font-semibold text-gray-400 mb-1">Card base</label>
+                                <select id="item-base-card-select" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-amber-500 focus:outline-none"></select>
+                            </div>
+                            <!-- <div id="item-true-school-wrapper" class="hidden">
+                                <label for="item-true-school-select" class="block text-xs font-semibold text-gray-400 mb-1">Escola</label>
+                                <select id="item-true-school-select" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-amber-500 focus:outline-none">
+                                    <option value="">Selecione a escola</option>
+                                    <option value="ADIVINHAÇÃO">ADIVINHAÇÃO</option>
+                                    <option value="CONJURAÇÃO">CONJURAÇÃO</option>
+                                    <option value="ENCANTAMENTO">ENCANTAMENTO</option>
+                                    <option value="ILUSÃO">ILUSÃO</option>
+                                    <option value="NECROMANCIA">NECROMANCIA</option>
+                                    <option value="PROTEÇÃO">PROTEÇÃO</option>
+                                    <option value="TRANSMUTAÇÃO">TRANSMUTAÇÃO</option>
+                                </select>
+                            </div> -->
+                        </div>
+                        <div id="item-inline-related-options" class="bg-gray-800/50 p-3 rounded border border-amber-500/30">
+                            <input type="hidden" id="itemEnhanceCardId">
+                            <input type="hidden" id="itemTrueCardId">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                <h3 class="text-xs font-bold text-amber-300 uppercase">Criar relacionado</h3>
+                            </div>
+                            <div id="item-base-text-fields" class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                                <div id="item-enhance-text-wrapper">
+                                    <label for="itemEnhanceText" class="block text-xs font-semibold text-gray-400 mb-1">Aprimorar</label>
+                                    <textarea id="itemEnhanceText" rows="3" class="w-full h-36 px-3 py-1.5 bg-gray-700 text-white rounded border border-gray-600 text-sm focus:border-amber-500 focus:outline-none"></textarea>
+                                </div>
+                                <div id="item-true-text-wrapper">
+                                    <label for="itemTrueText" class="block text-xs font-semibold text-gray-400 mb-1">Verdadeiro</label>
+                                    <textarea id="itemTrueText" rows="3" class="w-full h-36 px-3 py-1.5 bg-gray-700 text-white rounded border border-gray-600 text-sm focus:border-amber-500 focus:outline-none"></textarea>
+                                </div>
+                            </div>
+                            <div id="item-inline-related-sections" class="space-y-3 mt-3"></div>
+                            <div id="related-item-creation-panel" class="hidden mt-3 bg-amber-950/30 border border-amber-500/30 rounded-lg p-3">
+                                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                                    <div>
+                                        <p class="text-xs font-bold uppercase tracking-wide text-amber-200">Criando item relacionado</p>
+                                        <p class="text-sm text-gray-200">Ao salvar, este novo item sera ligado automaticamente a <span id="related-item-base-name" class="font-semibold text-amber-200">card base</span> em <span id="related-item-target-slot" class="font-semibold text-amber-200">Aprimorar</span>.</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="bg-gray-800/50 p-2 rounded border border-gray-700/50 grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div>
@@ -613,6 +710,8 @@
                                 <!-- NOVOS CAMPOS INSERIDOS -->
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano</label><input type="text" id="itemDamage" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                                 <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano Sem Mana</label><input type="text" id="itemDanoSemMana" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-300">Dado Vida</label><input type="text" id="itemVidaDado" placeholder="1d8" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
+                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-blue-300">Dado Mana</label><input type="text" id="itemManaDado" placeholder="1d6" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
                             </div>
                         </div>
 
@@ -640,68 +739,23 @@
             </form>
         </div>
     </div>
-    <div id="attack-creation-section" class="hidden">
-         <!-- Conteúdo do form de ataque -->
-        <div class="form-container" style="max-width: 1000px;">
+
+    <div id="item-relations-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4">
+        <div class="form-container w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
             <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
-                <h2 id="attack-form-title" class="text-2xl font-bold text-red-400">Novo Ataque</h2>
-                <button id="close-attack-form-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+                <div>
+                    <h2 class="text-xl font-bold text-amber-300">Relacionar Itens</h2>
+                    <p class="text-xs text-gray-400">Selecione itens ja criados para Aprimorar e Verdadeiro.</p>
+                </div>
+                <button type="button" id="close-item-relations-modal-btn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
             </div>
-            <form id="attackForm" class="space-y-3">
-                 <div class="flex flex-col md:flex-row gap-4">
-                    <div class="w-full md:w-1/5 flex flex-col items-center gap-2 bg-gray-900/50 p-3 rounded-lg border border-gray-700 h-fit">
-                        <label for="attackImageUpload" class="block text-xs font-bold text-red-400 uppercase cursor-pointer hover:text-white">Ícone</label>
-                        <div class="relative group cursor-pointer w-24 h-24">
-                            <input type="file" id="attackImageUpload" accept="image/*" class="hidden">
-                             <img id="attackImagePreview" class="w-full h-full object-cover rounded-full border-4 border-red-900/50 group-hover:border-red-500 transition-colors hidden" onclick="document.getElementById('attackImageUpload').click()">
-                             <div id="attackImagePlaceholder" class="w-full h-full rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center text-gray-500 group-hover:border-red-500 group-hover:text-red-400 transition-colors" onclick="document.getElementById('attackImageUpload').click()">
-                                 <i class="fas fa-fist-raised text-3xl"></i>
-                             </div>
-                        </div>
-                    </div>
-                    <div class="w-full md:w-4/5 space-y-3">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div class="md:col-span-2">
-                                <label for="attackName" class="block text-xs font-semibold text-gray-400 mb-1">Nome</label>
-                                <input type="text" id="attackName" placeholder="Ex: Golpe Poderoso" required class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-red-500 focus:outline-none">
-                            </div>
-                            <div>
-                                <label for="attack-category-select" class="block text-xs font-semibold text-gray-400 mb-1">Categoria</label>
-                                <select id="attack-category-select" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-red-500 focus:outline-none"></select>
-                            </div>
-                        </div>
-                        <div>
-                            <label for="attackCharacterOwner" class="block text-xs font-semibold text-gray-400 mb-1">Personagem</label>
-                            <select id="attackCharacterOwner" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-red-500 focus:outline-none"></select>
-                        </div>
-                         <div class="bg-gray-800/50 p-2 rounded border border-gray-700/50">
-                            <h3 class="text-xs font-bold text-red-400 uppercase mb-2">Combate</h3>
-                            <!-- GRID ALTERADO PARA 5 COLUNAS PARA CABER ACERTO E DANO -->
-                            <div class="grid grid-cols-2 gap-2">
-                                <!-- NOVOS CAMPOS INSERIDOS -->
-                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-yellow-400">Acerto</label><input type="text" id="attackAcerto" placeholder="+0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
-                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-yellow-400">Crítico</label><input type="text" id="attackcritico" placeholder="+0" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
-                                
-                                <!-- NOVOS CAMPOS INSERIDOS -->
-                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano</label><input type="text" id="attackDamage" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
-                                <div><label class="block text-[10px] text-gray-500 text-center truncate text-red-400">Dano Sem Mana</label><input type="text" id="attackDanoSemMana" placeholder="1d4" class="w-full text-center px-1 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <label for="attackDescription" class="block text-xs font-semibold text-gray-400 mb-1">Descrição</label>
-                            <textarea id="attackDescription" rows="4" placeholder="Descrição do ataque..." class="w-full  h-64 px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-red-500 focus:outline-none"></textarea>
-                        </div>
-                    </div>
-                </div>
-                <div class="pt-2">
-                    <button type="submit" id="attackSubmitButton" class="w-full py-2 px-4 rounded-full text-base font-bold text-white bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 shadow-lg">
-                        Salvar Ataque
-                    </button>
-                </div>
-            </form>
+            <div class="flex gap-2 mb-3">
+                <button type="button" class="spell-relation-tab active" data-relation-type="enhance">Aprimorar</button>
+                <button type="button" class="spell-relation-tab" data-relation-type="true">Verdadeiro</button>
+            </div>
+            <div id="item-relations-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 overflow-y-auto pr-1"></div>
         </div>
     </div>
-
 
     <div id="select-character-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4" style="z-index: 1000000000000000000;">
         <div class="bg-gray-800 text-white rounded-lg shadow-2xl p-6 w-full max-w-sm border border-gray-700">
@@ -794,7 +848,6 @@
     <script type="module" src="./item_renderer.js"></script>
     <script type="module" src="./item_manager.js"></script>
     <script type="module" src="./attack_renderer.js"></script>
-    <script type="module" src="./attack_manager.js"></script>
     <script type="module" src="./grimoire_manager.js"></script>
     <script type="module" src="./navigation_manager.js"></script>
 </body>
