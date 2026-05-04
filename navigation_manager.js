@@ -844,7 +844,7 @@ export async function openSelectionModal(type) {
 // ... (createItemGrid, renderGroupedList, renderCharacterList, renderSpellList, renderItemList, renderAttackList remain unchanged) ...
 async function createItemGrid(items, type, renderSheetFunction) {
     const gridContainer = document.createElement('div');
-    gridContainer.className = 'grid gap-4 w-full justify-items-center grid-cols-3 md:grid-cols-4 lg:grid-cols-5';
+    gridContainer.className = 'grid gap-4 w-full justify-items-center grid-cols-4 md:grid-cols-4 lg:grid-cols-5';
 
     if (items.length === 0) return gridContainer;
 

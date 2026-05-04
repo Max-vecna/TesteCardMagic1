@@ -1852,6 +1852,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
 .character-collection-mini-card {
     appearance: none;
     width: 100%;
+    position: relative;
     display: block;
     justify-self: stretch;
     align-self: start;
@@ -1867,6 +1868,25 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
 .character-collection-mini-card:hover {
     transform: translateY(-3px);
     filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.22));
+}
+
+.character-collection-mini-card__caption {
+    position: absolute;
+    top: calc(var(--collection-card-scaled-height, 100%) + 0.35rem);
+    left: 0;
+    right: 0;
+    min-height: 1rem;
+    padding: 0 0.15rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.05;
+    text-align: center;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
 }
 
 .character-collection-modal-grid .related-character-grid-item,
@@ -1939,6 +1959,10 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     margin: 0;
 }
 
+.character-form-mini-card.has-mini-card-caption {
+    height: 122px;
+}
+
 .character-form-mini-card:hover,
 .relationship-form-thumbnail:hover {
     transform: translateY(-6px);
@@ -1957,6 +1981,28 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
     transform-origin: top left !important;
     pointer-events: none;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.34);
+}
+
+.character-form-mini-card__caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 8;
+    min-height: 1rem;
+    padding: 0.16rem 0.22rem;
+    border-radius: 0 0 8px 8px;
+    background: rgba(17, 24, 39, 0.86);
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1.05;
+    text-align: center;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
 }
 
 #selected-magics-container .remove-selection-btn,

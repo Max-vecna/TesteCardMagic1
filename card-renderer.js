@@ -1183,6 +1183,8 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
         let fanStyle = '';
         let relatedStackHtml = '';
         let hasRelatedStack = false;
+        const showMiniCardCaption = config.key === 'spells';
+        const miniCardCaption = escapeHtml(item.name || item.title || 'Magia');
 
         if (config.type === 'character') {
             wrapperClass = 'related-character-grid-item';
@@ -1233,11 +1235,12 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
 
         return `
             <div
-                class="character-collection-mini-card ${wrapperClass}${hasRelatedStack ? ' has-related-stack' : ''}"
+                class="character-collection-mini-card ${wrapperClass}${hasRelatedStack ? ' has-related-stack' : ''}${showMiniCardCaption ? ' has-mini-card-caption' : ''}"
                 data-collection-key="${config.key}"
                 data-item-id="${item.id}"${fanStyle}>
                 ${miniSheetHtml}
                 ${relatedStackHtml}
+                ${showMiniCardCaption ? `<div class="character-collection-mini-card__caption" title="${miniCardCaption}">${miniCardCaption}</div>` : ''}
             </div>
         `;
     };
@@ -1255,7 +1258,11 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                 const targetWidth = item.clientWidth;
                 if (sheetWidth > 0 && sheetHeight > 0 && targetWidth > 0) {
                     const scale = targetWidth / sheetWidth;
-                    item.style.height = `${sheetHeight * scale}px`;
+                    const scaledHeight = sheetHeight * scale;
+                    const caption = item.querySelector('.character-collection-mini-card__caption');
+                    const captionHeight = caption ? caption.offsetHeight + 8 : 0;
+                    item.style.setProperty('--collection-card-scaled-height', `${scaledHeight}px`);
+                    item.style.height = `${scaledHeight + captionHeight}px`;
                     item.style.position = 'relative';
 
                     const stackedSheets = item.querySelectorAll('.related-card-stack-layer > div');

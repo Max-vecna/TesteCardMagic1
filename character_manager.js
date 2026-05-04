@@ -48,6 +48,15 @@ function calcMaxVidaMana({ classe, level, vigor, sabedoria, carisma }) {
     return { vidaMax: Math.max(0, vidaMax), manaMax: Math.max(0, manaMax) };
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function updateDerivedStatsInForm() {
     const classSelect = document.getElementById('cardClass');
     const levelInput = document.getElementById('cardLevel');
@@ -533,9 +542,12 @@ async function createSelectedElement(data, type) {
     }
 
     if (type === 'relationship' || type === 'magic' || type === 'skill' || type === 'attack') {
-        itemElement.className = `character-form-mini-card ${gridItemClass}`;
+        const showMiniCardCaption = type === 'magic';
+        const miniCardCaption = escapeHtml(data.name || data.title || 'Magia');
+        itemElement.className = `character-form-mini-card ${gridItemClass}${showMiniCardCaption ? ' has-mini-card-caption' : ''}`;
         itemElement.innerHTML = `
             ${miniSheetHtml}
+            ${showMiniCardCaption ? `<div class="character-form-mini-card__caption" title="${miniCardCaption}">${miniCardCaption}</div>` : ''}
             <button type="button" class="text-red-500 hover:text-red-400 remove-selection-btn text-xl leading-none" aria-label="Remover card relacionado">&times;</button>
         `;
         itemElement.querySelector('.remove-selection-btn').addEventListener('click', async (e) => {
