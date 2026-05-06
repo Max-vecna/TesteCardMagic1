@@ -97,24 +97,24 @@ const INFO_STAT_ICON_BY_KEY = {
     range: 'fa-ruler-combined',
     target: 'fa-crosshairs',
     duration: 'fa-hourglass-half',
-    resistencia: 'fa-shield-alt',
+    resistencia: 'fa-shield-halved',
     charge: 'fa-weight-hanging',
     prerequisite: 'fa-key',
-    bonus: 'fa-plus-circle'
+    bonus: 'fa-circle-plus'
 };
 
 const INFO_STAT_ICON_BY_LABEL = {
     ex: 'fa-bolt',
     al: 'fa-ruler-combined',
     av: 'fa-crosshairs',
-    cd: 'fa-shield-alt',
+    cd: 'fa-shield-halved',
     du: 'fa-hourglass-half',
     tipo: 'fa-tag',
     carga: 'fa-weight-hanging',
     pre: 'fa-key',
     prerequisito: 'fa-key',
-    bonus: 'fa-plus-circle',
-    bonusfixo: 'fa-plus-circle'
+    bonus: 'fa-circle-plus',
+    bonusfixo: 'fa-circle-plus'
 };
 
 function normalizeInfoStatName(value) {
@@ -303,8 +303,8 @@ export async function renderFullSpellSheet(spellData, isModal, options = {}) {
                     
                     <div style="filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.8));">            
                         <!-- Div Principal com o recorte de trapézio -->
-                        <div style=" clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%); margin-top: -1px; background-color: ${predominantColor.color100};; display: flex; align-items: center; justify-content: center; color: white;">
-                            <h3 class="" style="font-size: 1.3rem">${spellData.name}</h3>
+                        <div style="clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%); margin-top: -1px; background-color: ${predominantColor.color100};; display: flex; align-items: center; justify-content: center; color: white;">
+                            <h3>${spellData.name}</h3>
                         </div>                    
                     </div>
                 

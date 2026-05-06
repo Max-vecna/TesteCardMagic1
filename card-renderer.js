@@ -1061,7 +1061,7 @@ export async function renderFullCharacterSheet(characterData, isModal, isInPlay,
                     <div class="h-full w-12 right-2 top-2 pb-4 absolute top-0 bottom-0 flex flex-col items-center justify-content" style="justify-content: space-between;">
                         <div class="mt-2 flex flex-col items-center">
                             <div style="position: relative; display: ${hasVida ? 'block' : 'none'};" data-action="edit-stat" data-stat-type="vida" data-stat-max="${permanentMaxVida}">
-                                <i class="fa-solid fa-heart text-6xl status-resource-icon status-heart-icon" data-stat-icon="vida" style="${heartIconStyle}"></i>
+                                <i class="fa-solid fa-heart text-5xl status-resource-icon status-heart-icon" data-stat-icon="vida" style="${heartIconStyle}"></i>
                                 <div class="absolute inset-0 flex flex-col items-center justify-center font-bold text-white text-xs pointer-events-none" style="margin: auto; z-index: 2;">
                                     <span data-stat-current="vida">
                                         ${characterData.attributes.vidaAtual || 0}

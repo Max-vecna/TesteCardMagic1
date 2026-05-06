@@ -745,18 +745,13 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
 .sheet-info-stat {
   width: 100%;
   min-width: 0;
-}
-
-.sheet-dice-stat,
-.sheet-info-stat {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.12rem;
 }
 
-.sheet-dice-stat__icon,
-.sheet-info-stat__icon {
+.sheet-dice-stat__icon {
   position: relative;
   width: 2.45rem;
   height: 2.2rem;
@@ -767,8 +762,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
 }
 
-.sheet-dice-stat__icon i,
-.sheet-info-stat__icon i {
+.sheet-dice-stat__icon i {
   font-size: 2rem;
   line-height: 1;
   background: var(--sheet-accent, #fff);
@@ -777,8 +771,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
   -webkit-text-fill-color: transparent;
 }
 
-.sheet-dice-stat__value,
-.sheet-info-stat__value {
+.sheet-dice-stat__value {
   position: absolute;
   inset: 0;
   display: flex;
@@ -794,8 +787,7 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
   pointer-events: none;
 }
 
-.sheet-dice-stat__label,
-.sheet-info-stat__label {
+.sheet-dice-stat__label {
   max-width: 100%;
   color: rgba(255, 255, 255, 0.82);
   font-size: 0.46rem;
@@ -807,8 +799,52 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
   white-space: nowrap;
 }
 
+.sheet-info-stat__icon {
+  position: relative;
+  width: 2.45rem;
+  height: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sheet-accent, #fff);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+}
+
+.sheet-info-stat__icon i {
+  font-size: 2rem;
+  line-height: 1;
+  background: var(--sheet-accent, #fff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 .sheet-info-stat__value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 0.95;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
   padding: 0 0.12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-info-stat__label {
+  max-width: 100%;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.46rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

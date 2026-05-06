@@ -97,24 +97,24 @@ const INFO_STAT_ICON_BY_KEY = {
     range: 'fa-ruler-combined',
     target: 'fa-crosshairs',
     duration: 'fa-hourglass-half',
-    resistencia: 'fa-shield-alt',
+    resistencia: 'fa-shield-halved',
     charge: 'fa-weight-hanging',
     prerequisite: 'fa-key',
-    bonus: 'fa-plus-circle'
+    bonus: 'fa-circle-plus'
 };
 
 const INFO_STAT_ICON_BY_LABEL = {
     ex: 'fa-bolt',
     al: 'fa-ruler-combined',
     av: 'fa-crosshairs',
-    cd: 'fa-shield-alt',
+    cd: 'fa-shield-halved',
     du: 'fa-hourglass-half',
     tipo: 'fa-tag',
     carga: 'fa-weight-hanging',
     pre: 'fa-key',
     prerequisito: 'fa-key',
-    bonus: 'fa-plus-circle',
-    bonusfixo: 'fa-plus-circle'
+    bonus: 'fa-circle-plus',
+    bonusfixo: 'fa-circle-plus'
 };
 
 function normalizeInfoStatName(value) {
