@@ -164,9 +164,11 @@ function renderSideInfoRail(stats, predominantColor) {
         <div class="sheet-side-rail sheet-side-rail--right sheet-info-rail" style="--sheet-accent: ${predominantColor.color100}; --sheet-panel-bg: ${predominantColor.color30};">
             ${items.map(stat => `
                 <div class="sheet-info-stat" title="${escapeHtml(`${stat.label}: ${stat.value}`)}">
-                    <i class="fas ${getInfoStatIcon(stat)} sheet-info-stat__icon" aria-hidden="true"></i>
+                    <div class="sheet-info-stat__icon">
+                        <i class="fas ${getInfoStatIcon(stat)}" aria-hidden="true"></i>
+                        <span class="sheet-info-stat__value">${escapeHtml(stat.value)}</span>
+                    </div>
                     <span class="sheet-info-stat__label">${escapeHtml(stat.label)}</span>
-                    <span class="sheet-info-stat__value">${escapeHtml(stat.value)}</span>
                 </div>
             `).join('')}
         </div>
