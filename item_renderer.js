@@ -67,6 +67,112 @@ function getInlineRelatedLayout(cardCount, aspectRatio) {
     };
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getDiceValueParts(value) {
+    const text = String(value ?? '').trim();
+    if (!text) return null;
+
+    const plusIndex = text.indexOf('+');
+    if (plusIndex < 0) {
+        return { main: text, bonus: '' };
+    }
+
+    return {
+        main: text.slice(0, plusIndex).trim() || text,
+        bonus: `+${text.slice(plusIndex + 1).trim()}`
+    };
+}
+
+const INFO_STAT_ICON_BY_KEY = {
+    type: 'fa-tag',
+    execution: 'fa-bolt',
+    range: 'fa-ruler-combined',
+    target: 'fa-crosshairs',
+    duration: 'fa-hourglass-half',
+    resistencia: 'fa-shield-alt',
+    charge: 'fa-weight-hanging',
+    prerequisite: 'fa-key',
+    bonus: 'fa-plus-circle'
+};
+
+const INFO_STAT_ICON_BY_LABEL = {
+    ex: 'fa-bolt',
+    al: 'fa-ruler-combined',
+    av: 'fa-crosshairs',
+    cd: 'fa-shield-alt',
+    du: 'fa-hourglass-half',
+    tipo: 'fa-tag',
+    carga: 'fa-weight-hanging',
+    pre: 'fa-key',
+    prerequisito: 'fa-key',
+    bonus: 'fa-plus-circle',
+    bonusfixo: 'fa-plus-circle'
+};
+
+function normalizeInfoStatName(value) {
+    return String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '');
+}
+
+function getInfoStatIcon(stat) {
+    const key = normalizeInfoStatName(stat.key);
+    const label = normalizeInfoStatName(stat.label);
+    return stat.icon || INFO_STAT_ICON_BY_KEY[key] || INFO_STAT_ICON_BY_LABEL[label] || 'fa-gem';
+}
+
+function renderSideDiceRail(stats, predominantColor) {
+    const items = stats
+        .map(stat => ({ ...stat, valueParts: getDiceValueParts(stat.value) }))
+        .filter(stat => stat.valueParts);
+
+    if (items.length === 0) return '';
+
+    return `
+        <div class="sheet-side-rail sheet-side-rail--left sheet-dice-rail" style="--sheet-accent: ${predominantColor.color100}; --sheet-panel-bg: ${predominantColor.color30};">
+            ${items.map(stat => `
+                <div class="sheet-dice-stat" title="${escapeHtml(stat.label)}">
+                    <div class="sheet-dice-stat__icon">
+                        <i class="fas ${stat.icon}"></i>
+                        <span class="sheet-dice-stat__value">
+                            <span>${escapeHtml(stat.valueParts.main)}</span>
+                            ${stat.valueParts.bonus ? `<span>${escapeHtml(stat.valueParts.bonus)}</span>` : ''}
+                        </span>
+                    </div>
+                    <span class="sheet-dice-stat__label">${escapeHtml(stat.label)}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function renderSideInfoRail(stats, predominantColor) {
+    const items = stats.filter(stat => stat.value !== null && stat.value !== undefined && String(stat.value).trim() !== '');
+    if (items.length === 0) return '';
+
+    return `
+        <div class="sheet-side-rail sheet-side-rail--right sheet-info-rail" style="--sheet-accent: ${predominantColor.color100}; --sheet-panel-bg: ${predominantColor.color30};">
+            ${items.map(stat => `
+                <div class="sheet-info-stat" title="${escapeHtml(`${stat.label}: ${stat.value}`)}">
+                    <i class="fas ${getInfoStatIcon(stat)} sheet-info-stat__icon" aria-hidden="true"></i>
+                    <span class="sheet-info-stat__label">${escapeHtml(stat.label)}</span>
+                    <span class="sheet-info-stat__value">${escapeHtml(stat.value)}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
 export async function renderFullItemSheet(itemData, isModal, options = {}) {
     const sheetContainer = document.getElementById('item-sheet-container');
     if (!sheetContainer) return '';
@@ -122,6 +228,26 @@ export async function renderFullItemSheet(itemData, isModal, options = {}) {
         `;
     }
 
+    const diceStatsHtml = renderSideDiceRail([
+        { key: 'acerto', label: 'ATK', icon: 'fa-dice-d20', value: itemData.acerto },
+        { key: 'critico', label: 'ATK s/Mana', icon: 'fa-crosshairs', value: itemData.critico },
+        { key: 'damage', label: 'DMG', icon: 'fa-fire', value: itemData.damage },
+        { key: 'danoSemMana', label: 'DMG s/Mana', icon: 'fa-skull', value: itemData.danoSemMana },
+        { key: 'vidaDado', label: 'PV', icon: 'fa-heart', value: itemData.vidaDado },
+        { key: 'manaDado', label: 'PM', icon: 'fa-fire', value: itemData.manaDado }
+    ], predominantColor);
+    const fixedBonusInfo = itemData.aumentos.map(aumento => ({
+        key: 'bonus',
+        label: aumento.nome || 'Bonus',
+        value: `${Number(aumento.valor) > 0 ? '+' : ''}${aumento.valor}`
+    }));
+    const sideInfoHtml = renderSideInfoRail([
+        { key: 'type', label: 'Tipo', value: itemData.type },
+        { key: 'charge', label: 'Carga', value: itemData.charge },
+        { key: 'prerequisite', label: 'Pre', value: itemData.prerequisite },
+        ...fixedBonusInfo
+    ], predominantColor);
+
     let aumentosHtml = '';
     if (itemData.aumentos && itemData.aumentos.length > 0) {
         const aumentosFixos = itemData.aumentos.filter(a => (a?.tipo || 'fixo') === 'fixo');
@@ -152,10 +278,13 @@ export async function renderFullItemSheet(itemData, isModal, options = {}) {
             <div class="w-full text-left absolute top-0 line-top" style="background-color: ${predominantColor.color30}; padding-top: 20px; padding-bottom: 10px; text-align: center; --minha-cor: ${predominantColor.color100};">
                 <h3 class="font-bold tracking-tight text-white" style="font-size: 1.3rem">${itemData.name}</h3>
             </div>
+
+            ${diceStatsHtml}
+            ${sideInfoHtml}
             
-            <div class="mt-auto p-6 pt-3 md:p-6 w-full text-left absolute bottom-0 line-bottom" style="background-color: ${predominantColor.color30}; --minha-cor: ${predominantColor.color100};">                
-                <div class="sheet-card-text-panel">                      
-                  <div class="space-y-3 max-h-40 overflow-y-auto pr-2">
+            <div class="mt-auto p-6 pt-3 md:p-6 w-full text-left absolute bottom-0 line-bottom sheet-description-zone" style="--sheet-description-bg: ${predominantColor.color30}; --minha-cor: ${predominantColor.color100};">                
+                <div class="sheet-card-text-panel sheet-description-panel">                      
+                  <div class="sheet-description-scroll space-y-3 overflow-y-auto pr-2">
                         ${[
                             { label: 'Descrição', value: itemData.effect },
                             { label: 'Aprimorar', value: itemData.enhance, hidden: Boolean(itemData.enhanceCardId) },
@@ -166,8 +295,6 @@ export async function renderFullItemSheet(itemData, isModal, options = {}) {
                                 <p class="text-gray-300 text-xs leading-relaxed mt-1 pl-6" style="white-space:pre-line;">${section.value}</p>
                             </div>
                         `).join('')}
-                        ${detailsHtml}
-                        ${aumentosHtml}
                     </div>
                 </div>
             </div>            

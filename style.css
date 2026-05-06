@@ -711,6 +711,186 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
   top: 0.45rem;
 }
 
+.sheet-side-rail {
+  position: absolute;
+  top: 6.25rem;
+  bottom: 49%;
+  z-index: 24;
+  width: 3.35rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  padding: 0.45rem 0.25rem;
+    overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.sheet-side-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.sheet-side-rail--left {
+  left: 0.7rem;
+  border-radius: 0 12px 12px 0;
+}
+
+.sheet-side-rail--right {
+  right: 0.7rem;
+  border-radius: 12px 0 0 12px;
+}
+
+.sheet-dice-stat,
+.sheet-info-stat {
+  width: 100%;
+  min-width: 0;
+}
+
+.sheet-dice-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+}
+
+.sheet-dice-stat__icon {
+  position: relative;
+  width: 2.45rem;
+  height: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sheet-accent, #fff);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+}
+
+.sheet-dice-stat__icon i {
+  font-size: 2rem;
+  line-height: 1;
+  background: var(--sheet-accent, #fff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sheet-dice-stat__value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 0.95;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
+}
+
+.sheet-dice-stat__label {
+  max-width: 100%;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.46rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-info-rail {
+  gap: 0.36rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.sheet-info-stat {
+  position: relative;
+  min-height: 2.15rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.05rem;
+  padding: 0.16rem 0.2rem;
+  border-radius: 6px;
+  border: 1px solid var(--sheet-accent, rgba(255, 255, 255, 0.5));
+  background: color-mix(in srgb, var(--sheet-panel-bg, rgba(15, 23, 42, 0.62)) 78%, rgba(0, 0, 0, 0.5));
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.28), inset 0 0 8px rgba(0, 0, 0, 0.18);
+  text-align: center;
+  overflow: hidden;
+}
+
+.sheet-info-stat__icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: color-mix(in srgb, var(--sheet-accent, #fff) 78%, #fff 22%);
+  font-size: 1.55rem;
+  line-height: 1;
+  opacity: 0.36;
+  text-shadow: 0 0 12px rgba(0, 0, 0, 0.65);
+  transform: translate(-50%, -50%) rotate(-8deg) scale(1.12);
+  pointer-events: none;
+}
+
+.sheet-info-stat__label {
+  position: relative;
+  z-index: 1;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.48rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.sheet-info-stat__value {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1.05;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-description-zone {
+  max-height: 48%;
+  display: flex;
+  flex-direction: column;
+  background: var(--sheet-description-bg);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet-description-zone .sheet-description-panel {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  background: transparent;
+}
+
+.sheet-description-scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
 @media (max-width: 640px) {
   .spell-carousel-nav {
     width: 2.35rem;

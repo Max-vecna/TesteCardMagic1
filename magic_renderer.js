@@ -67,6 +67,111 @@ function getInlineRelatedLayout(cardCount, aspectRatio) {
     };
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getDiceValueParts(value) {
+    const text = String(value ?? '').trim();
+    if (!text) return null;
+
+    const plusIndex = text.indexOf('+');
+    if (plusIndex < 0) {
+        return { main: text, bonus: '' };
+    }
+
+    return {
+        main: text.slice(0, plusIndex).trim() || text,
+        bonus: `+${text.slice(plusIndex + 1).trim()}`
+    };
+}
+
+const INFO_STAT_ICON_BY_KEY = {
+    type: 'fa-tag',
+    execution: 'fa-bolt',
+    range: 'fa-ruler-combined',
+    target: 'fa-crosshairs',
+    duration: 'fa-hourglass-half',
+    resistencia: 'fa-shield-alt',
+    charge: 'fa-weight-hanging',
+    prerequisite: 'fa-key',
+    bonus: 'fa-plus-circle'
+};
+
+const INFO_STAT_ICON_BY_LABEL = {
+    ex: 'fa-bolt',
+    al: 'fa-ruler-combined',
+    av: 'fa-crosshairs',
+    cd: 'fa-shield-alt',
+    du: 'fa-hourglass-half',
+    tipo: 'fa-tag',
+    carga: 'fa-weight-hanging',
+    pre: 'fa-key',
+    prerequisito: 'fa-key',
+    bonus: 'fa-plus-circle',
+    bonusfixo: 'fa-plus-circle'
+};
+
+function normalizeInfoStatName(value) {
+    return String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '');
+}
+
+function getInfoStatIcon(stat) {
+    const key = normalizeInfoStatName(stat.key);
+    const label = normalizeInfoStatName(stat.label);
+    return stat.icon || INFO_STAT_ICON_BY_KEY[key] || INFO_STAT_ICON_BY_LABEL[label] || 'fa-gem';
+}
+
+function renderSideDiceRail(stats, predominantColor) {
+    const items = stats
+        .map(stat => ({ ...stat, valueParts: getDiceValueParts(stat.value) }))
+        .filter(stat => stat.valueParts);
+
+    if (items.length === 0) return '';
+
+    return `
+        <div class="sheet-side-rail sheet-side-rail--left sheet-dice-rail" style="--sheet-accent: ${predominantColor.color100}; --sheet-panel-bg: ${predominantColor.color30};">
+            ${items.map(stat => `
+                <div class="sheet-dice-stat" title="${escapeHtml(stat.label)}">
+                    <div class="sheet-dice-stat__icon">
+                        <i class="fas ${stat.icon}"></i>
+                        <span class="sheet-dice-stat__value">
+                            <span>${escapeHtml(stat.valueParts.main)}</span>
+                            ${stat.valueParts.bonus ? `<span>${escapeHtml(stat.valueParts.bonus)}</span>` : ''}
+                        </span>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function renderSideInfoRail(stats, predominantColor) {
+    const items = stats.filter(stat => stat.value !== null && stat.value !== undefined && String(stat.value).trim() !== '');
+    if (items.length === 0) return '';
+
+    return `
+        <div class="sheet-side-rail sheet-side-rail--right sheet-info-rail" style="--sheet-accent: ${predominantColor.color100}; --sheet-panel-bg: ${predominantColor.color30};">
+            ${items.map(stat => `
+                <div class="sheet-info-stat" title="${escapeHtml(`${stat.label}: ${stat.value}`)}" style="--sheet-accent: ${predominantColor.color100}; --sheet-panel-bg: ${predominantColor.color30};">
+                    <i class="fas ${getInfoStatIcon(stat)} sheet-info-stat__icon" aria-hidden="true"></i>
+                    <span class="sheet-info-stat__label">${escapeHtml(stat.label)}</span>
+                    <span class="sheet-info-stat__value">${escapeHtml(stat.value)}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
 export async function renderFullSpellSheet(spellData, isModal, options = {}) {
     const sheetContainer = document.getElementById('spell-sheet-container');
     if (!sheetContainer) return;
@@ -135,21 +240,19 @@ export async function renderFullSpellSheet(spellData, isModal, options = {}) {
     }
 
     const uniqueId = `spell-${spellData.id}-${Date.now()}`;
-    const statsFields = ['execution', 'range', 'target', 'duration', 'resistencia'];
-    const hasStatsInfo = statsFields.some(field => spellData[field]);
-    let statsHtml = '';
-    
-    if (hasStatsInfo) {
-        statsHtml = `
-            <div class="grid grid-cols-5 gap-x-2 text-xs mt-2 text-center text-gray-200">
-                <div><p class="font-bold tracking-wider">EX</p><p class="text-gray-300 truncate">${spellData.execution || '-'}</p></div>
-                <div><p class="font-bold tracking-wider">AL</p><p class="text-gray-300 truncate">${spellData.range || '-'}</p></div>
-                <div><p class="font-bold tracking-wider">AV</p><p class="text-gray-300 truncate">${spellData.target || '-'}</p></div>
-                <div><p class="font-bold tracking-wider">DU</p><p class="text-gray-300 truncate">${spellData.duration || '-'}</p></div>
-                <div><p class="font-bold tracking-wider">CD</p><p class="text-gray-300 truncate">${spellData.resistencia || '-'}</p></div>
-            </div>
-        `;
-    }
+    const fixedBonusInfo = spellData.aumentos.map(aumento => ({
+        key: 'bonus',
+        label: aumento.nome || 'Bonus',
+        value: `${Number(aumento.valor) > 0 ? '+' : ''}${aumento.valor}`
+    }));
+    const sideInfoHtml = renderSideInfoRail([
+        { key: 'execution', label: 'EX', value: spellData.execution },
+        { key: 'range', label: 'AL', value: spellData.range },
+        { key: 'target', label: 'AV', value: spellData.target },
+        { key: 'duration', label: 'DU', value: spellData.duration },
+        { key: 'resistencia', label: 'CD', value: spellData.resistencia },
+        ...fixedBonusInfo
+    ], predominantColor);
 
     const topBarParts = [];
     if (spellData.circle > 0 || spellData.manaCost > 0) {
@@ -159,37 +262,14 @@ export async function renderFullSpellSheet(spellData, isModal, options = {}) {
         ? `<p style="font-size: 10px;">${topBarParts.join(' - ')}</p>`
         : '';
 
-    // Modificado para suportar Acerto/Dano Sem Mana
-    const attackStats = { acerto: 'ATK', critico: 'ATK s/Mana', dano: 'DMG', danoSemMana: 'DMG s/Mana', vidaDado: 'PV', manaDado: 'PM'};
-    // Gera HTML para Acerto e Dano (Novo Card)
-    const attackStatsHtml = Object.entries(attackStats).map(([stat, label]) => 
-    {
-        const baseValue = spellData[stat] || 0;
-        const content = baseValue || '-';
-
-        const icon = stat === 'acerto' ? 'fa-dice-d20' :
-                     stat === 'dano' ? 'fa-fire' :
-                     stat === 'critico' ? 'fa-crosshairs' :
-                     stat === 'danoSemMana' ? 'fa-skull' :
-                     stat === 'vidaDado' ? 'fa-heart' :
-                     stat === 'manaDado' ? 'fa-fire' : "";
-
-        return `
-            <div style="position: relative; transform: scale(.8); display: ${content === "-" ? 'none' : 'block'}" class="flex flex-col items-center flex">
-                <i class="fas ${icon} text-5xl" style="background: ${predominantColor.color100}; -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
-                <div class="absolute inset-0 flex flex-col items-center justify-center text-white text-xs pointer-events-none" style="margin: auto;">
-                    <div class="text-center text-sm">
-                        <span class="font-bold">
-                            ${content.split("+")[0] || ""}
-                        </span>
-                        <hr style="width: 100%;">
-                        <span style="bottom: 12px;" class="font-bold">
-                            +${content.split("+")[1] || ""}
-                        </span>
-                    </div>
-                </div>
-            </div> `;
-    }).join('');
+    const attackStatsHtml = renderSideDiceRail([
+        { key: 'acerto', label: 'ATK', icon: 'fa-dice-d20', value: spellData.acerto },
+        { key: 'critico', label: 'ATK s/Mana', icon: 'fa-crosshairs', value: spellData.critico },
+        { key: 'dano', label: 'DMG', icon: 'fa-fire', value: spellData.dano },
+        { key: 'danoSemMana', label: 'DMG s/Mana', icon: 'fa-skull', value: spellData.danoSemMana },
+        { key: 'vidaDado', label: 'PV', icon: 'fa-heart', value: spellData.vidaDado },
+        { key: 'manaDado', label: 'PM', icon: 'fa-fire', value: spellData.manaDado }
+    ], predominantColor);
 
     const textSections = [
         { label: 'Descrição', value: spellData.description },
@@ -217,26 +297,29 @@ export async function renderFullSpellSheet(spellData, isModal, options = {}) {
             <div id="spell-bg-2-${uniqueId}" class="absolute inset-0 w-full h-full bg-cover bg-center" style="background-image: url('${mainImageUrl}'); z-index: 0; opacity: 0;"></div>
 
             <div class="absolute inset-0 w-full h-full z-10" style="background: linear-gradient(-180deg, #000000a4, transparent, transparent, #0000008f, #0000008f, #000000a4); display: flex; align-items: center; justify-content: center; pointer-events: none;box-shadow: inset 0px 0px 5px black; ">
-                <div class="rounded-lg" style="width: 100%; height: calc(100% - 20px); border: 3px solid ${predominantColor.color100}; margin: 10px;box-shadow: inset 0px 0px 5px black, 0px 0px 5px black;"></div>
+                <div class="rounded-lg" style="width: 100%; height: calc(100% - 20px); border: 3px solid ${predominantColor.color100}; margin: 10px;box-shadow: inset 0px 0px 33px black, inset 0px 0px 16px black; overflow: hidden;">
+                    
+                    <div style="filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.8));">            
+                        <!-- Div Principal com o recorte de trapézio -->
+                        <div style=" clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%); margin-top: -1px; background-color: ${predominantColor.color100};; display: flex; align-items: center; justify-content: center; color: white;">
+                            <h3 class="" style="font-size: 1.3rem">${spellData.name}</h3>
+                        </div>                    
+                    </div>
+                
+                </div>
             </div>
             
-            <div class="w-full text-left absolute top-0 line-top z-20 pt-[20px] pb-[10px]" style="background-color: ${predominantColor.color30}; text-align: center; --minha-cor: ${predominantColor.color100};">
-                <h3 class="font-bold tracking-tight text-white" style="font-size: 1.3rem">${spellData.name}</h3>
-                ${topBarHtml}
-            </div>
+            
+
+            ${attackStatsHtml}
+            ${sideInfoHtml}
              
-            <div class="mt-auto  w-full text-left absolute bottom-0 z-20">                              
-                <div class="p-6 pt-3 md:p-6 sheet-card-text-panel line-bottom" style="background-color: ${predominantColor.color30}; --minha-cor: ${predominantColor.color100};">                      
-                    <div id="spell-scroll-container-${uniqueId}" class="space-y-3 overflow-y-auto custom-scrollbar" style="max-height: 12rem; height: 12rem">                       
+            <div class="mt-auto w-full text-left absolute bottom-0 z-20 sheet-description-zone" style="--sheet-description-bg: ${predominantColor.color30}; --minha-cor: ${predominantColor.color100};">                              
+                <div class="p-6 pt-3 md:p-6 sheet-card-text-panel sheet-description-panel line-bottom">                      
+                    <div id="spell-scroll-container-${uniqueId}" class="sheet-description-scroll space-y-3 overflow-y-auto custom-scrollbar">                       
+                        ${topBarHtml}
                         ${textLabelHtml}
-                        
-                        ${aumentosHtml}
                     </div>
-                    <div class="flex row mt-2 pt-2" style="justify-content: space-around;  border-top: 1px solid ${predominantColor.color100};">
-                        ${attackStatsHtml}  
-                    </div>
-                    ${statsHtml}
-                    
                 </div>
             </div>            
         </div>
