@@ -640,6 +640,14 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
   --spell-carousel-card-scale: 0.88;
 }
 
+.spell-carousel-modal-layout {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+}
+
 .spell-carousel-track,
 .spell-carousel-slide {
   position: absolute;
@@ -914,31 +922,58 @@ body:not(.dark) #sidebar-buttons .sidebar-btn {
 }
 
 @media (max-width: 640px) {
+  .spell-carousel-modal-layout {
+    min-height: 100vh;
+    min-height: 100dvh;
+    align-items: start;
+    padding: calc(env(safe-area-inset-top, 0px) + 3.25rem) 0.25rem calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+  }
+
   .spell-carousel-shell {
-    --spell-carousel-card-scale: 0.78;
+    width: min(98vw, calc((100vh - 4.25rem) * 0.5625)) !important;
+    height: min(calc(100vh - 4.25rem), calc(98vw / 0.5625)) !important;
+    max-height: calc(100vh - 4.25rem);
+    width: min(98vw, calc((100dvh - 4.25rem) * 0.5625)) !important;
+    height: min(calc(100dvh - 4.25rem), calc(98vw / 0.5625)) !important;
+    max-width: 98vw;
+    max-height: calc(100dvh - 4.25rem);
+    --spell-carousel-card-scale: 1;
+    touch-action: pan-x pan-y;
   }
 
-  .spell-carousel-nav {
-    width: 2rem;
-    height: 2rem;
-    background: rgba(0, 0, 0, 0.72);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+  .spell-carousel-track {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
   }
 
-  .spell-carousel-nav.prev {
-    left: -0.75rem;
+  .spell-carousel-track::-webkit-scrollbar {
+    display: none;
   }
 
-  .spell-carousel-nav.next {
-    right: -0.75rem;
+  .spell-carousel-slide,
+  .spell-carousel-slide.active {
+    position: relative;
+    inset: auto;
+    flex: 0 0 100%;
+    display: grid;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
   }
 
+  .spell-carousel-nav,
   .spell-carousel-dots {
-    bottom: 0.65rem;
-    padding: 0.25rem 0.4rem;
-    border-radius: 999px;
-    background: rgba(0, 0, 0, 0.5);
+    display: none;
+  }
+
+  .spell-carousel-close {
+    top: calc(env(safe-area-inset-top, 0px) + 0.75rem) !important;
+    right: 0.75rem !important;
   }
 }
 

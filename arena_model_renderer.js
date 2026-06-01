@@ -1378,6 +1378,17 @@ function resolveArenaModelSize(model, options = {}) {
     const aspectRatio = modelW / modelH;
     const windowWidth = window.innerWidth || modelW;
     const windowHeight = window.innerHeight || modelH;
+    const isMobile = window.matchMedia?.('(max-width: 640px)').matches || windowWidth <= 640;
+
+    if (isMobile) {
+        const maxWidth = Math.max(240, windowWidth - 8);
+        const maxHeight = Math.max(320, windowHeight - 68);
+        if ((maxWidth / aspectRatio) > maxHeight) {
+            return { modelW, modelH, finalWidth: maxHeight * aspectRatio, finalHeight: maxHeight };
+        }
+        return { modelW, modelH, finalWidth: maxWidth, finalHeight: maxWidth / aspectRatio };
+    }
+
     if ((windowWidth / aspectRatio) > windowHeight) {
         const finalHeight = windowHeight * 0.9;
         return { modelW, modelH, finalWidth: finalHeight * aspectRatio, finalHeight };

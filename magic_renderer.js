@@ -16,6 +16,17 @@ function resolveSpellCardSize(aspectRatio, options = {}) {
 
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;
+    const isMobile = window.matchMedia?.('(max-width: 640px)').matches || windowWidth <= 640;
+
+    if (isMobile) {
+        const maxWidth = Math.max(240, windowWidth - 8);
+        const maxHeight = Math.max(320, windowHeight - 68);
+        const finalHeight = Math.min(maxHeight, maxWidth / aspectRatio);
+        return {
+            finalWidth: finalHeight * aspectRatio,
+            finalHeight
+        };
+    }
 
     if ((windowWidth / aspectRatio) > windowHeight) {
         const finalHeight = windowHeight * 0.9;
@@ -169,7 +180,7 @@ export async function renderFullSpellSheet(spellData, isModal, options = {}) {
                 width: finalWidth,
                 height: finalHeight,
                 closeButtonHtml: `
-                    <button id="close-spell-sheet-btn-${uniqueId}" class="absolute top-4 right-4 bg-red-600 hover:text-white z-50 thumb-btn" style="display:block;">
+                    <button id="close-spell-sheet-btn-${uniqueId}" class="spell-carousel-close absolute top-4 right-4 bg-red-600 hover:text-white z-50 thumb-btn" style="display:block;">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 `,
@@ -198,7 +209,7 @@ export async function renderFullSpellSheet(spellData, isModal, options = {}) {
 
             sheetContainer.querySelector(`#close-spell-sheet-btn-${uniqueId}`)?.addEventListener('click', closeSheet);
             const overlayHandler = (event) => {
-                if (event.target === sheetContainer) {
+                if (event.target === sheetContainer || event.target?.classList?.contains('spell-carousel-modal-layout')) {
                     closeSheet();
                     sheetContainer.removeEventListener('click', overlayHandler);
                 }
@@ -336,7 +347,7 @@ export async function renderFullSpellSheet(spellData, isModal, options = {}) {
             width: finalWidth,
             height: finalHeight,
             closeButtonHtml: `
-                <button id="close-spell-sheet-btn-${uniqueId}" class="absolute top-4 right-4 bg-red-600 hover:text-white z-50 thumb-btn" style="display:block;">
+                <button id="close-spell-sheet-btn-${uniqueId}" class="spell-carousel-close absolute top-4 right-4 bg-red-600 hover:text-white z-50 thumb-btn" style="display:block;">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             `,
@@ -385,7 +396,7 @@ export async function renderFullSpellSheet(spellData, isModal, options = {}) {
     }
 
     const overlayHandler = (e) => {
-        if (e.target === sheetContainer) {
+        if (e.target === sheetContainer || e.target?.classList?.contains('spell-carousel-modal-layout')) {
             closeSheet();
             sheetContainer.removeEventListener('click', overlayHandler);
         }

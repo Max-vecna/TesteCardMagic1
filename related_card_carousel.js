@@ -119,32 +119,34 @@ export async function buildRelatedCardCarousel({
     }))).join('');
 
     return `
-        ${closeButtonHtml}
-        <div
-            class="spell-carousel-shell"
-            style="width: ${width}px; height: ${height}px;"
-            data-active-slide="${safeActiveIndex}"
-            tabindex="0"
-            role="region"
-            aria-label="Cards relacionados">
-            <button type="button" class="spell-carousel-nav prev" aria-label="Card anterior">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            <div class="spell-carousel-track">
-                ${slidesHtml}
-            </div>
-            <button type="button" class="spell-carousel-nav next" aria-label="Proximo card">
-                <i class="fas fa-chevron-right"></i>
-            </button>
-            <div class="spell-carousel-dots">
-                ${relatedCards.map((relation, index) => `
-                    <button
-                        type="button"
-                        class="spell-carousel-dot${index === safeActiveIndex ? ' active' : ''}"
-                        data-slide-index="${index}"
-                        aria-label="${escapeHtml(relation.label)}"
-                        aria-current="${index === safeActiveIndex ? 'true' : 'false'}"></button>
-                `).join('')}
+        <div class="spell-carousel-modal-layout">
+            ${closeButtonHtml}
+            <div
+                class="spell-carousel-shell"
+                style="width: ${width}px; height: ${height}px;"
+                data-active-slide="${safeActiveIndex}"
+                tabindex="0"
+                role="region"
+                aria-label="Cards relacionados">
+                <button type="button" class="spell-carousel-nav prev" aria-label="Card anterior">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="spell-carousel-track">
+                    ${slidesHtml}
+                </div>
+                <button type="button" class="spell-carousel-nav next" aria-label="Proximo card">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <div class="spell-carousel-dots">
+                    ${relatedCards.map((relation, index) => `
+                        <button
+                            type="button"
+                            class="spell-carousel-dot${index === safeActiveIndex ? ' active' : ''}"
+                            data-slide-index="${index}"
+                            aria-label="${escapeHtml(relation.label)}"
+                            aria-current="${index === safeActiveIndex ? 'true' : 'false'}"></button>
+                    `).join('')}
+                </div>
             </div>
         </div>
     `;
@@ -159,10 +161,15 @@ export function setupRelatedCardCarousel(root) {
 
         const slides = Array.from(carousel.querySelectorAll('.spell-carousel-slide'));
         const dots = Array.from(carousel.querySelectorAll('.spell-carousel-dot'));
+        const track = carousel.querySelector('.spell-carousel-track');
         if (slides.length <= 1) return;
 
         let activeIndex = parseInt(carousel.dataset.activeSlide || '0', 10) || 0;
-        const showSlide = (nextIndex) => {
+        const isMobileSwipeMode = () => (
+            typeof window !== 'undefined'
+            && (window.matchMedia?.('(max-width: 640px)').matches || window.innerWidth <= 640)
+        );
+        const showSlide = (nextIndex, options = {}) => {
             activeIndex = (nextIndex + slides.length) % slides.length;
             carousel.dataset.activeSlide = String(activeIndex);
             slides.forEach((slide, index) => {
@@ -175,6 +182,16 @@ export function setupRelatedCardCarousel(root) {
                 dot.classList.toggle('active', isActive);
                 dot.setAttribute('aria-current', isActive ? 'true' : 'false');
             });
+
+            if (options.scroll !== false && track && isMobileSwipeMode()) {
+                const targetSlide = slides[activeIndex];
+                if (targetSlide) {
+                    track.scrollTo({
+                        left: targetSlide.offsetLeft,
+                        behavior: options.instant ? 'auto' : 'smooth'
+                    });
+                }
+            }
         };
 
         carousel.querySelector('.spell-carousel-nav.prev')?.addEventListener('click', (event) => {
@@ -210,6 +227,20 @@ export function setupRelatedCardCarousel(root) {
             }
         });
 
-        showSlide(activeIndex);
+        let scrollFrame = 0;
+        track?.addEventListener('scroll', () => {
+            if (!isMobileSwipeMode()) return;
+            if (scrollFrame) cancelAnimationFrame(scrollFrame);
+            scrollFrame = requestAnimationFrame(() => {
+                const slideWidth = Math.max(1, track.clientWidth);
+                showSlide(Math.round(track.scrollLeft / slideWidth), { scroll: false });
+            });
+        }, { passive: true });
+
+        window.addEventListener('resize', () => {
+            showSlide(activeIndex, { instant: true });
+        }, { passive: true });
+
+        showSlide(activeIndex, { instant: true });
     });
 }

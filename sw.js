@@ -1,4 +1,4 @@
-const CACHE_NAME = 'magic-cards-shell-v8';
+const CACHE_NAME = 'magic-cards-shell-v9';
 
 const LOCAL_ASSETS = [
     './',
@@ -20,6 +20,7 @@ const LOCAL_ASSETS = [
     './arena_model_renderer.js',
     './receiver_icon_controls.js',
     './card-renderer.js',
+    './related_card_carousel.js',
     './character_manager.js',
     './magic_renderer.js',
     './magic_manager.js',
