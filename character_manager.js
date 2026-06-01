@@ -4,6 +4,8 @@ import { openSelectionModal as openItemSelectionModal } from './navigation_manag
 import { renderFullCharacterSheet } from './card-renderer.js';
 import { renderFullSpellSheet } from './magic_renderer.js';
 import { renderFullAttackSheet } from './attack_renderer.js';
+import { isArenaModelTemplatePayload, saveArenaModelTemplateFromCard } from './arena_model_renderer.js';
+import { applyReceiverIconSelection, readReceiverIconControls, setReceiverIconControlsVisible, writeReceiverIconControls } from './receiver_icon_controls.js';
 import { readFileAsArrayBuffer, bufferToBlob, arrayBufferToBase64, base64ToArrayBuffer, showImagePreview, calculateColor, showCustomConfirm } from './ui_utils.js';
 
 const PERICIAS_DATA = {
@@ -27,6 +29,15 @@ let backgroundImageFile = null;
 let currentCharacterItems = [];
 let currentCharacterFormType = 'character';
 let pendingRelatedCharacterCreation = null;
+
+function shouldShowCharacterReceiverIconControls(cardData = null) {
+    return true;
+}
+
+function syncCharacterReceiverIconControls(cardData = {}) {
+    setReceiverIconControlsVisible('card', shouldShowCharacterReceiverIconControls(cardData));
+    writeReceiverIconControls('card', cardData || {});
+}
 
 function toInt(value) {
     const n = parseInt(value, 10);
@@ -105,6 +116,63 @@ function getSelectedIdsFromContainer(containerId) {
     return Array.from(document.querySelectorAll(`#${containerId} [data-id]`)).map(el => el.dataset.id);
 }
 
+function normalizeRelatedCardRole(card) {
+    return card?.cardVariant === 'enhance' || card?.cardVariant === 'true' ? card.cardVariant : 'base';
+}
+
+function getBaseCardForRecord(record, allRecords) {
+    if (!record) return null;
+
+    const records = (allRecords || []).filter(Boolean);
+    const recordsById = new Map(records.map(item => [String(item.id), item]));
+    const role = normalizeRelatedCardRole(record);
+
+    if (role !== 'base' && record.baseCardId) {
+        return recordsById.get(String(record.baseCardId)) || record;
+    }
+
+    const parent = records.find(item =>
+        String(item?.enhanceCardId || '') === String(record.id) ||
+        String(item?.trueCardId || '') === String(record.id)
+    );
+
+    return parent || record;
+}
+
+async function normalizeRecordIdsToBaseIds(storeName, ids, options = {}) {
+    const { dedupe = true } = options;
+    const allRecords = ((await getData(storeName)) || []).filter(Boolean);
+    const recordsById = new Map(allRecords.map(item => [String(item.id), item]));
+    const normalizedIds = [];
+    const seenIds = new Set();
+
+    for (const id of ids || []) {
+        const record = recordsById.get(String(id));
+        if (!record) continue;
+
+        const baseRecord = getBaseCardForRecord(record, allRecords);
+        const baseId = String(baseRecord?.id || record.id || '');
+        if (!baseId) continue;
+        if (dedupe && seenIds.has(baseId)) continue;
+
+        seenIds.add(baseId);
+        normalizedIds.push(baseId);
+    }
+
+    return normalizedIds;
+}
+
+async function normalizeRecordsToBaseRecords(storeName, records, options = {}) {
+    const ids = await normalizeRecordIdsToBaseIds(
+        storeName,
+        (records || []).map(record => record?.id).filter(Boolean),
+        options
+    );
+
+    const normalizedRecords = await Promise.all(ids.map(id => getData(storeName, id)));
+    return normalizedRecords.filter(Boolean);
+}
+
 function hasBaseCharacterImage(snapshot) {
     return Boolean(snapshot?.characterImageFile || snapshot?.characterImage);
 }
@@ -141,6 +209,7 @@ function updateRelatedCreationUi() {
 
 async function captureCharacterFormSnapshot() {
     const persistedData = currentEditingCardId ? await getData('rpgCards', currentEditingCardId) : null;
+    const receiverIconSelection = readReceiverIconControls('card');
 
     return {
         currentEditingCardId,
@@ -150,6 +219,10 @@ async function captureCharacterFormSnapshot() {
         level: document.getElementById('cardLevel')?.value || '',
         dinheiro: document.getElementById('dinheiro')?.value || '',
         classe: document.getElementById('cardClass')?.value || '',
+        receiverIconType: receiverIconSelection.type,
+        receiverIconMode: receiverIconSelection.mode,
+        receiverIconTarget: receiverIconSelection.target,
+        receiverIconFree: receiverIconSelection.free,
         vida: document.getElementById('vida')?.value || '',
         mana: document.getElementById('mana')?.value || '',
         vidaAtual: document.getElementById('vidaAtual')?.value || '',
@@ -200,6 +273,7 @@ async function restoreCharacterFormSnapshot(snapshot, options = {}) {
     document.getElementById('cardLevel').value = snapshot.level || '';
     document.getElementById('dinheiro').value = snapshot.dinheiro || '';
     document.getElementById('cardClass').value = snapshot.classe || '';
+    syncCharacterReceiverIconControls(snapshot);
 
     document.getElementById('vida').value = snapshot.vida || '';
     document.getElementById('mana').value = snapshot.mana || '';
@@ -226,17 +300,20 @@ async function restoreCharacterFormSnapshot(snapshot, options = {}) {
 
     populatePericiasCheckboxes(currentCharacterFormType === 'creature' ? [] : (snapshot.selectedPericias || []));
 
-    for (const magicId of snapshot.selectedMagicIds || []) {
+    const restoredMagicIds = await normalizeRecordIdsToBaseIds('rpgEffects', snapshot.selectedMagicIds || []);
+    for (const magicId of restoredMagicIds) {
         const magicData = await getData('rpgEffects', magicId);
         if (magicData) createSelectedElement(magicData, magicData.type === 'habilidade' ? 'skill' : 'magic');
     }
 
-    for (const skillId of snapshot.selectedSkillIds || []) {
+    const restoredSkillIds = await normalizeRecordIdsToBaseIds('rpgEffects', snapshot.selectedSkillIds || []);
+    for (const skillId of restoredSkillIds) {
         const skillData = await getData('rpgEffects', skillId);
         if (skillData) createSelectedElement(skillData, 'skill');
     }
 
-    for (const attackId of snapshot.selectedAttackIds || []) {
+    const restoredAttackIds = await normalizeRecordIdsToBaseIds('rpgEffects', snapshot.selectedAttackIds || []);
+    for (const attackId of restoredAttackIds) {
         const attackData = await getData('rpgEffects', attackId);
         if (attackData) createSelectedElement(attackData, 'attack');
     }
@@ -246,7 +323,7 @@ async function restoreCharacterFormSnapshot(snapshot, options = {}) {
         if (relatedCharData?.cardType === 'creature') createSelectedElement(relatedCharData, 'relationship');
     }
 
-    currentCharacterItems = (snapshot.items || []).slice();
+    currentCharacterItems = await normalizeRecordsToBaseRecords('rpgItems', snapshot.items || [], { dedupe: false });
     document.getElementById('form-inventory-section').classList.toggle('hidden', currentCharacterFormType === 'creature');
     renderInventoryForForm(currentCharacterItems, parseInt(snapshot.forca, 10) || 0);
 
@@ -371,6 +448,7 @@ export function resetCharacterFormState(preserveRelatedCreation = false) {
 
     const cardForm = document.getElementById('cardForm');
     if (cardForm) cardForm.reset();
+    syncCharacterReceiverIconControls();
 
     document.getElementById('selected-magics-container').innerHTML = '';
     document.getElementById('selected-skills-container').innerHTML = '';
@@ -475,22 +553,25 @@ export async function populateCharacterSelect(selectId, includeNoneOption = true
     }
 }
 
-function updateRelationshipFanLayout() {
-    const container = document.getElementById('selected-relationships-container');
-    if (!container) return;
+function scaleArenaModelInFormMiniCard(cardElement) {
+    requestAnimationFrame(() => {
+        const arenaSheet = Array.from(cardElement.children).find(child => child.classList?.contains('arena-model-card'));
+        if (!arenaSheet) return;
 
-    const cards = Array.from(container.querySelectorAll('.character-form-mini-card.related-character-grid-item'));
-    const centerIndex = (cards.length - 1) / 2;
+        const sheetWidth = parseFloat(arenaSheet.style.width) || Number(arenaSheet.dataset.arenaModelWidth) || arenaSheet.offsetWidth;
+        const sheetHeight = parseFloat(arenaSheet.style.height) || Number(arenaSheet.dataset.arenaModelHeight) || arenaSheet.offsetHeight;
+        const caption = cardElement.querySelector('.character-form-mini-card__caption');
+        const targetWidth = cardElement.clientWidth;
+        const targetHeight = Math.max(1, cardElement.clientHeight - (caption?.offsetHeight || 0));
+        if (sheetWidth <= 0 || sheetHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) return;
 
-    cards.forEach((card, index) => {
-        const distanceFromCenter = index - centerIndex;
-        const rotation = distanceFromCenter * 5.5;
-        const offsetY = Math.abs(distanceFromCenter) * 8;
-        const layer = Math.max(1, Math.round((cards.length - Math.abs(distanceFromCenter)) * 10));
-
-        card.style.setProperty('--fan-rotate', `${rotation}deg`);
-        card.style.setProperty('--fan-offset-y', `${offsetY}px`);
-        card.style.setProperty('--fan-z', String(layer));
+        const scale = Math.min(targetWidth / sheetWidth, targetHeight / sheetHeight);
+        arenaSheet.style.position = 'absolute';
+        arenaSheet.style.top = '0';
+        arenaSheet.style.left = '0';
+        arenaSheet.style.margin = '0';
+        arenaSheet.style.transformOrigin = 'top left';
+        arenaSheet.style.setProperty('transform', `scale(${scale})`, 'important');
     });
 }
 
@@ -554,10 +635,9 @@ async function createSelectedElement(data, type) {
             e.stopPropagation();
             if (!await showCustomConfirm('Remover este card do personagem?')) return;
             itemElement.remove();
-            if (type === 'relationship') updateRelationshipFanLayout();
         });
         container.appendChild(itemElement);
-        if (type === 'relationship') updateRelationshipFanLayout();
+        scaleArenaModelInFormMiniCard(itemElement);
         return;
     }
 
@@ -754,14 +834,20 @@ export async function saveCharacterCard(cardForm) {
         ? backgroundImageFile.type
         : (baseBackgroundSource?.mimeType || (existingData ? existingData.backgroundMimeType : null));
 
-    const itemIds = isCreature ? [] : currentCharacterItems.map(item => item.id);
+    const itemIds = isCreature
+        ? []
+        : await normalizeRecordIdsToBaseIds('rpgItems', currentCharacterItems.map(item => item.id), { dedupe: false });
 
-    const magicIds = isCreature ? [] : [
-        ...Array.from(document.querySelectorAll('#selected-magics-container [data-id]')),
-        ...Array.from(document.querySelectorAll('#selected-skills-container [data-id]'))
-    ].map(el => el.dataset.id);
+    const magicIds = isCreature
+        ? []
+        : await normalizeRecordIdsToBaseIds('rpgEffects', [
+            ...Array.from(document.querySelectorAll('#selected-magics-container [data-id]')),
+            ...Array.from(document.querySelectorAll('#selected-skills-container [data-id]'))
+        ].map(el => el.dataset.id));
 
-    const attackIds = isCreature ? [] : Array.from(document.querySelectorAll('#selected-attacks-container [data-id]')).map(el => el.dataset.id);
+    const attackIds = isCreature
+        ? []
+        : await normalizeRecordIdsToBaseIds('rpgEffects', Array.from(document.querySelectorAll('#selected-attacks-container [data-id]')).map(el => el.dataset.id));
     const relationshipIds = isCreature
         ? []
         : Array.from(new Set([
@@ -770,6 +856,7 @@ export async function saveCharacterCard(cardForm) {
         ]));
 
     const classe = cardClassSelect ? cardClassSelect.value : '';
+    const receiverIconSelection = readReceiverIconControls('card');
 
     let cardData;
     if (currentEditingCardId) {
@@ -814,6 +901,7 @@ export async function saveCharacterCard(cardForm) {
             inPlay: false
         };
     }
+    applyReceiverIconSelection(cardData, receiverIconSelection);
 
     cardData.predominantColor = await calculateColor(cardData.image, cardData.imageMimeType);
 
@@ -859,6 +947,7 @@ export async function editCard(cardId) {
 
     const classSelect = document.getElementById('cardClass');
     if (classSelect) classSelect.value = cardData.classe || '';
+    syncCharacterReceiverIconControls(cardData);
 
     const attrs = cardData.attributes;
     document.getElementById('vida').value = attrs.vida;
@@ -888,7 +977,8 @@ export async function editCard(cardId) {
     populatePericiasCheckboxes(currentCharacterFormType === 'creature' ? [] : attrs.pericias);
 
     if (currentCharacterFormType !== 'creature' && cardData.spells) {
-        for (const magicId of cardData.spells) {
+        const spellIds = await normalizeRecordIdsToBaseIds('rpgEffects', cardData.spells);
+        for (const magicId of spellIds) {
             const magicData = await getData('rpgEffects', magicId);
             if (magicData) {
                 const renderType = magicData.type === 'habilidade' ? 'skill' : 'magic';
@@ -898,7 +988,8 @@ export async function editCard(cardId) {
     }
 
     if (currentCharacterFormType !== 'creature' && cardData.attacks) {
-        for (const attackId of cardData.attacks) {
+        const attackIds = await normalizeRecordIdsToBaseIds('rpgEffects', cardData.attacks);
+        for (const attackId of attackIds) {
             const attackData = await getData('rpgEffects', attackId);
             if (attackData) createSelectedElement(attackData, 'attack');
         }
@@ -921,7 +1012,7 @@ export async function editCard(cardId) {
     }
 
     const items = cardData.items ? (await Promise.all(cardData.items.map(id => getData('rpgItems', id)))).filter(Boolean) : [];
-    currentCharacterItems = items;
+    currentCharacterItems = await normalizeRecordsToBaseRecords('rpgItems', items, { dedupe: false });
     document.getElementById('form-inventory-section').classList.toggle('hidden', currentCharacterFormType === 'creature');
     renderInventoryForForm(currentCharacterItems, attrs.forca || 0);
 
@@ -948,22 +1039,45 @@ export async function exportCard(cardId) {
     }
 }
 
-export async function importCard(file) {
+export async function importCard(file, forcedCardType = '') {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
                 const importedCard = JSON.parse(e.target.result);
+                const targetCardType = forcedCardType || importedCard?.cardType || 'character';
+                if (isArenaModelTemplatePayload(importedCard)) {
+                    const templateCard = importedCard.app === 'arena-card-model'
+                        ? { arenaModel: importedCard }
+                        : { ...importedCard };
+                    if (!saveArenaModelTemplateFromCard(templateCard)) {
+                        saveArenaModelTemplateFromCard(
+                            { ...templateCard, _arenaStoreName: 'rpgCards', cardType: targetCardType },
+                            { templateType: targetCardType }
+                        );
+                    }
+                    syncCharacterReceiverIconControls();
+                    resolve({ __arenaModelTemplateOnly: true });
+                    return;
+                }
                 if (!importedCard || importedCard.id === undefined) throw new Error("Formato inválido.");
 
-                importedCard.id = Date.now().toString();
-                importedCard.inPlay = false;
+                const existingCard = await getData('rpgCards', importedCard.id);
+                importedCard.id = existingCard ? String(existingCard.id) : Date.now().toString();
+                importedCard.inPlay = existingCard ? Boolean(existingCard.inPlay) : false;
+                importedCard.cardType = targetCardType;
+                if (importedCard.arenaModel || importedCard._arenaModel) {
+                    importedCard.disableArenaModel = false;
+                    importedCard._disableArenaModel = false;
+                }
 
                 if (importedCard.image) importedCard.image = base64ToArrayBuffer(importedCard.image);
                 if (importedCard.backgroundImage) importedCard.backgroundImage = base64ToArrayBuffer(importedCard.backgroundImage);
 
                 importedCard.predominantColor = await calculateColor(importedCard.backgroundImage, importedCard.backgroundMimeType);
 
+                saveArenaModelTemplateFromCard(importedCard, { templateType: targetCardType });
+                syncCharacterReceiverIconControls(importedCard);
                 await saveData('rpgCards', importedCard);
                 resolve(importedCard);
             } catch (error) {
@@ -994,6 +1108,8 @@ function getCurrentlySelectedPericias() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    syncCharacterReceiverIconControls();
+
     const characterImageUpload = document.getElementById('characterImageUpload');
     if (characterImageUpload) {
         characterImageUpload.addEventListener('change', (e) => {
@@ -1016,17 +1132,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    document.addEventListener('addItemToCharacter', (e) => {
+    document.addEventListener('addItemToCharacter', async (e) => {
         const { data, type } = e.detail;
 
         if (type === 'magic') {
-            const finalType = data.type === 'habilidade' ? 'skill' : 'magic';
-            createSelectedElement(data, finalType);
+            const [baseData] = await normalizeRecordsToBaseRecords('rpgEffects', [data]);
+            const finalData = baseData || data;
+            const finalType = finalData.type === 'habilidade' ? 'skill' : 'magic';
+            createSelectedElement(finalData, finalType);
         } else if (type === 'item') {
-            currentCharacterItems.push(data);
+            const [baseData] = await normalizeRecordsToBaseRecords('rpgItems', [data], { dedupe: false });
+            currentCharacterItems.push(baseData || data);
             renderInventoryForForm(currentCharacterItems, parseInt(document.getElementById('forca').value) || 0);
         } else if (type === 'attack') {
-            createSelectedElement(data, 'attack');
+            const [baseData] = await normalizeRecordsToBaseRecords('rpgEffects', [data]);
+            createSelectedElement(baseData || data, 'attack');
         }
     });
 

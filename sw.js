@@ -1,9 +1,10 @@
-const CACHE_NAME = 'magic-cards-shell-v6';
+const CACHE_NAME = 'magic-cards-shell-v8';
 
 const LOCAL_ASSETS = [
     './',
     './index.html',
     './style.css',
+    './Enchanted Land.otf',
     './vendor/rpg-awesome/css/rpg-awesome.min.css',
     './vendor/rpg-awesome/fonts/rpgawesome-webfont.eot',
     './vendor/rpg-awesome/fonts/rpgawesome-webfont.svg',
@@ -16,6 +17,8 @@ const LOCAL_ASSETS = [
     './local_db.js',
     './ui_utils.js',
     './category_manager.js',
+    './arena_model_renderer.js',
+    './receiver_icon_controls.js',
     './card-renderer.js',
     './character_manager.js',
     './magic_renderer.js',

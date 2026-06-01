@@ -7,6 +7,7 @@ import { openDatabase, removeData, getData, saveData, exportDatabase, importData
 import { renderFullCharacterSheet } from './card-renderer.js';
 import { renderFullSpellSheet } from './magic_renderer.js';
 import { renderFullItemSheet } from './item_renderer.js';
+import { clearArenaModelTemplates, hasArenaModel, seedArenaModelTemplatesFromLocalData } from './arena_model_renderer.js';
 import { showCustomAlert, showCustomConfirm } from './ui_utils.js';
 import { bufferToBlob } from './ui_utils.js';
 
@@ -30,8 +31,50 @@ const MENU_ACTION_LABELS = {
     edit: 'editar',
     remove: 'excluir',
     delete: 'excluir',
-    'export-json': 'exportar'
+    'export-json': 'exportar',
+    'reset-arena-model': 'voltar ao visual original'
 };
+
+function cardHasArenaLayout(card) {
+    return Boolean(card && hasArenaModel(card));
+}
+
+const ARENA_MODEL_RECORD_STORES = ['rpgCards', 'rpgEffects', 'rpgItems', 'rpgSpells', 'rpgAttacks'];
+
+function removeArenaModelFields(record) {
+    if (!record || typeof record !== 'object') return false;
+    const keys = ['arenaModel', '_arenaModel', 'disableArenaModel', '_disableArenaModel'];
+    const hadArenaState = keys.some(key => Object.prototype.hasOwnProperty.call(record, key));
+    keys.forEach(key => delete record[key]);
+    return hadArenaState;
+}
+
+function refreshAllCardViews() {
+    ['personagem-em-jogo', 'personagem', 'criaturas', 'magias', 'habilidades', 'itens', 'ataques'].forEach(view => {
+        document.getElementById(`view-${view}`)?.remove();
+    });
+    const activeNav = document.querySelector('.nav-button.active, .desktop-nav-button.active')?.dataset.target || 'personagem-em-jogo';
+    if (typeof renderContent === 'function') renderContent(activeNav, true);
+}
+
+async function resetAllArenaModelsToDefault() {
+    if (!(await showCustomConfirm('Remover o modelo Arena exportado e voltar todos os cards para o visual padrao da ficha?'))) return;
+
+    clearArenaModelTemplates();
+    let changedRecords = 0;
+    for (const storeName of ARENA_MODEL_RECORD_STORES) {
+        const records = (await getData(storeName)) || [];
+        for (const record of records) {
+            if (!removeArenaModelFields(record)) continue;
+            await saveData(storeName, record);
+            changedRecords++;
+        }
+    }
+
+    refreshAllCardViews();
+    const suffix = changedRecords ? ` ${changedRecords} card${changedRecords === 1 ? '' : 's'} atualizado${changedRecords === 1 ? '' : 's'}.` : '';
+    showCustomAlert(`Modelo Arena removido. Os cards voltaram ao modelo padrao.${suffix}`);
+}
 
 function escapeHtml(value = '') {
     return String(value)
@@ -58,23 +101,21 @@ function buildRelatedCardIdSets(items) {
     const trueIds = new Set();
 
     items.forEach(item => {
-        if (item?.enhanceCardId) enhanceIds.add(item.enhanceCardId);
-        if (item?.trueCardId) trueIds.add(item.trueCardId);
+        if (item?.enhanceCardId) enhanceIds.add(String(item.enhanceCardId));
+        if (item?.trueCardId) trueIds.add(String(item.trueCardId));
     });
 
     return { enhanceIds, trueIds };
 }
 
-function getGridBaseCards(items) {
-    const { enhanceIds, trueIds } = buildRelatedCardIdSets(items);
-    const existingIds = new Set(items.map(item => item?.id).filter(Boolean));
+function getGridBaseCards(items, referenceItems = items) {
+    const { enhanceIds, trueIds } = buildRelatedCardIdSets(referenceItems);
 
     return items.filter(item => {
         if (!item?.id) return false;
-        if (enhanceIds.has(item.id) || trueIds.has(item.id)) return false;
-        if ((item.cardVariant === 'enhance' || item.cardVariant === 'true') && item.baseCardId && existingIds.has(item.baseCardId)) {
-            return false;
-        }
+        const id = String(item.id);
+        if (enhanceIds.has(id) || trueIds.has(id)) return false;
+        if (item.cardVariant === 'enhance' || item.cardVariant === 'true') return false;
         return true;
     });
 }
@@ -378,6 +419,10 @@ function createBulkDeleteToolbar() {
             <i class="fas fa-bullseye"></i>
             <span>Selecionar</span>
         </button>
+        <button type="button" class="bulk-delete-toolbar__button bulk-delete-toolbar__button--model-reset" data-bulk-action="reset-arena-models" title="Remover modelo Arena exportado">
+            <i class="fas fa-rotate-left"></i>
+            <span>Modelo padrao</span>
+        </button>
         <span class="bulk-delete-toolbar__status" data-bulk-status>0 selecionados</span>
         <button type="button" class="bulk-delete-toolbar__button bulk-delete-toolbar__button--danger" data-bulk-action="delete" disabled title="Apagar selecionados">
             <i class="fas fa-trash-alt"></i>
@@ -523,6 +568,8 @@ function setupBulkDeleteControls(container, eventType) {
             setSelectionActive(false);
         } else if (action === 'delete') {
             await deleteSelectedCards();
+        } else if (action === 'reset-arena-models') {
+            await resetAllArenaModelsToDefault();
         }
     });
 
@@ -564,15 +611,22 @@ async function renderCharacterInGame(container) {
     }
 }
 
-// ... (applyThumbnailScaling function remains unchanged) ...
+// ... (applyThumbnailScaling function handles card thumbnails) ...
 function applyThumbnailScaling(container) {
-    requestAnimationFrame(() => {
+    const scaleThumbnails = () => {
         container.querySelectorAll('.rpg-thumbnail').forEach(thumbnail => {
-            const stackedSheets = thumbnail.querySelectorAll('.related-card-stack-layer > div[style*="width"]');
-            const innerSheet = stackedSheets[0] || thumbnail.querySelector('.miniCard > div[style*="width"]');
+            const stackedSheets = Array.from(thumbnail.querySelectorAll(
+                '.related-card-stack-layer > .arena-model-card, .related-card-stack-layer > div[style*="width"]'
+            ));
+            const directSheet = thumbnail.querySelector('.miniCard > .arena-model-card, .miniCard > div[style*="width"]');
+            const sheets = stackedSheets.length ? stackedSheets : (directSheet ? [directSheet] : []);
+            const innerSheet = sheets[0];
+            const miniCard = thumbnail.querySelector('.miniCard');
+            if (miniCard) miniCard.classList.toggle('has-arena-model', sheets.some(sheet => sheet.classList?.contains('arena-model-card')));
+
             if (innerSheet) {
-                const sheetWidth = parseFloat(innerSheet.style.width);
-                const sheetHeight = parseFloat(innerSheet.style.height);
+                const sheetWidth = parseFloat(innerSheet.style.width) || Number(innerSheet.dataset.arenaModelWidth) || innerSheet.offsetWidth;
+                const sheetHeight = parseFloat(innerSheet.style.height) || Number(innerSheet.dataset.arenaModelHeight) || innerSheet.offsetHeight;
 
                 if (sheetWidth > 0 && sheetHeight > 0) {
                     thumbnail.style.aspectRatio = `${sheetWidth} / ${sheetHeight}`;
@@ -583,10 +637,11 @@ function applyThumbnailScaling(container) {
                         const scaleY = thumbHeight > 0 ? thumbHeight / sheetHeight : 1;
                         const scale = Math.min(scaleX, scaleY);
 
-                        innerSheet.style.transformOrigin = 'top left';
-                        innerSheet.style.transform = `scale(${scale})`;
-
-                        stackedSheets.forEach(relatedSheet => {
+                        sheets.forEach(relatedSheet => {
+                            relatedSheet.style.position = 'absolute';
+                            relatedSheet.style.top = '0';
+                            relatedSheet.style.left = '0';
+                            relatedSheet.style.margin = '0';
                             relatedSheet.style.transformOrigin = 'top left';
                             relatedSheet.style.transform = `scale(${scale})`;
                         });
@@ -598,14 +653,12 @@ function applyThumbnailScaling(container) {
         const thumbnails = Array.from(container.querySelectorAll('.rpg-thumbnail'));
 
         thumbnails.forEach(t => t.classList.remove('visible'));
-        //svoid container.offsetHeight;
-
-        thumbnails.forEach((cardWrapper, index) => {
-            setTimeout(() => cardWrapper.classList.add('visible'), index * 50);
-
-            
+        requestAnimationFrame(() => {
+            thumbnails.forEach(cardWrapper => cardWrapper.classList.add('visible'));
         });
-    });
+    };
+
+    requestAnimationFrame(scaleThumbnails);
 }
 
 // ... (openCharacterSelectionForRelationship and openSelectionModal remain unchanged) ...
@@ -716,6 +769,7 @@ export async function openSelectionModal(type) {
     const renderList = async (characterId) => {
         listContainer.innerHTML = '<div class="text-center p-4"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i></div>';
         let data = await getData(storeName);
+        let referenceData = Array.isArray(data) ? data.slice() : [];
 
         // Identificar IDs já selecionados no formulário
         const selectedIds = new Set();
@@ -740,17 +794,25 @@ export async function openSelectionModal(type) {
             if (data && Array.isArray(data)) {
                 data = data.filter(c => c.cardType === 'creature');
             }
-        } else if (characterId && characterId !== 'all') {
-            data = data.filter(item => item.characterId === characterId);
         }
 
         // Filtragem por tipo quando usamos o store unificado
         if (storeName === 'rpgEffects') {
             if (type === 'magic') {
                 data = data.filter(item => item.type === 'magia' || item.type === 'habilidade');
+                referenceData = referenceData.filter(item => item.type === 'magia' || item.type === 'habilidade');
             } else if (type === 'attack') {
                 data = data.filter(item => item.type === 'ataque');
+                referenceData = referenceData.filter(item => item.type === 'ataque');
             }
+        }
+
+        if (type !== 'relationship' && characterId && characterId !== 'all') {
+            data = data.filter(item => item.characterId === characterId);
+        }
+
+        if (type !== 'relationship') {
+            data = getGridBaseCards(data, referenceData);
         }
         
         listContainer.innerHTML = '';
@@ -850,18 +912,6 @@ async function createItemGrid(items, type, renderSheetFunction) {
 
     const cardElements = await Promise.all(items.map(async (item) => {
         const sheetHtml = await renderSheetFunction(item, false);
-        const shouldStackRelated = ['magias', 'habilidades', 'ataques', 'itens'].includes(type);
-        const relatedStoreName = type === 'itens' ? 'rpgItems' : 'rpgEffects';
-        const relatedIds = shouldStackRelated ? [item.enhanceCardId, item.trueCardId].filter(Boolean) : [];
-        const relatedCards = (await Promise.all(relatedIds.map(id => getData(relatedStoreName, id)))).filter(Boolean);
-        const hasRelatedStack = shouldStackRelated && relatedCards.length > 0;
-        const baseLayerHtml = hasRelatedStack
-            ? `<div class="related-card-stack-layer related-card-stack-layer-base">${sheetHtml}</div>`
-            : sheetHtml;
-        const relatedStackHtml = (await Promise.all(relatedCards.map(async (related, index) => {
-            const relatedHtml = await renderSheetFunction(related, false);
-            return `<div class="related-card-stack-layer related-card-stack-layer-${index + 1}">${relatedHtml}</div>`;
-        }))).join('');
         const cardWrapper = document.createElement('div');
         let cardType = type;
 
@@ -876,8 +926,7 @@ async function createItemGrid(items, type, renderSheetFunction) {
         cardWrapper.dataset.id = item.id;
         cardWrapper.innerHTML = `
             <div class="miniCard absolute inset-0 text-white">
-                ${baseLayerHtml}
-                ${relatedStackHtml}
+                ${sheetHtml}
             </div>
             <div class="thumbnail-actions absolute z-10">
                 <button class="thumb-btn thumb-btn-menu"><i class="fas fa-ellipsis-v"></i></button>
@@ -885,6 +934,7 @@ async function createItemGrid(items, type, renderSheetFunction) {
                     <button class="menu-item" data-action="edit" data-id="${item.id}"><i class="fas fa-edit"></i></button>
                     <button class="menu-item" data-action="remove" data-id="${item.id}"><i class="fas fa-trash-alt"></i></button>
                     <button class="menu-item" data-action="export-json" data-id="${item.id}"><i class="fas fa-file-download"></i></button>
+                    ${cardHasArenaLayout(item) ? `<button class="menu-item" data-action="reset-arena-model" data-id="${item.id}" title="Voltar ao visual original"><i class="fas fa-rotate-left"></i></button>` : ''}
                 </div>
             </div>
         `;
@@ -905,8 +955,9 @@ function effectBelongsToListType(item, type) {
 }
 
 function normalizeCardListRole(item, enhanceIds, trueIds) {
-    if (item?.cardVariant === 'enhance' || enhanceIds.has(item?.id)) return 'enhance';
-    if (item?.cardVariant === 'true' || trueIds.has(item?.id)) return 'true';
+    const id = String(item?.id || '');
+    if (item?.cardVariant === 'enhance' || enhanceIds.has(id)) return 'enhance';
+    if (item?.cardVariant === 'true' || trueIds.has(id)) return 'true';
     return 'base';
 }
 
@@ -915,8 +966,8 @@ function sortCardsByRelationRole(items) {
     const trueIds = new Set();
 
     items.forEach(item => {
-        if (item?.enhanceCardId) enhanceIds.add(item.enhanceCardId);
-        if (item?.trueCardId) trueIds.add(item.trueCardId);
+        if (item?.enhanceCardId) enhanceIds.add(String(item.enhanceCardId));
+        if (item?.trueCardId) trueIds.add(String(item.trueCardId));
     });
 
     const order = { base: 0, enhance: 1, true: 2 };
@@ -935,7 +986,7 @@ async function renderGroupedList({ type, storeName, buttonText, buttonAction, im
 
     const rawItems = (await getData(storeName)) || [];
     const listItems = rawItems.filter(item => effectBelongsToListType(item, type));
-    const allItems = sortCardsByRelationRole(RELATED_GRID_TYPES.has(type) ? getGridBaseCards(listItems) : listItems);
+    const allItems = sortCardsByRelationRole(RELATED_GRID_TYPES.has(type) ? getGridBaseCards(listItems, rawItems) : listItems);
     const allCharacters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
     const allCategories = (await getData('rpgCategories')) || [];
 
@@ -1075,7 +1126,10 @@ async function renderGroupedList({ type, storeName, buttonText, buttonAction, im
         const file = e.target.files[0];
         if (file) {
             try {
-                await importFunction(file, type);
+                const imported = await importFunction(file, type);
+                if (imported?.__arenaModelTemplateOnly) {
+                    showCustomAlert('Modelo Arena importado como template. Ele nao sera adicionado como card no grid.');
+                }
                 renderContent(type, true);
              } catch (error) {
                  showCustomAlert(`Erro ao importar ${type}: ${error.message}`);
@@ -1136,6 +1190,7 @@ async function renderCharacterList(container, listType = 'character') {
                     <button class="menu-item" data-action="edit" data-id="${char.id}"><i class="fas fa-edit"></i></button>
                     <button class="menu-item" data-action="remove" data-id="${char.id}"><i class="fas fa-trash-alt"></i></button>
                     <button class="menu-item" data-action="export-json" data-id="${char.id}"><i class="fas fa-file-download"></i></button>
+                    ${cardHasArenaLayout(char) ? `<button class="menu-item" data-action="reset-arena-model" data-id="${char.id}" title="Voltar ao visual original"><i class="fas fa-rotate-left"></i></button>` : ''}
                     ${!isCreatureList ? (char.inPlay
                         ? `<button class="menu-item" data-action="remove-from-play" data-id="${char.id}"><i class="fas fa-sign-out-alt"></i></button>`
                         : `<button class="menu-item" data-action="set-in-play" data-id="${char.id}"><i class="fas fa-play-circle"></i></button>`) : ''}
@@ -1161,7 +1216,12 @@ async function renderCharacterList(container, listType = 'character') {
         const file = e.target.files[0];
         if (file) {
              try {
-                const imported = await importCard(file);
+                const imported = await importCard(file, isCreatureList ? 'creature' : 'character');
+                if (imported?.__arenaModelTemplateOnly) {
+                    showCustomAlert('Modelo Arena importado como template. Ele nao sera adicionado como card no grid.');
+                    renderContent(isCreatureList ? 'criaturas' : 'personagem', true);
+                    return;
+                }
                 imported.cardType = isCreatureList ? 'creature' : 'character';
                 await saveData('rpgCards', imported);
                 renderContent(isCreatureList ? 'criaturas' : 'personagem', true);
@@ -1354,6 +1414,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (cardType === 'spell') await exportSpell(cardId);
             if (cardType === 'item') await exportItem(cardId);
             if (cardType === 'attack') await exportSpell(cardId);
+        } else if (action === 'reset-arena-model') {
+            let storeName = '';
+            let eventType = activeNav;
+            if (cardType === 'character' || cardType === 'creature') {
+                storeName = 'rpgCards';
+                eventType = cardType === 'creature' ? 'criaturas' : 'personagem';
+            } else if (cardType === 'spell' || cardType === 'attack') {
+                storeName = 'rpgEffects';
+                eventType = cardType === 'attack' ? 'ataques' : getEventTypeForEffect(await getData('rpgEffects', cardId));
+            } else if (cardType === 'item') {
+                storeName = 'rpgItems';
+                eventType = 'itens';
+            }
+
+            if (!storeName) return;
+            const card = await getData(storeName, cardId);
+            if (!card) return;
+            if (!(await showCustomConfirm('Voltar este card para o visual original da pagina? O layout da Arena sera removido deste card.'))) return;
+            delete card.arenaModel;
+            delete card._arenaModel;
+            card.disableArenaModel = true;
+            card._disableArenaModel = true;
+            await saveData(storeName, card);
+            document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: eventType } }));
         } else if (action === 'set-in-play' || action === 'remove-from-play') {
             const isSettingInPlay = action === 'set-in-play';
             const allCharacters = (await getData('rpgCards')).filter(char => char.cardType !== 'creature');
@@ -1647,6 +1731,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     await openDatabase();
+    await seedArenaModelTemplatesFromLocalData();
 
     const emJogoButtons = document.querySelectorAll('[data-target="personagem-em-jogo"]');
     emJogoButtons.forEach(btn => btn.classList.add('active'));
@@ -1740,6 +1825,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const cachedView = document.getElementById(`view-${targetView}`);
             if (cachedView) cachedView.remove();
         }
+        if (type === 'categorias') {
+            ['magias', 'habilidades', 'itens', 'ataques'].forEach(view => {
+                const cachedView = document.getElementById(`view-${view}`);
+                if (cachedView) cachedView.remove();
+            });
+        }
         if (['personagem', 'itens', 'magias', 'habilidades', 'ataques'].includes(type)) {
             const cachedInPlayView = document.getElementById('view-personagem-em-jogo');
             if (cachedInPlayView) cachedInPlayView.remove();
@@ -1747,7 +1838,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Se a navegação ativa for a que mudou, recarrega
         const activeNav = document.querySelector('.nav-button.active, .desktop-nav-button.active')?.dataset.target;
-        if (activeNav === targetView || activeNav === 'personagem-em-jogo') {
+        if (activeNav === targetView || activeNav === 'personagem-em-jogo' || (type === 'categorias' && ['magias', 'habilidades', 'itens', 'ataques'].includes(activeNav))) {
             renderContent(activeNav, true);
         }
     });

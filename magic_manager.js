@@ -1,6 +1,8 @@
 import { saveData, getData, removeData } from './local_db.js';
 import { getAumentosData, populateCharacterSelect } from './character_manager.js';
 import { populateCategorySelect } from './category_manager.js';
+import { isArenaModelTemplatePayload, saveArenaModelTemplateFromCard } from './arena_model_renderer.js';
+import { applyReceiverIconSelection, readReceiverIconControls, setReceiverIconControlsVisible, writeReceiverIconControls } from './receiver_icon_controls.js';
 import {
     showImagePreview,
     readFileAsArrayBuffer as readFileAsArrayBufferUtil,
@@ -22,6 +24,15 @@ let spellInlineRelatedImageFiles = { enhance: null, true: null };
 let spellBaseDraftId = null;
 const spellPendingRelatedDrafts = { enhance: null, true: null };
 let openSpellRelationsModalForRole = null;
+
+function shouldShowSpellReceiverIconControls(spellData = null) {
+    return true;
+}
+
+function syncSpellReceiverIconControls(spellData = {}) {
+    setReceiverIconControlsVisible('spell', shouldShowSpellReceiverIconControls(spellData));
+    writeReceiverIconControls('spell', spellData || {});
+}
 
 const RELATED_CARD_ROLES = ['enhance', 'true'];
 const RELATED_ROLE_LABELS = {
@@ -65,6 +76,43 @@ function getEffectTypeMeta(type) {
 
 function normalizeCardRole(role) {
     return role === 'enhance' || role === 'true' ? role : 'base';
+}
+
+function getCanonicalEffectBaseId(effectData, role, baseCardId, allEffects = []) {
+    const normalizedRole = normalizeCardRole(role || effectData?.cardVariant);
+    if (!effectData?.id) return '';
+    if (normalizedRole === 'base') return effectData.id;
+    if (baseCardId || effectData.baseCardId) return baseCardId || effectData.baseCardId;
+
+    const parent = (allEffects || []).find(effect =>
+        String(effect?.enhanceCardId || '') === String(effectData.id) ||
+        String(effect?.trueCardId || '') === String(effectData.id)
+    );
+
+    return parent?.id || effectData.id;
+}
+
+async function addCardToCharacterCollection(characterId, collectionKey, cardId) {
+    if (!characterId || !cardId) return false;
+
+    const character = await getData('rpgCards', characterId);
+    if (!character || character.cardType === 'creature') return false;
+
+    const currentIds = Array.isArray(character[collectionKey]) ? character[collectionKey].map(String) : [];
+    if (currentIds.includes(String(cardId))) return false;
+
+    character[collectionKey] = [...currentIds, String(cardId)];
+    await saveData('rpgCards', character);
+    return true;
+}
+
+async function syncEffectOwnerToCharacter(effectData, role, baseCardId, allEffects = []) {
+    const ownerId = effectData?.characterId || '';
+    if (!ownerId) return false;
+
+    const effectId = getCanonicalEffectBaseId(effectData, role, baseCardId, allEffects);
+    const collectionKey = effectData?.type === 'ataque' ? 'attacks' : 'spells';
+    return addCardToCharacterCollection(ownerId, collectionKey, effectId);
 }
 
 function getCardDisplayName(card) {
@@ -830,6 +878,7 @@ function updateRelatedSpellCreationUi() {
 
 async function captureSpellFormSnapshot() {
     const persistedData = currentEditingSpellId ? await getData('rpgEffects', currentEditingSpellId) : null;
+    const receiverIconSelection = readReceiverIconControls('spell');
     const aumentos = [];
     document.querySelectorAll('#spell-aumentos-list div[data-nome]').forEach(el => {
         aumentos.push({
@@ -866,6 +915,10 @@ async function captureSpellFormSnapshot() {
         danoSemMana: document.getElementById('spellDanoSemMana')?.value || '',
         vidaDado: document.getElementById('spellVidaDado')?.value || '',
         manaDado: document.getElementById('spellManaDado')?.value || '',
+        receiverIconType: receiverIconSelection.type,
+        receiverIconMode: receiverIconSelection.mode,
+        receiverIconTarget: receiverIconSelection.target,
+        receiverIconFree: receiverIconSelection.free,
         aumentos,
         spellImageFile,
         spellImage: persistedData?.image || null,
@@ -916,6 +969,7 @@ async function restoreSpellFormSnapshot(snapshot, options = {}) {
 
     await populateCharacterSelect('spellCharacterOwner');
     document.getElementById('spellCharacterOwner').value = snapshot.characterId || '';
+    syncSpellReceiverIconControls(snapshot);
 
     await populateCategorySelect('spell-category-select', snapshot.type);
     document.getElementById('spell-category-select').value = snapshot.categoryId || '';
@@ -1102,6 +1156,7 @@ export function resetSpellFormState(preserveRelatedCreation = false) {
     if (trueSchoolSelect) trueSchoolSelect.value = '';
     if (enhanceText) enhanceText.value = '';
     if (trueText) trueText.value = '';
+    syncSpellReceiverIconControls();
     updateSpellRoleUi();
     updateRelatedSpellCreationUi();
 }
@@ -1160,6 +1215,7 @@ export async function saveSpellCard(spellForm, type) {
     const cardVariant = normalizeCardRole(spellRoleSelect?.value);
     const baseCardId = cardVariant === 'base' ? '' : (spellBaseCardSelect?.value || relatedCreationContext?.baseSpellId || relatedCreationContext?.baseDraftId || '');
     const trueSchool = '';
+    const receiverIconSelection = readReceiverIconControls('spell');
 
     if (cardVariant !== 'base' && !baseCardId) {
         showCustomAlert('Escolha um card base para este card.');
@@ -1222,13 +1278,14 @@ export async function saveSpellCard(spellForm, type) {
         image: imageBuffer,
         imageMimeType: imageMimeType,
         acerto: spellAcertoInput.value,
-        dano: spellDamageInput.value,  
+        dano: spellDamageInput.value,
         // Novos campos salvos
         critico: spellcriticoInput ? spellcriticoInput.value : '',
         danoSemMana: spellDanoSemManaInput ? spellDanoSemManaInput.value : '',
         vidaDado: spellVidaDadoInput ? spellVidaDadoInput.value : '',
         manaDado: spellManaDadoInput ? spellManaDadoInput.value : ''
     };
+    applyReceiverIconSelection(baseData, receiverIconSelection);
 
     if (currentEditingSpellId) {
         spellData = existingData;
@@ -1251,6 +1308,7 @@ export async function saveSpellCard(spellForm, type) {
     }
 
     await saveData('rpgEffects', spellData);
+    let characterRelationChanged = await syncEffectOwnerToCharacter(spellData, cardVariant, baseCardId, allEffects);
     if (cardVariant === 'base') {
         await unlinkRemovedBaseEffectRelations(
             spellData.id,
@@ -1273,6 +1331,7 @@ export async function saveSpellCard(spellForm, type) {
                 : { color30: 'rgba(13, 148, 136, 0.3)', color100: 'rgb(13, 148, 136)' });
             await saveData('rpgEffects', relatedDraft);
             await syncBaseEffectRelation(relatedDraft, role, spellData.id);
+            characterRelationChanged = await syncEffectOwnerToCharacter(relatedDraft, role, spellData.id, allEffects) || characterRelationChanged;
         }
     }
 
@@ -1283,10 +1342,14 @@ export async function saveSpellCard(spellForm, type) {
             : { color30: 'rgba(13, 148, 136, 0.3)', color100: 'rgb(13, 148, 136)' });
         await saveData('rpgEffects', relatedSpellData);
         await syncBaseEffectRelation(relatedSpellData, payload.role, spellData.id);
+        characterRelationChanged = await syncEffectOwnerToCharacter(relatedSpellData, payload.role, spellData.id, allEffects) || characterRelationChanged;
     }
 
     const eventType = type === 'habilidade' ? 'habilidades' : (type === 'ataque' ? 'ataques' : 'magias');
     document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: eventType } }));
+    if (characterRelationChanged) {
+        document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: 'personagem' } }));
+    }
 
     if (relatedCreationContext) {
         await restoreBaseSpellDraft(spellData.id);
@@ -1338,6 +1401,7 @@ export async function editSpell(spellId) {
 
     await populateCharacterSelect('spellCharacterOwner');
     document.getElementById('spellCharacterOwner').value = spellData.characterId || '';
+    syncSpellReceiverIconControls(spellData);
 
     await populateCategorySelect('spell-category-select', spellData.type);
     document.getElementById('spell-category-select').value = spellData.categoryId || '';
@@ -1403,14 +1467,32 @@ export async function importSpell(file, type) {
         reader.onload = async (e) => {
             try {
                 const importedSpell = JSON.parse(e.target.result);
+                const targetTemplateType = type === 'habilidades' ? 'habilidade' : (type === 'ataques' ? 'ataque' : 'magia');
+                if (isArenaModelTemplatePayload(importedSpell)) {
+                    const templateCard = importedSpell.app === 'arena-card-model'
+                        ? { arenaModel: importedSpell }
+                        : { ...importedSpell };
+                    if (!saveArenaModelTemplateFromCard(templateCard)) {
+                        saveArenaModelTemplateFromCard(
+                            { ...templateCard, _arenaStoreName: 'rpgEffects', type: targetTemplateType },
+                            { templateType: targetTemplateType }
+                        );
+                    }
+                    syncSpellReceiverIconControls();
+                    resolve({ __arenaModelTemplateOnly: true });
+                    return;
+                }
                 if (!importedSpell || importedSpell.id === undefined) {
                     throw new Error("Formato de arquivo inválido.");
                 }
 
-                importedSpell.id = Date.now().toString();
-                if (type === 'habilidades') importedSpell.type = 'habilidade';
-                else if (type === 'ataques') importedSpell.type = 'ataque';
-                else importedSpell.type = 'magia';
+                const existingSpell = await getData('rpgEffects', importedSpell.id);
+                importedSpell.id = existingSpell ? String(existingSpell.id) : Date.now().toString();
+                if (importedSpell.arenaModel || importedSpell._arenaModel) {
+                    importedSpell.disableArenaModel = false;
+                    importedSpell._disableArenaModel = false;
+                }
+                importedSpell.type = targetTemplateType;
 
                 if (importedSpell.image) importedSpell.image = base64ToArrayBufferUtil(importedSpell.image);
                 if (importedSpell.enhanceImage) importedSpell.enhanceImage = base64ToArrayBufferUtil(importedSpell.enhanceImage);
@@ -1419,6 +1501,8 @@ export async function importSpell(file, type) {
                 importedSpell.predominantColor = await calculateColorUtil(importedSpell.image, importedSpell.imageMimeType, importedSpell.type === 'ataque'
                     ? { color30: 'rgba(248, 113, 113, 0.3)', color100: 'rgb(248, 113, 113)' }
                     : { color30: 'rgba(13, 148, 136, 0.3)', color100: 'rgb(13, 148, 136)' });
+                saveArenaModelTemplateFromCard(importedSpell, { templateType: targetTemplateType });
+                syncSpellReceiverIconControls(importedSpell);
                 await saveData('rpgEffects', importedSpell);
                 resolve(importedSpell);
             } catch (error) {
@@ -1432,6 +1516,7 @@ export async function importSpell(file, type) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    syncSpellReceiverIconControls();
     populateSpellAumentosSelect();
     document.addEventListener('periciasUpdated', populateSpellAumentosSelect);
 

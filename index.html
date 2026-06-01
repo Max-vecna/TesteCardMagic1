@@ -30,7 +30,6 @@
     <div id="top-alert-container" class="fixed top-0 left-1/2 -translate-x-1/2 z-[1000000000000] p-4 space-y-2 pointer-events-none max-w-md">
         <!-- Alertas serão adicionados aqui via JS -->
     </div>
-
     <!-- New Desktop Sidebar -->
     <aside id="desktop-sidebar" class="hidden md:flex flex-col fixed top-0 left-0 h-screen w-64 z-40 shadow-lg">
         <div class="p-5 text-2xl font-bold border-b border-gray-700/50 flex items-center gap-3">
@@ -230,6 +229,60 @@
                                     <option value="paladino">Paladino</option>
                                 </select>
                             </div>
+                            <div class="hidden">
+                                <label for="cardReceiverIcon" class="block text-xs font-semibold text-gray-400 mb-1">Icone Receptor</label>
+                                <select id="cardReceiverIcon" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none">
+                                    <option value="">Nenhum</option>
+                                    <option value="padrao/magia">Padrao/Magia</option>
+                                    <option value="padrao/habilidade">Padrao/Habilidade</option>
+                                    <option value="padrao/item">Padrao/Item</option>
+                                    <option value="padrao/ataque">Padrao/Ataque</option>
+                                    <option value="padrao/atributos">Padrao/Atributos</option>
+                                    <option value="padrao/medicina">Padrao/Medicina</option>
+                                    <option value="padrao/combate">Padrao/Combate</option>
+                                    <option value="padrao/texto">Padrao/Texto</option>
+                                    <option value="modificar/magia">Modificar/Magia</option>
+                                    <option value="modificar/habilidade">Modificar/Habilidade</option>
+                                    <option value="modificar/item">Modificar/Item</option>
+                                    <option value="modificar/ataque">Modificar/Ataque</option>
+                                    <option value="modificar/atributos">Modificar/Atributos</option>
+                                    <option value="modificar/medicina">Modificar/Medicina</option>
+                                    <option value="modificar/combate">Modificar/Combate</option>
+                                    <option value="modificar/texto">Modificar/Texto</option>
+                                    <option value="ra-wrench" hidden>Modificar - antigo</option>
+                                    <option value="ra-cog" hidden>Padrao - antigo</option>
+                                    <option value="ra-heart-bottle" hidden>Cura vida - antigo</option>
+                                    <option value="ra-bottle-vapors" hidden>Restaurar mana - antigo</option>
+                                    <option value="padrao/vida" hidden>Padrao/Vida - antigo</option>
+                                    <option value="padrao/mana" hidden>Padrao/Mana - antigo</option>
+                                    <option value="modificar/vida" hidden>Modificar/Vida - antigo</option>
+                                    <option value="modificar/mana" hidden>Modificar/Mana - antigo</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2" data-receiver-icon-controls="card">
+                                <div>
+                                    <label for="cardReceiverIconMode" class="block text-xs font-semibold text-gray-400 mb-1">Icone base</label>
+                                    <select id="cardReceiverIconMode" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none">
+                                        <option value="padrao">Padrao</option>
+                                        <option value="modificar">Modificador</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="cardReceiverIconTarget" class="block text-xs font-semibold text-gray-400 mb-1">Icone do card</label>
+                                    <select id="cardReceiverIconTarget" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none">
+                                        <option value="magia">Magia</option>
+                                        <option value="habilidade">Habilidade</option>
+                                        <option value="item">Item</option>
+                                        <option value="ataque">Ataque</option>
+                                        <option value="atributos">Atributos</option>
+                                        <option value="medicina">Medicina</option>
+                                        <option value="combate">Combate</option>
+                                        <option value="texto">Texto</option>
+                                        <option value="vida" hidden>Vida - antigo</option>
+                                        <option value="mana" hidden>Mana - antigo</option>
+                                    </select>
+                                </div>
+                            </div>
                             <div>
                                 <label for="dinheiro" class="block text-xs font-semibold text-gray-400 mb-1">Dinheiro</label>
                                 <input type="number" id="dinheiro" placeholder="0" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-indigo-500 focus:outline-none">
@@ -423,6 +476,60 @@
                             <div>
                                 <label for="spell-category-select" class="block text-xs font-semibold text-gray-400 mb-1">Categoria</label>
                                 <select id="spell-category-select" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none"></select>
+                            </div>
+                            <div class="hidden">
+                                <label for="spellReceiverIcon" class="block text-xs font-semibold text-gray-400 mb-1">Icone Receptor</label>
+                                <select id="spellReceiverIcon" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none">
+                                    <option value="">Nenhum</option>
+                                    <option value="padrao/magia">Padrao/Magia</option>
+                                    <option value="padrao/habilidade">Padrao/Habilidade</option>
+                                    <option value="padrao/item">Padrao/Item</option>
+                                    <option value="padrao/ataque">Padrao/Ataque</option>
+                                    <option value="padrao/atributos">Padrao/Atributos</option>
+                                    <option value="padrao/medicina">Padrao/Medicina</option>
+                                    <option value="padrao/combate">Padrao/Combate</option>
+                                    <option value="padrao/texto">Padrao/Texto</option>
+                                    <option value="modificar/magia">Modificar/Magia</option>
+                                    <option value="modificar/habilidade">Modificar/Habilidade</option>
+                                    <option value="modificar/item">Modificar/Item</option>
+                                    <option value="modificar/ataque">Modificar/Ataque</option>
+                                    <option value="modificar/atributos">Modificar/Atributos</option>
+                                    <option value="modificar/medicina">Modificar/Medicina</option>
+                                    <option value="modificar/combate">Modificar/Combate</option>
+                                    <option value="modificar/texto">Modificar/Texto</option>
+                                    <option value="ra-wrench" hidden>Modificar - antigo</option>
+                                    <option value="ra-cog" hidden>Padrao - antigo</option>
+                                    <option value="ra-heart-bottle" hidden>Cura vida - antigo</option>
+                                    <option value="ra-bottle-vapors" hidden>Restaurar mana - antigo</option>
+                                    <option value="padrao/vida" hidden>Padrao/Vida - antigo</option>
+                                    <option value="padrao/mana" hidden>Padrao/Mana - antigo</option>
+                                    <option value="modificar/vida" hidden>Modificar/Vida - antigo</option>
+                                    <option value="modificar/mana" hidden>Modificar/Mana - antigo</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-2" data-receiver-icon-controls="spell">
+                                <div>
+                                    <label for="spellReceiverIconMode" class="block text-xs font-semibold text-gray-400 mb-1">Icone base</label>
+                                    <select id="spellReceiverIconMode" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none">
+                                        <option value="padrao">Padrao</option>
+                                        <option value="modificar">Modificador</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="spellReceiverIconTarget" class="block text-xs font-semibold text-gray-400 mb-1">Icone do card</label>
+                                    <select id="spellReceiverIconTarget" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-teal-500 focus:outline-none">
+                                        <option value="magia">Magia</option>
+                                        <option value="habilidade">Habilidade</option>
+                                        <option value="item">Item</option>
+                                        <option value="ataque">Ataque</option>
+                                        <option value="atributos">Atributos</option>
+                                        <option value="medicina">Medicina</option>
+                                        <option value="combate">Combate</option>
+                                        <option value="texto">Texto</option>
+                                        <option value="vida" hidden>Vida - antigo</option>
+                                        <option value="mana" hidden>Mana - antigo</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                         <div>
@@ -626,6 +733,60 @@
                             <div>
                                 <label for="item-category-select" class="block text-xs font-semibold text-gray-400 mb-1">Categoria</label>
                                 <select id="item-category-select" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-amber-500 focus:outline-none"></select>
+                            </div>
+                            <div class="hidden">
+                                <label for="itemReceiverIcon" class="block text-xs font-semibold text-gray-400 mb-1">Icone Receptor</label>
+                                <select id="itemReceiverIcon" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-amber-500 focus:outline-none">
+                                    <option value="">Nenhum</option>
+                                    <option value="padrao/magia">Padrao/Magia</option>
+                                    <option value="padrao/habilidade">Padrao/Habilidade</option>
+                                    <option value="padrao/item">Padrao/Item</option>
+                                    <option value="padrao/ataque">Padrao/Ataque</option>
+                                    <option value="padrao/atributos">Padrao/Atributos</option>
+                                    <option value="padrao/medicina">Padrao/Medicina</option>
+                                    <option value="padrao/combate">Padrao/Combate</option>
+                                    <option value="padrao/texto">Padrao/Texto</option>
+                                    <option value="modificar/magia">Modificar/Magia</option>
+                                    <option value="modificar/habilidade">Modificar/Habilidade</option>
+                                    <option value="modificar/item">Modificar/Item</option>
+                                    <option value="modificar/ataque">Modificar/Ataque</option>
+                                    <option value="modificar/atributos">Modificar/Atributos</option>
+                                    <option value="modificar/medicina">Modificar/Medicina</option>
+                                    <option value="modificar/combate">Modificar/Combate</option>
+                                    <option value="modificar/texto">Modificar/Texto</option>
+                                    <option value="ra-wrench" hidden>Modificar - antigo</option>
+                                    <option value="ra-cog" hidden>Padrao - antigo</option>
+                                    <option value="ra-heart-bottle" hidden>Cura vida - antigo</option>
+                                    <option value="ra-bottle-vapors" hidden>Restaurar mana - antigo</option>
+                                    <option value="padrao/vida" hidden>Padrao/Vida - antigo</option>
+                                    <option value="padrao/mana" hidden>Padrao/Mana - antigo</option>
+                                    <option value="modificar/vida" hidden>Modificar/Vida - antigo</option>
+                                    <option value="modificar/mana" hidden>Modificar/Mana - antigo</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-2" data-receiver-icon-controls="item">
+                                <div>
+                                    <label for="itemReceiverIconMode" class="block text-xs font-semibold text-gray-400 mb-1">Icone base</label>
+                                    <select id="itemReceiverIconMode" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-amber-500 focus:outline-none">
+                                        <option value="padrao">Padrao</option>
+                                        <option value="modificar">Modificador</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="itemReceiverIconTarget" class="block text-xs font-semibold text-gray-400 mb-1">Icone do card</label>
+                                    <select id="itemReceiverIconTarget" class="w-full px-3 py-1.5 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-amber-500 focus:outline-none">
+                                        <option value="magia">Magia</option>
+                                        <option value="habilidade">Habilidade</option>
+                                        <option value="item">Item</option>
+                                        <option value="ataque">Ataque</option>
+                                        <option value="atributos">Atributos</option>
+                                        <option value="medicina">Medicina</option>
+                                        <option value="combate">Combate</option>
+                                        <option value="texto">Texto</option>
+                                        <option value="vida" hidden>Vida - antigo</option>
+                                        <option value="mana" hidden>Mana - antigo</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                         <div>

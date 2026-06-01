@@ -1,6 +1,8 @@
 import { saveData, getData, removeData } from './local_db.js';
 import { getAumentosData, populateCharacterSelect } from './character_manager.js';
 import { populateCategorySelect } from './category_manager.js';
+import { isArenaModelTemplatePayload, saveArenaModelTemplateFromCard } from './arena_model_renderer.js';
+import { applyReceiverIconSelection, readReceiverIconControls, setReceiverIconControlsVisible, writeReceiverIconControls } from './receiver_icon_controls.js';
 import {
     showImagePreview,
     readFileAsArrayBuffer as readFileAsArrayBufferUtil,
@@ -19,6 +21,15 @@ let itemBaseDraftId = null;
 const itemPendingRelatedDrafts = { enhance: null, true: null };
 let activeItemRelationType = 'enhance';
 let openItemRelationsModalForRole = null;
+
+function shouldShowItemReceiverIconControls(itemData = null) {
+    return true;
+}
+
+function syncItemReceiverIconControls(itemData = {}) {
+    setReceiverIconControlsVisible('item', shouldShowItemReceiverIconControls(itemData));
+    writeReceiverIconControls('item', itemData || {});
+}
 
 const RELATED_ITEM_ROLES = ['enhance', 'true'];
 const RELATED_ITEM_ROLE_LABELS = {
@@ -41,6 +52,42 @@ function createRecordId() {
 
 function normalizeItemRole(role) {
     return role === 'enhance' || role === 'true' ? role : 'base';
+}
+
+function getCanonicalItemBaseId(itemData, role, baseCardId, allItems = []) {
+    const normalizedRole = normalizeItemRole(role || itemData?.cardVariant);
+    if (!itemData?.id) return '';
+    if (normalizedRole === 'base') return itemData.id;
+    if (baseCardId || itemData.baseCardId) return baseCardId || itemData.baseCardId;
+
+    const parent = (allItems || []).find(item =>
+        String(item?.enhanceCardId || '') === String(itemData.id) ||
+        String(item?.trueCardId || '') === String(itemData.id)
+    );
+
+    return parent?.id || itemData.id;
+}
+
+async function addCardToCharacterCollection(characterId, collectionKey, cardId) {
+    if (!characterId || !cardId) return false;
+
+    const character = await getData('rpgCards', characterId);
+    if (!character || character.cardType === 'creature') return false;
+
+    const currentIds = Array.isArray(character[collectionKey]) ? character[collectionKey].map(String) : [];
+    if (currentIds.includes(String(cardId))) return false;
+
+    character[collectionKey] = [...currentIds, String(cardId)];
+    await saveData('rpgCards', character);
+    return true;
+}
+
+async function syncItemOwnerToCharacter(itemData, role, baseCardId, allItems = []) {
+    const ownerId = itemData?.characterId || '';
+    if (!ownerId) return false;
+
+    const itemId = getCanonicalItemBaseId(itemData, role, baseCardId, allItems);
+    return addCardToCharacterCollection(ownerId, 'items', itemId);
 }
 
 function getItemDisplayName(item) {
@@ -692,6 +739,7 @@ async function collectItemInlineRelatedPayloads(roles, baseItemId, roleIds, base
 
 async function captureItemFormSnapshot() {
     const persistedData = currentEditingItemId ? await getData('rpgItems', currentEditingItemId) : null;
+    const receiverIconSelection = readReceiverIconControls('item');
     const aumentos = [];
     document.querySelectorAll('#item-aumentos-list div[data-nome]').forEach(el => {
         aumentos.push({
@@ -713,6 +761,10 @@ async function captureItemFormSnapshot() {
         prerequisite: document.getElementById('itemPrerequisite')?.value || '',
         characterId: document.getElementById('itemCharacterOwner')?.value || '',
         categoryId: document.getElementById('item-category-select')?.value || '',
+        receiverIconType: receiverIconSelection.type,
+        receiverIconMode: receiverIconSelection.mode,
+        receiverIconTarget: receiverIconSelection.target,
+        receiverIconFree: receiverIconSelection.free,
         cardVariant: normalizeItemRole(document.getElementById('item-card-role')?.value),
         trueSchool: '',
         baseCardId: document.getElementById('item-base-card-select')?.value || '',
@@ -755,6 +807,7 @@ async function restoreItemFormSnapshot(snapshot) {
     document.getElementById('itemCharge').value = snapshot.charge || '';
     document.getElementById('itemPrerequisite').value = snapshot.prerequisite || '';
     document.getElementById('itemAcerto').value = snapshot.acerto || '';
+    syncItemReceiverIconControls(snapshot);
     const criticoInput = document.getElementById('itemcritico');
     const danoSemManaInput = document.getElementById('itemDanoSemMana');
     const vidaDadoInput = document.getElementById('itemVidaDado');
@@ -1053,6 +1106,7 @@ export function resetItemFormState(preserveRelatedCreation = false) {
     if (trueInput) trueInput.value = '';
     if (enhanceText) enhanceText.value = '';
     if (trueText) trueText.value = '';
+    syncItemReceiverIconControls();
 
     showImagePreview(document.getElementById('itemImagePreview'), null);
     updateItemRoleUi();
@@ -1104,6 +1158,7 @@ export async function saveItemCard(itemForm) {
     const cardVariant = normalizeItemRole(itemRoleSelect?.value);
     const baseCardId = cardVariant === 'base' ? '' : (itemBaseCardSelect?.value || relatedCreationContext?.baseItemId || relatedCreationContext?.baseDraftId || '');
     const trueSchool = '';
+    const receiverIconSelection = readReceiverIconControls('item');
 
     if (cardVariant !== 'base' && !baseCardId) {
         showCustomAlert('Escolha um card base para este item.');
@@ -1167,6 +1222,7 @@ export async function saveItemCard(itemForm) {
         image: imageBuffer,
         imageMimeType: imageMimeType,
     };
+    applyReceiverIconSelection(baseData, receiverIconSelection);
 
     if (currentEditingItemId) {
         itemData = existingData;
@@ -1187,6 +1243,7 @@ export async function saveItemCard(itemForm) {
     }
 
     await saveData('rpgItems', itemData);
+    let characterRelationChanged = await syncItemOwnerToCharacter(itemData, cardVariant, baseCardId, allItems);
     if (cardVariant === 'base') {
         await unlinkRemovedBaseItemRelations(
             itemData.id,
@@ -1207,6 +1264,7 @@ export async function saveItemCard(itemForm) {
             relatedDraft.predominantColor = await calculateColorUtil(relatedDraft.image, relatedDraft.imageMimeType, { color30: 'rgba(217, 119, 6, 0.3)', color100: 'rgb(217, 119, 6)' });
             await saveData('rpgItems', relatedDraft);
             await syncBaseItemRelation(relatedDraft, role, itemData.id);
+            characterRelationChanged = await syncItemOwnerToCharacter(relatedDraft, role, itemData.id, allItems) || characterRelationChanged;
         }
     }
 
@@ -1215,9 +1273,13 @@ export async function saveItemCard(itemForm) {
         relatedItemData.predominantColor = await calculateColorUtil(relatedItemData.image, relatedItemData.imageMimeType, { color30: 'rgba(217, 119, 6, 0.3)', color100: 'rgb(217, 119, 6)' });
         await saveData('rpgItems', relatedItemData);
         await syncBaseItemRelation(relatedItemData, payload.role, itemData.id);
+        characterRelationChanged = await syncItemOwnerToCharacter(relatedItemData, payload.role, itemData.id, allItems) || characterRelationChanged;
     }
 
     document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: 'itens' } }));
+    if (characterRelationChanged) {
+        document.dispatchEvent(new CustomEvent('dataChanged', { detail: { type: 'personagem' } }));
+    }
 
     resetItemFormState();
     return { keepOpen: false };
@@ -1253,6 +1315,7 @@ export async function editItem(itemId) {
     
     await populateCharacterSelect('itemCharacterOwner');
     document.getElementById('itemCharacterOwner').value = itemData.characterId || '';
+    syncItemReceiverIconControls(itemData);
 
     await populateCategorySelect('item-category-select', 'item');
     document.getElementById('item-category-select').value = itemData.categoryId || '';
@@ -1308,11 +1371,32 @@ export async function importItem(file) {
         reader.onload = async (e) => {
             try {
                 const importedItem = JSON.parse(e.target.result);
-                importedItem.id = Date.now().toString(); 
+                if (isArenaModelTemplatePayload(importedItem)) {
+                    const templateCard = importedItem.app === 'arena-card-model'
+                        ? { arenaModel: importedItem }
+                        : { ...importedItem };
+                    if (!saveArenaModelTemplateFromCard(templateCard)) {
+                        saveArenaModelTemplateFromCard(
+                            { ...templateCard, _arenaStoreName: 'rpgItems', type: 'item' },
+                            { templateType: 'item' }
+                        );
+                    }
+                    syncItemReceiverIconControls();
+                    resolve({ __arenaModelTemplateOnly: true });
+                    return;
+                }
+                const existingItem = await getData('rpgItems', importedItem.id);
+                importedItem.id = existingItem ? String(existingItem.id) : Date.now().toString();
+                if (importedItem.arenaModel || importedItem._arenaModel) {
+                    importedItem.disableArenaModel = false;
+                    importedItem._disableArenaModel = false;
+                }
                 if (importedItem.image) {
                     importedItem.image = base64ToArrayBufferUtil(importedItem.image);
                 }
                 importedItem.predominantColor = await calculateColorUtil(importedItem.image, importedItem.imageMimeType, { color30: 'rgba(217, 119, 6, 0.3)', color100: 'rgb(217, 119, 6)' });
+                saveArenaModelTemplateFromCard(importedItem, { templateType: 'item' });
+                syncItemReceiverIconControls(importedItem);
                 await saveData('rpgItems', importedItem);
                 resolve(importedItem);
             } catch (error) {
@@ -1325,6 +1409,7 @@ export async function importItem(file) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    syncItemReceiverIconControls();
     populateItemAumentosSelect();
     setupItemRelationsModal();
     
