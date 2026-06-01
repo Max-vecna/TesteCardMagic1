@@ -514,6 +514,10 @@ function getEffectiveChildFillMode(element) {
     return 'solid';
 }
 
+function getBackdropBlur(element) {
+    return clampNumber(element?.backdropBlur ?? 0, 0, 80);
+}
+
 function cardColorVar(fallback = '#0d9488') {
     return `var(--arena-card-color, ${normalizeHexColor(fallback, '#0d9488')})`;
 }
@@ -605,13 +609,15 @@ function replaceGradientChildColorRules(code, elements) {
             const blockPattern = new RegExp(`(\\.clip-div\\.${escapeRegExp(className)}::before\\s*\\{[\\s\\S]*?\\n\\})`, 'g');
             if (parentUsesCardImage) {
                 next = next.replace(blockPattern, block => {
+                    const hasBackdropBlur = getBackdropBlur(element) > 0;
                     let updated = block
                         .replace(/background-color:\s*[^;]+;/, 'background-color: transparent;')
                         .replace(/background-image:\s*[^;]+;/, 'background-image: none;');
                     if (/background:\s*[^;]+;/.test(updated)) {
                         updated = updated.replace(/background:\s*[^;]+;/, 'background: transparent;');
                     }
-                    return setCssProperty(updated, 'opacity', '0');
+                    if (hasBackdropBlur) updated = setCssProperty(updated, 'background-color', 'rgba(255,255,255,0.01)');
+                    return setCssProperty(updated, 'opacity', hasBackdropBlur ? '1' : '0');
                 });
                 return;
             }
@@ -806,11 +812,13 @@ function restoreTransparentChildRules(code, elements) {
             const parentClassName = parent ? cssClassForElement(parent) : '';
 
             next = replaceCssRuleBlock(next, `\\.clip-div\\.${escapedClassName}::before`, block => {
+                const hasBackdropBlur = getBackdropBlur(element) > 0;
                 let updated = block
                     .replace(/\n\s*background-color:\s*[^;]+;/gi, '')
                     .replace(/\n\s*background-image:\s*[^;]+;/gi, '');
                 updated = setCssProperty(updated, 'background', 'transparent');
-                return setCssProperty(updated, 'opacity', '0');
+                if (hasBackdropBlur) updated = setCssProperty(updated, 'background-color', 'rgba(255,255,255,0.01)');
+                return setCssProperty(updated, 'opacity', hasBackdropBlur ? '1' : '0');
             });
 
             if (!parentClassName) return;

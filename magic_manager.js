@@ -49,6 +49,189 @@ const TRUE_SCHOOL_OPTIONS = [
     'TRANSMUTAÇÃO'
 ];
 
+const EFFECT_CHOICE_INPUT_CLASS = 'w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600';
+const EFFECT_CHOICE_EXTRA_INPUT_CLASS = 'hidden w-full mt-1 px-2 py-1 bg-gray-800 text-white text-sm rounded border border-gray-600';
+const EFFECT_CHOICE_CONFIG = {
+    execution: {
+        customPlaceholder: 'Execucao personalizada',
+        options: [
+            { label: 'Padrao', value: 'PAD' },
+            { label: 'Movimento', value: 'MOV' },
+            { label: 'Reacao', value: 'REA' },
+            { label: 'Completa', value: 'COMP' }
+        ]
+    },
+    range: {
+        customPlaceholder: 'Alcance personalizado',
+        options: [
+            { label: 'Pessoal', value: 'PES' },
+            { label: 'Toque', value: 'TOQ' },
+            { label: 'Curto', value: 'CUR' },
+            { label: 'Medio', value: 'MED' },
+            { label: 'Longo', value: 'LON' },
+            { label: 'Ilimitado', value: 'ILIM' }
+        ]
+    },
+    duration: {
+        customPlaceholder: 'Duracao personalizada',
+        detailPlaceholder: 'Quantidade',
+        options: [
+            { label: 'Instantanea', value: 'INS' },
+            { label: 'Rodadas', value: 'RD', needsDetail: true, detailPlaceholder: 'Qtd. de rodadas' },
+            { label: 'Minutos', value: 'MIN', needsDetail: true, detailPlaceholder: 'Qtd. de minutos' },
+            { label: 'Horas', value: 'H', needsDetail: true, detailPlaceholder: 'Qtd. de horas' },
+            { label: 'Cena', value: 'CENA' },
+            { label: 'Sustentada', value: 'SUS' },
+            { label: 'Permanente', value: 'PER' }
+        ]
+    }
+};
+
+function buildEffectChoiceOptionsHtml(field) {
+    const config = EFFECT_CHOICE_CONFIG[field];
+    if (!config) return '<option value="">Selecione</option>';
+    return `
+        <option value="">Selecione</option>
+        ${config.options.map(option => `
+            <option value="${option.value}"${option.needsDetail ? ' data-needs-detail="true"' : ''}${option.detailPlaceholder ? ` data-detail-placeholder="${option.detailPlaceholder}"` : ''}>
+                ${option.label} (${option.value})
+            </option>
+        `).join('')}
+        <option value="__custom">Personalizado</option>
+    `;
+}
+
+function buildEffectChoiceControlHtml(prefix, field, label) {
+    const config = EFFECT_CHOICE_CONFIG[field] || {};
+    const targetId = `${prefix}-${field}`;
+    return `
+        <div>
+            <label for="${targetId}-select" class="block text-[10px] text-gray-500 uppercase mb-1">${label}</label>
+            <select id="${targetId}-select" data-effect-choice="${field}" data-effect-choice-target="${targetId}" class="${EFFECT_CHOICE_INPUT_CLASS}">
+                ${buildEffectChoiceOptionsHtml(field)}
+            </select>
+            <input type="hidden" id="${targetId}">
+            ${field === 'duration' ? `<input type="text" id="${targetId}-detail" data-effect-choice-detail-for="${targetId}" placeholder="${config.detailPlaceholder || 'Quantidade'}" class="${EFFECT_CHOICE_EXTRA_INPUT_CLASS}">` : ''}
+            <input type="text" id="${targetId}-custom" data-effect-choice-custom-for="${targetId}" placeholder="${config.customPlaceholder || 'Valor personalizado'}" class="${EFFECT_CHOICE_EXTRA_INPUT_CLASS}">
+        </div>
+    `;
+}
+
+function getEffectChoiceSelect(targetId) {
+    return Array.from(document.querySelectorAll('[data-effect-choice-target]'))
+        .find(select => select.dataset.effectChoiceTarget === targetId) || null;
+}
+
+function getEffectChoiceCompanion(targetId, kind) {
+    const attr = kind === 'detail' ? 'data-effect-choice-detail-for' : 'data-effect-choice-custom-for';
+    return Array.from(document.querySelectorAll(`[${attr}]`))
+        .find(input => input.getAttribute(attr) === targetId) || null;
+}
+
+function normalizeEffectChoiceText(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
+function syncEffectChoiceControl(targetId) {
+    const hidden = document.getElementById(targetId);
+    const select = getEffectChoiceSelect(targetId);
+    if (!hidden || !select) return hidden?.value || '';
+
+    const customInput = getEffectChoiceCompanion(targetId, 'custom');
+    const detailInput = getEffectChoiceCompanion(targetId, 'detail');
+    const selectedOption = select.options[select.selectedIndex];
+    const isCustom = select.value === '__custom';
+    const needsDetail = selectedOption?.dataset.needsDetail === 'true';
+
+    if (customInput) customInput.classList.toggle('hidden', !isCustom);
+    if (detailInput) {
+        detailInput.classList.toggle('hidden', !needsDetail);
+        if (selectedOption?.dataset.detailPlaceholder) {
+            detailInput.placeholder = selectedOption.dataset.detailPlaceholder;
+        }
+    }
+
+    if (isCustom) {
+        hidden.value = customInput?.value?.trim() || '';
+    } else if (needsDetail) {
+        const detail = detailInput?.value?.trim() || '';
+        hidden.value = detail ? `${detail} ${select.value}` : select.value;
+    } else {
+        hidden.value = select.value || '';
+    }
+    return hidden.value;
+}
+
+function setEffectChoiceValue(targetId, value = '') {
+    const hidden = document.getElementById(targetId);
+    const select = getEffectChoiceSelect(targetId);
+    const rawValue = String(value || '').trim();
+    if (hidden) hidden.value = rawValue;
+    if (!select) return;
+
+    const customInput = getEffectChoiceCompanion(targetId, 'custom');
+    const detailInput = getEffectChoiceCompanion(targetId, 'detail');
+    const field = select.dataset.effectChoice;
+    const config = EFFECT_CHOICE_CONFIG[field];
+    const normalizedRawValue = normalizeEffectChoiceText(rawValue);
+    const exactOption = (config?.options || []).find(option => (
+        option.value.toUpperCase() === rawValue.toUpperCase()
+        || normalizeEffectChoiceText(option.label) === normalizedRawValue
+    ));
+
+    if (!rawValue) {
+        select.value = '';
+        if (customInput) customInput.value = '';
+        if (detailInput) detailInput.value = '';
+        syncEffectChoiceControl(targetId);
+        return;
+    }
+
+    if (exactOption) {
+        select.value = exactOption.value;
+        if (customInput) customInput.value = '';
+        if (detailInput) detailInput.value = '';
+        syncEffectChoiceControl(targetId);
+        return;
+    }
+
+    const detailOption = (config?.options || []).find(option => (
+        option.needsDetail && rawValue.toUpperCase().endsWith(` ${option.value}`)
+    ));
+    if (detailOption) {
+        select.value = detailOption.value;
+        if (customInput) customInput.value = '';
+        if (detailInput) detailInput.value = rawValue.slice(0, -detailOption.value.length).trim();
+        syncEffectChoiceControl(targetId);
+        return;
+    }
+
+    select.value = '__custom';
+    if (customInput) customInput.value = rawValue;
+    if (detailInput) detailInput.value = '';
+    syncEffectChoiceControl(targetId);
+}
+
+function getEffectChoiceValue(targetId) {
+    return syncEffectChoiceControl(targetId);
+}
+
+function initializeEffectChoiceControls(root = document) {
+    root.querySelectorAll?.('[data-effect-choice-target]')?.forEach(select => {
+        const targetId = select.dataset.effectChoiceTarget;
+        if (!targetId || select.dataset.effectChoiceReady === 'true') return;
+        select.dataset.effectChoiceReady = 'true';
+        select.addEventListener('change', () => syncEffectChoiceControl(targetId));
+        getEffectChoiceCompanion(targetId, 'custom')?.addEventListener('input', () => syncEffectChoiceControl(targetId));
+        getEffectChoiceCompanion(targetId, 'detail')?.addEventListener('input', () => syncEffectChoiceControl(targetId));
+        setEffectChoiceValue(targetId, document.getElementById(targetId)?.value || '');
+    });
+}
+
 function createRecordId() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -632,22 +815,13 @@ function renderSpellInlineRelatedSection(role) {
                                 <input type="number" id="${prefix}-mana-cost" placeholder="0" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
                             </div>
                         ` : ''}
-                        <div>
-                            <label for="${prefix}-execution" class="block text-[10px] text-gray-500 uppercase mb-1">Execucao</label>
-                            <input type="text" id="${prefix}-execution" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
-                        </div>
-                        <div>
-                            <label for="${prefix}-range" class="block text-[10px] text-gray-500 uppercase mb-1">Alcance</label>
-                            <input type="text" id="${prefix}-range" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
-                        </div>
+                        ${buildEffectChoiceControlHtml(prefix, 'execution', 'Execucao')}
+                        ${buildEffectChoiceControlHtml(prefix, 'range', 'Alcance')}
                         <div>
                             <label for="${prefix}-target" class="block text-[10px] text-gray-500 uppercase mb-1">Alvo</label>
                             <input type="text" id="${prefix}-target" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
                         </div>
-                        <div>
-                            <label for="${prefix}-duration" class="block text-[10px] text-gray-500 uppercase mb-1">Duracao</label>
-                            <input type="text" id="${prefix}-duration" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
-                        </div>
+                        ${buildEffectChoiceControlHtml(prefix, 'duration', 'Duracao')}
                         <div class="md:col-span-2">
                             <label for="${prefix}-resistencia" class="block text-[10px] text-gray-500 uppercase mb-1">Resistencia</label>
                             <input type="text" id="${prefix}-resistencia" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
@@ -687,6 +861,7 @@ function renderSpellInlineRelatedSection(role) {
     `);
 
     syncSpellInlineSelectOptions(role);
+    initializeEffectChoiceControls(document.getElementById(`${prefix}-section`) || document);
     document.getElementById(`${prefix}-image-upload`)?.addEventListener('change', (e) => {
         const file = e.target.files[0];
         spellInlineRelatedImageFiles[role] = file || null;
@@ -808,11 +983,11 @@ async function collectSpellInlineRelatedPayloads(roles, type, baseSpellId, roleI
                 id: roleIds[role],
                 name,
                 circle: parseInt(document.getElementById(`${prefix}-circle`)?.value, 10) || 0,
-                execution: document.getElementById(`${prefix}-execution`)?.value || '',
+                execution: getEffectChoiceValue(`${prefix}-execution`),
                 manaCost: parseInt(document.getElementById(`${prefix}-mana-cost`)?.value, 10) || 0,
-                range: document.getElementById(`${prefix}-range`)?.value || '',
+                range: getEffectChoiceValue(`${prefix}-range`),
                 target: document.getElementById(`${prefix}-target`)?.value || '',
-                duration: document.getElementById(`${prefix}-duration`)?.value || '',
+                duration: getEffectChoiceValue(`${prefix}-duration`),
                 resistencia: document.getElementById(`${prefix}-resistencia`)?.value || '',
                 description: document.getElementById(`${prefix}-description`)?.value || '',
                 cardVariant: role,
@@ -893,11 +1068,11 @@ async function captureSpellFormSnapshot() {
         type: getCurrentSpellFormType(),
         name: document.getElementById('spellName')?.value || '',
         circle: document.getElementById('spellCircle')?.value || '',
-        execution: document.getElementById('spellExecution')?.value || '',
+        execution: getEffectChoiceValue('spellExecution'),
         manaCost: document.getElementById('spellManaCost')?.value || '',
-        range: document.getElementById('spellRange')?.value || '',
+        range: getEffectChoiceValue('spellRange'),
         target: document.getElementById('spellTarget')?.value || '',
-        duration: document.getElementById('spellDuration')?.value || '',
+        duration: getEffectChoiceValue('spellDuration'),
         resistencia: document.getElementById('spellResistencia')?.value || '',
         description: document.getElementById('spellDescription')?.value || '',
         enhance: document.getElementById('spellEnhanceText')?.value || '',
@@ -940,11 +1115,11 @@ async function restoreSpellFormSnapshot(snapshot, options = {}) {
 
     document.getElementById('spellName').value = snapshot.name || '';
     document.getElementById('spellCircle').value = snapshot.circle || '';
-    document.getElementById('spellExecution').value = snapshot.execution || '';
+    setEffectChoiceValue('spellExecution', snapshot.execution || '');
     document.getElementById('spellManaCost').value = snapshot.manaCost || '';
-    document.getElementById('spellRange').value = snapshot.range || '';
+    setEffectChoiceValue('spellRange', snapshot.range || '');
     document.getElementById('spellTarget').value = snapshot.target || '';
-    document.getElementById('spellDuration').value = snapshot.duration || '';
+    setEffectChoiceValue('spellDuration', snapshot.duration || '');
     document.getElementById('spellResistencia').value = snapshot.resistencia || '';
     document.getElementById('spellDescription').value = snapshot.description || '';
     const spellEnhanceText = document.getElementById('spellEnhanceText');
@@ -1135,6 +1310,7 @@ export function resetSpellFormState(preserveRelatedCreation = false) {
 
     const spellForm = document.getElementById('spellForm');
     if (spellForm) spellForm.reset();
+    ['spellExecution', 'spellRange', 'spellDuration'].forEach(targetId => setEffectChoiceValue(targetId, ''));
 
     const aumentosList = document.getElementById('spell-aumentos-list');
     if (aumentosList) aumentosList.innerHTML = '';
@@ -1169,11 +1345,8 @@ export async function saveSpellCard(spellForm, type) {
     const relatedCreationContext = pendingRelatedSpellCreation;
     const spellNameInput = document.getElementById('spellName');
     const spellCircleInput = document.getElementById('spellCircle');
-    const spellExecutionInput = document.getElementById('spellExecution');
     const spellManaCostInput = document.getElementById('spellManaCost');
-    const spellRangeInput = document.getElementById('spellRange');
     const spellTargetInput = document.getElementById('spellTarget');
-    const spellDurationInput = document.getElementById('spellDuration');
     const spellResistenciaInput = document.getElementById('spellResistencia');
     const spellDescriptionInput = document.getElementById('spellDescription');
     const spellEnhanceTextInput = document.getElementById('spellEnhanceText');
@@ -1257,11 +1430,11 @@ export async function saveSpellCard(spellForm, type) {
     const baseData = {
         name: spellNameInput.value,
         circle: parseInt(spellCircleInput.value) || 0,
-        execution: spellExecutionInput.value,
+        execution: getEffectChoiceValue('spellExecution'),
         manaCost: parseInt(spellManaCostInput.value) || 0,
-        range: spellRangeInput.value,
+        range: getEffectChoiceValue('spellRange'),
         target: spellTargetInput.value,
-        duration: spellDurationInput.value,
+        duration: getEffectChoiceValue('spellDuration'),
         resistencia: spellResistenciaInput.value,
         description: spellDescriptionInput.value,
         enhance: cardVariant === 'base' && !hasEnhanceRelation ? (spellEnhanceTextInput?.value || '') : '',
@@ -1372,11 +1545,11 @@ export async function editSpell(spellId) {
 
     document.getElementById('spellName').value = spellData.name;
     document.getElementById('spellCircle').value = spellData.circle || '';
-    document.getElementById('spellExecution').value = spellData.execution;
+    setEffectChoiceValue('spellExecution', spellData.execution || '');
     document.getElementById('spellManaCost').value = spellData.manaCost || '';
-    document.getElementById('spellRange').value = spellData.range;
+    setEffectChoiceValue('spellRange', spellData.range || '');
     document.getElementById('spellTarget').value = spellData.target;
-    document.getElementById('spellDuration').value = spellData.duration;
+    setEffectChoiceValue('spellDuration', spellData.duration || '');
     document.getElementById('spellResistencia').value = spellData.resistencia;
     document.getElementById('spellDescription').value = spellData.description;
     const spellEnhanceText = document.getElementById('spellEnhanceText');
@@ -1516,6 +1689,7 @@ export async function importSpell(file, type) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    initializeEffectChoiceControls();
     syncSpellReceiverIconControls();
     populateSpellAumentosSelect();
     document.addEventListener('periciasUpdated', populateSpellAumentosSelect);

@@ -548,20 +548,53 @@
                                 </div>
                             </div>
                             <div>
-                                <label for="spellExecution" class="block text-[10px] text-gray-500 uppercase mb-1">Execução</label>
-                                <input type="text" id="spellExecution" placeholder="padrão" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                                <label for="spellExecutionSelect" class="block text-[10px] text-gray-500 uppercase mb-1">Execução</label>
+                                <select id="spellExecutionSelect" data-effect-choice="execution" data-effect-choice-target="spellExecution" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                                    <option value="">Selecione</option>
+                                    <option value="PAD">Padrão (PAD)</option>
+                                    <option value="MOV">Movimento (MOV)</option>
+                                    <option value="REA">Reação (REA)</option>
+                                    <option value="COMP">Completa (COMP)</option>
+                                    <option value="__custom">Personalizado</option>
+                                </select>
+                                <input type="hidden" id="spellExecution">
+                                <input type="text" id="spellExecutionCustom" data-effect-choice-custom-for="spellExecution" placeholder="Execução personalizada" class="hidden w-full mt-1 px-2 py-1 bg-gray-800 text-white text-sm rounded border border-gray-600">
                             </div>
                             <div>
-                                <label for="spellRange" class="block text-[10px] text-gray-500 uppercase mb-1">Alcance</label>
-                                <input type="text" id="spellRange" placeholder="toque" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                                <label for="spellRangeSelect" class="block text-[10px] text-gray-500 uppercase mb-1">Alcance</label>
+                                <select id="spellRangeSelect" data-effect-choice="range" data-effect-choice-target="spellRange" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                                    <option value="">Selecione</option>
+                                    <option value="PES">Pessoal (PES)</option>
+                                    <option value="TOQ">Toque (TOQ)</option>
+                                    <option value="CUR">Curto (CUR)</option>
+                                    <option value="MED">Médio (MED)</option>
+                                    <option value="LON">Longo (LON)</option>
+                                    <option value="ILIM">Ilimitado (ILIM)</option>
+                                    <option value="__custom">Personalizado</option>
+                                </select>
+                                <input type="hidden" id="spellRange">
+                                <input type="text" id="spellRangeCustom" data-effect-choice-custom-for="spellRange" placeholder="Alcance personalizado" class="hidden w-full mt-1 px-2 py-1 bg-gray-800 text-white text-sm rounded border border-gray-600">
                             </div>
                             <div>
                                 <label for="spellTarget" class="block text-[10px] text-gray-500 uppercase mb-1">Alvo</label>
                                 <input type="text" id="spellTarget" placeholder="1 ser" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
                             </div>
                              <div>
-                                <label for="spellDuration" class="block text-[10px] text-gray-500 uppercase mb-1">Duração</label>
-                                <input type="text" id="spellDuration" placeholder="instantânea" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                                <label for="spellDurationSelect" class="block text-[10px] text-gray-500 uppercase mb-1">Duração</label>
+                                <select id="spellDurationSelect" data-effect-choice="duration" data-effect-choice-target="spellDuration" class="w-full px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600">
+                                    <option value="">Selecione</option>
+                                    <option value="INS">Instantânea (INS)</option>
+                                    <option value="RD" data-needs-detail="true" data-detail-placeholder="Qtd. de rodadas">Rodadas (RD)</option>
+                                    <option value="MIN" data-needs-detail="true" data-detail-placeholder="Qtd. de minutos">Minutos (MIN)</option>
+                                    <option value="H" data-needs-detail="true" data-detail-placeholder="Qtd. de horas">Horas (H)</option>
+                                    <option value="CENA">Cena (CENA)</option>
+                                    <option value="SUS">Sustentada (SUS)</option>
+                                    <option value="PER">Permanente (PER)</option>
+                                    <option value="__custom">Personalizado</option>
+                                </select>
+                                <input type="hidden" id="spellDuration">
+                                <input type="text" id="spellDurationDetail" data-effect-choice-detail-for="spellDuration" placeholder="Quantidade" class="hidden w-full mt-1 px-2 py-1 bg-gray-800 text-white text-sm rounded border border-gray-600">
+                                <input type="text" id="spellDurationCustom" data-effect-choice-custom-for="spellDuration" placeholder="Duração personalizada" class="hidden w-full mt-1 px-2 py-1 bg-gray-800 text-white text-sm rounded border border-gray-600">
                             </div>
                             <div class="md:col-span-2">
                                 <label for="spellResistencia" class="block text-[10px] text-gray-500 uppercase mb-1">Resistência</label>
